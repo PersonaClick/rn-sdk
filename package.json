@@ -1,0 +1,27 @@
+{
+  "name": "react-native-personal-click",
+  "version": "1.0.0",
+  "description": "PersonalClick React Native SDK",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PersonaClick/rn-sdk.git"
+  },
+  "author": "PersonaClick",
+  "license": "https://github.com/PersonaClick/rn-sdk/blob/master/LICENSE",
+  "keywords": [
+    "react-native",
+    "react",
+    "native",
+    "PersonaClick"
+  ],
+  "bugs": {
+    "url": "https://github.com/PersonaClick/rn-sdk/issues"
+  },
+  "dependencies": {
+    "axios": "^0.21.1"
+  },
+  "devDependencies": {
+    "react-native": "^0.64.0"
+  }
+}
