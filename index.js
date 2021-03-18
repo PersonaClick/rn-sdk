@@ -36,27 +36,29 @@ class PersonalClick {
         },
       });
       
-      const data = {
-        did: response?.did,
-        seance: response?.seance,
-      };
+      if (response?.did && response?.seance) {
+        const data = {
+          did: response?.did,
+          seance: response?.seance,
+        };
 
-      this.initialized = true;
+        this.initialized = true;
 
-      try {
-        await AsyncStorage.setItem('@personalClick', JSON.stringify(data));
-      } catch (error) {
-        console.log(error);
+        try {
+          await AsyncStorage.setItem('@personalClick', JSON.stringify(data));
+        } catch (error) {
+          return error;
+        }
+      } else {
+        this.initialized = false;
       }
     } catch (error) {
       this.initialized = false;
-      console.log(error);
+      return error;
     }
   }
 
-  isInit() {
-    return this.initialized;
-  }
+  isInit = () => this.initialized;
 
   async track(event, options) {
     try {
