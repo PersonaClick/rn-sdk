@@ -1,19 +1,20 @@
 {
-  "name": "react-native-personaclick",
+  "name": "@personaclick/rn-sdk",
   "version": "1.0.0",
   "description": "PersonaClick React Native SDK",
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/PersonaClick/rn-sdk.git"
+    "url": "git+https://github.com/PersonaClick/rn-sdk.git"
   },
   "author": "PersonaClick",
-  "license": "https://github.com/PersonaClick/rn-sdk/blob/master/LICENSE",
+  "license": "MIT",
   "keywords": [
     "react-native",
     "react",
     "native",
-    "PersonaClick"
+    "PersonaClick",
+    "@personaclick/rn-sdk"
   ],
   "bugs": {
     "url": "https://github.com/PersonaClick/rn-sdk/issues"
@@ -23,5 +24,12 @@
   },
   "devDependencies": {
     "react-native": "^0.64.0"
+  },
+  "homepage": "https://github.com/PersonaClick/rn-sdk#readme",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
   }
 }

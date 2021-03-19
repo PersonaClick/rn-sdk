@@ -6,7 +6,7 @@
 PersonaClick React Native SDK is available through [GitHub](https://github.com/PersonaClick/rn-sdk/). To install it, run next command in terminal:
 
 ```
-yarn add react-native-personaclick
+yarn add @personaclick/rn-sdk
 ```
 or 
 
@@ -33,7 +33,7 @@ SDK is used for several tasks:
 Initialize SDK object and use it anywhere in your application. (!) Remember to initialize SDK only once on application launch.
 
 ```js
-import PersonaClick from 'react-native-personaclick';
+import PersonaClick from '@personaclick/rn-sdk';
 
 .....
 const personaclicksdk = new PersonaClick("YOUR_SHOP_ID", "Stream")
