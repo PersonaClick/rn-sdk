@@ -1,7 +1,7 @@
 {
-  "name": "react-native-personal-click",
+  "name": "react-native-personaclick",
   "version": "1.0.0",
-  "description": "PersonalClick React Native SDK",
+  "description": "PersonaClick React Native SDK",
   "main": "index.js",
   "repository": {
     "type": "git",

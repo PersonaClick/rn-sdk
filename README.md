@@ -1,12 +1,12 @@
-# PersonalClick React Native SDK
+# PersonaClick React Native SDK
 
 
 ## Installation
 
-PersonalClick React Native SDK is available through [GitHub](https://github.com/PersonaClick/rn-sdk/). To install it, run next command in terminal:
+PersonaClick React Native SDK is available through [GitHub](https://github.com/PersonaClick/rn-sdk/). To install it, run next command in terminal:
 
 ```
-yarn add react-native-personal-click
+yarn add react-native-personaclick
 ```
 or 
 
@@ -33,16 +33,16 @@ SDK is used for several tasks:
 Initialize SDK object and use it anywhere in your application. (!) Remember to initialize SDK only once on application launch.
 
 ```js
-import PersonalClick from 'react-native-personal-click';
+import PersonaClick from 'react-native-personaclick';
 
 .....
-const personalclicksdk = new PersonalClick("YOUR_SHOP_ID", "Stream")
+const personaclicksdk = new PersonaClick("YOUR_SHOP_ID", "Stream")
 ```
 
 ## Check init
 
 ```js
-personalclicksdk.isInit(); // returns true/false
+personaclicksdk.isInit(); // returns true/false
 ```
 
 ## Events tracking
@@ -56,7 +56,7 @@ const params = {
   item_id: [] // array of products
 };
 
-personalclicksdk.track(event, {params})
+personaclicksdk.track(event, {params})
   .then((res) => {
     console.log(res);
   })
@@ -73,7 +73,7 @@ const type = 'instant_search'; // full_search, ...
 
 let search_query = 'your_search_text';
 
-personalclicksdk.search({
+personaclicksdk.search({
   type,
   search_query,
   // other params
@@ -98,7 +98,7 @@ const params = {
  // other params
 };
 
-personalclicksdk.recommend(recommender_code, {params}) 
+personaclicksdk.recommend(recommender_code, {params}) 
   .then((res) => {
     console.log(res);
   })
@@ -115,7 +115,7 @@ const params = {
   type: 'mobile_push_transactional'
 };
 
-personalclicksdk.notificationClicked({params}) 
+personaclicksdk.notificationClicked({params}) 
   .then((res) => {
     console.log(res);
   })
@@ -126,4 +126,4 @@ personalclicksdk.notificationClicked({params})
 
 ## License
 
-PersonalClick React Native SDK is available under the MIT license. See the LICENSE file for more info.
+PersonaClick React Native SDK is available under the MIT license. See the LICENSE file for more info.

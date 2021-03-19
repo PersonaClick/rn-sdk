@@ -2,8 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {request} from './lib/сlient';
 
-
-class PersonalClick {
+class PersonaClick {
   constructor(shop_id, stream) {
     this.shop_id = shop_id;
     this.stream = stream ?? null;
@@ -45,7 +44,7 @@ class PersonalClick {
         this.initialized = true;
 
         try {
-          await AsyncStorage.setItem('@personalClick', JSON.stringify(data));
+          await AsyncStorage.setItem('@personaClick', JSON.stringify(data));
         } catch (error) {
           return error;
         }
@@ -121,4 +120,4 @@ class PersonalClick {
   }
 }
 
-export default PersonalClick;
+export default PersonaClick;
