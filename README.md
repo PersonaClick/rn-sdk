@@ -50,13 +50,29 @@ personaclicksdk.isInit(); // returns true/false
 Track user's behavior to collect data. There are several types of events:
 
 ```js
-const event = 'view'; // or search, ...
+const event = 'cart'; // view, cart, purchase, search, ...
 
 const params = {
-  item_id: [] // array of products
+  item_id: [] // array of product ids, example: [1,45]
+  amount: []  // array of product amount, example: [1,10]
 };
 
 personaclicksdk.track(event, {params})
+  .then((res) => {
+    console.log(res);
+  })
+  .catch((error) => {
+    console.log(error);
+  });
+  
+//Example for purchase
+personaclicksdk.track('purchase', {
+  item_id: [1,37],
+  amount: [1,3],
+  price: [100, 130],
+  order_id: 'N12',
+  order_price: 490
+})
   .then((res) => {
     console.log(res);
   })
