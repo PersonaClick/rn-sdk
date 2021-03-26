@@ -50,14 +50,21 @@ personaclicksdk.isInit(); // returns true/false
 Track user's behavior to collect data. There are several types of events:
 
 ```js
+
+
+// View product (simple way)
 personaclicksdk.track("view", {
     id: 37,
     stock: true
 });
 
+// View category
 personaclicksdk.track("category", 100500);
 
+// Add product to cart (simple way)
 personaclicksdk.track("cart", id);
+
+// Add product to cart with amount and track recommender
 personaclicksdk.track("cart", {
   id: PRODUCT_ID,
   amount: PRODUCT_QUANTITY,
@@ -65,15 +72,21 @@ personaclicksdk.track("cart", {
   recommended_by: 'dynamic',
   recommended_code: 'UNIQUE_RECOMMENDER_CODE'
 });
+
+// Remove product from cart
 personaclicksdk.track("remove_from_cart", id);
 
+// Add product to favorities
 personaclicksdk.track("wish", id);
+
+// Remove product from favorities
 personaclicksdk.track("remove_wish", id);
 
+// Track purchase (several products)
 personaclicksdk.track("purchase", {
   products: [
-      {id: 37, price: 318, amount: 3, stock: true},
-      {id: 187, price: 5000, amount: 1, stock: false}
+      {id: 37, price: 318, amount: 3},
+      {id: 187, price: 5000, amount: 1}
   ],
   order: 'N318',
   order_price: 29999
