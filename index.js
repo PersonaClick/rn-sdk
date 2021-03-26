@@ -1,5 +1,5 @@
 import {request, clearData, updSeance} from './lib/client';
-import convertParams from './lib/tracker';
+import { convertParams } from './lib/tracker';
 
 //Время жизни сеанса в минутах
 export const SESSION_CODE_EXPIRE = 30;
@@ -51,12 +51,13 @@ class PersonaClick {
 
   async track(event, options) {
     try {
+      const queryParams = await convertParams(event, options);
       return await request('push', {
         method: 'POST',
         params: {
           shop_id: this.shop_id,
           stream: this.stream,
-          ...convertParams(event, options),
+          ...queryParams,
         },
       });
     } catch (error) {
