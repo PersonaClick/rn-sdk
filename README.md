@@ -53,9 +53,32 @@ Track user's behavior to collect data. There are several types of events:
 
 
 // View product (simple way)
+personaclicksdk.track("view", 37);
+
+// View product (try to avoid it)
 personaclicksdk.track("view", {
     id: 37,
     stock: true
+});
+
+// View product after user clicked on recommender block
+personaclicksdk.track("view", {
+  id: PRODUCT_ID,
+  recommended_by: 'dynamic',
+  recommended_code: 'UNIQUE_RECOMMENDER_CODE'
+});
+
+// View product, after user clicked on search results
+personaclicksdk.track("view", {
+  id: PRODUCT_ID,
+  recommended_by: 'full_search',
+  recommended_code: QUERY_STRING
+});
+// ... or instant search dropdown
+personaclicksdk.track("view", {
+  id: PRODUCT_ID,
+  recommended_by: 'instant_search',
+  recommended_code: QUERY_STRING
 });
 
 // View category
@@ -68,7 +91,6 @@ personaclicksdk.track("cart", id);
 personaclicksdk.track("cart", {
   id: PRODUCT_ID,
   amount: PRODUCT_QUANTITY,
-  stock: true,
   recommended_by: 'dynamic',
   recommended_code: 'UNIQUE_RECOMMENDER_CODE'
 });
