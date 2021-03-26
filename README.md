@@ -65,6 +65,10 @@ personaclicksdk.track("cart", {
   recommended_by: 'dynamic',
   recommended_code: 'UNIQUE_RECOMMENDER_CODE'
 });
+personaclicksdk.track("remove_from_cart", id);
+
+personaclicksdk.track("wish", id);
+personaclicksdk.track("remove_wish", id);
 
 personaclicksdk.track("purchase", {
   products: [
