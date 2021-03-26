@@ -36,13 +36,13 @@ Initialize SDK object and use it anywhere in your application. (!) Remember to i
 import PersonaClick from '@personaclick/rn-sdk';
 
 ...
-const personaclicksdk = new PersonaClick("YOUR_SHOP_ID", "Stream")
+const pcsdk = new PersonaClick("YOUR_SHOP_ID", "Stream")
 ```
 
 ## Check init
 
 ```js
-personaclicksdk.isInit(); // returns true/false
+pcsdk.isInit(); // returns true/false
 ```
 
 ## Events tracking
@@ -53,42 +53,42 @@ Track user's behavior to collect data. There are several types of events:
 
 
 // View product (simple way)
-personaclicksdk.track("view", 37);
+pcsdk.track("view", 37);
 
 // View product (try to avoid it)
-personaclicksdk.track("view", {
+pcsdk.track("view", {
     id: 37,
     stock: true
 });
 
 // View product after user clicked on recommender block
-personaclicksdk.track("view", {
+pcsdk.track("view", {
   id: PRODUCT_ID,
   recommended_by: 'dynamic',
   recommended_code: 'UNIQUE_RECOMMENDER_CODE'
 });
 
 // View product, after user clicked on search results
-personaclicksdk.track("view", {
+pcsdk.track("view", {
   id: PRODUCT_ID,
   recommended_by: 'full_search',
   recommended_code: QUERY_STRING
 });
 // ... or instant search dropdown
-personaclicksdk.track("view", {
+pcsdk.track("view", {
   id: PRODUCT_ID,
   recommended_by: 'instant_search',
   recommended_code: QUERY_STRING
 });
 
 // View category
-personaclicksdk.track("category", 100500);
+pcsdk.track("category", 100500);
 
 // Add product to cart (simple way)
-personaclicksdk.track("cart", id);
+pcsdk.track("cart", id);
 
 // Add product to cart with amount and track recommender
-personaclicksdk.track("cart", {
+pcsdk.track("cart", {
   id: PRODUCT_ID,
   amount: PRODUCT_QUANTITY,
   recommended_by: 'dynamic',
@@ -96,16 +96,16 @@ personaclicksdk.track("cart", {
 });
 
 // Remove product from cart
-personaclicksdk.track("remove_from_cart", id);
+pcsdk.track("remove_from_cart", id);
 
 // Add product to favorities
-personaclicksdk.track("wish", id);
+pcsdk.track("wish", id);
 
 // Remove product from favorities
-personaclicksdk.track("remove_wish", id);
+pcsdk.track("remove_wish", id);
 
 // Track purchase (several products)
-personaclicksdk.track("purchase", {
+pcsdk.track("purchase", {
   products: [
       {id: 37, price: 318, amount: 3},
       {id: 187, price: 5000, amount: 1}
@@ -122,7 +122,7 @@ const type = 'instant_search'; // full_search, ...
 
 let search_query = 'your_search_text';
 
-personaclicksdk.search({
+pcsdk.search({
   type,
   search_query,
   // other params
@@ -147,7 +147,7 @@ const params = {
  // other params
 };
 
-personaclicksdk.recommend(recommender_code, {params}) 
+pcsdk.recommend(recommender_code, {params}) 
   .then((res) => {
     console.log(res);
   })
@@ -164,7 +164,7 @@ const params = {
   type: 'mobile_push_transactional'
 };
 
-personaclicksdk.notificationClicked({params}) 
+pcsdk.notificationClicked({params}) 
   .then((res) => {
     console.log(res);
   })
