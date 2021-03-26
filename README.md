@@ -35,7 +35,7 @@ Initialize SDK object and use it anywhere in your application. (!) Remember to i
 ```js
 import PersonaClick from '@personaclick/rn-sdk';
 
-.....
+...
 const personaclicksdk = new PersonaClick("YOUR_SHOP_ID", "Stream")
 ```
 
@@ -50,36 +50,30 @@ personaclicksdk.isInit(); // returns true/false
 Track user's behavior to collect data. There are several types of events:
 
 ```js
-const event = 'cart'; // view, cart, purchase, search, ...
+personaclicksdk.track("view", {
+    id: 37,
+    stock: true
+});
 
-const params = {
-  item_id: [] // array of product ids, example: [1,45]
-  amount: []  // array of product amount, example: [1,10]
-};
+personaclicksdk.track("category", 100500);
 
-personaclicksdk.track(event, {params})
-  .then((res) => {
-    console.log(res);
-  })
-  .catch((error) => {
-    console.log(error);
-  });
-  
-//Example for purchase
-personaclicksdk.track('purchase', {
-  item_id: [1,37],
-  amount: [1,3],
-  price: [100, 130],
-  order_id: 'N12',
-  order_price: 490
-})
-  .then((res) => {
-    console.log(res);
-  })
-  .catch((error) => {
-    console.log(error);
-  });
+personaclicksdk.track("cart", id);
+personaclicksdk.track("cart", {
+  id: PRODUCT_ID,
+  amount: PRODUCT_QUANTITY,
+  stock: true,
+  recommended_by: 'dynamic',
+  recommended_code: 'UNIQUE_RECOMMENDER_CODE'
+});
 
+personaclicksdk.track("purchase", {
+  products: [
+      {id: 37, price: 318, amount: 3, stock: true},
+      {id: 187, price: 5000, amount: 1, stock: false}
+  ],
+  order: 'N318',
+  order_price: 29999
+});
 ```
 
 ## Product search

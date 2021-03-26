@@ -1,8 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {request, clearData, updSeance} from './lib/client';
+import convertParams from './lib/tracker';
 
-import {request} from './lib/client';
-
-const SESSION_CODE_EXPIRE = 2;
+//Время жизни сеанса в минутах
+export const SESSION_CODE_EXPIRE = 30;
 
 class PersonaClick {
   constructor(shop_id, stream) {
@@ -37,23 +37,10 @@ class PersonaClick {
         },
       });
 
-      if (response?.did && response?.seance) {
-        const data = {
-          did: response?.did,
-          seance: response?.seance,
-          expires: (new Date()).getTime() + SESSION_CODE_EXPIRE * 3600 * 1000,
-        };
+      this.initialized = true;
 
-        this.initialized = true;
+      await updSeance(response?.did, response?.seance);
 
-        try {
-          await AsyncStorage.setItem('@personaClick', JSON.stringify(data));
-        } catch (error) {
-          return error;
-        }
-      } else {
-        this.initialized = false;
-      }
     } catch (error) {
       this.initialized = false;
       return error;
@@ -69,8 +56,7 @@ class PersonaClick {
         params: {
           shop_id: this.shop_id,
           stream: this.stream,
-          event,
-          ...options,
+          ...convertParams(event, options),
         },
       });
     } catch (error) {
