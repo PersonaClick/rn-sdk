@@ -144,12 +144,16 @@ class PersonaClick {
 
   async setPushTokenNotification(token) {
     try {
+      const params = {
+        token: token,
+        platform: Platform.OS,
+      }
       return await request('mobile_push_tokens', {
         method: 'POST',
         params: {
           shop_id: this.shop_id,
           stream: this.stream,
-          ...{ token: token, platform: Platform.OS }
+          ...params
         },
       });
     } catch (error) {

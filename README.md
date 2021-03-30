@@ -28,6 +28,7 @@ SDK is used for several tasks:
 3. Product recommendations
 4. Product search
 5. Save profile settings
+6. Create new push token
 ## Initialization
 
 Initialize SDK object and use it anywhere in your application. (!) Remember to initialize SDK only once on application launch.
