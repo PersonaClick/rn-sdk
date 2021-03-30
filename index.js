@@ -1,5 +1,6 @@
 import {request, clearData, updSeance} from './lib/client';
 import { convertParams } from './lib/tracker';
+import { Platform } from 'react-native';
 
 //Время жизни сеанса в минутах
 export const SESSION_CODE_EXPIRE = 30;
@@ -134,6 +135,21 @@ class PersonaClick {
           shop_id: this.shop_id,
           stream: this.stream,
           ...options
+        },
+      });
+    } catch (error) {
+      return error;
+    }
+  }
+
+  async setPushTokenNotification(token) {
+    try {
+      return await request('mobile_push_tokens', {
+        method: 'POST',
+        params: {
+          shop_id: this.shop_id,
+          stream: this.stream,
+          ...{ token: token, platform: Platform.OS }
         },
       });
     } catch (error) {

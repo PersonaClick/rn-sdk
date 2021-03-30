@@ -184,6 +184,11 @@ const params = {
 pcsdk.setProfile(params);
 ```
 
+## Create new push token
+
+```js
+pcsdk.setPushTokenNotification("NEW_TOKEN");
+```
 ## License
 
 PersonaClick React Native SDK is available under the MIT license. See the LICENSE file for more info.
