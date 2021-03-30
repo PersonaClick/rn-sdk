@@ -108,6 +108,38 @@ class PersonaClick {
       return error;
     }
   }
+
+  async setProfile(params) {
+    if (params.hasOwnProperty("birthday") && !params.birthday.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      params.delete("birthday");
+    }
+    try {
+      return await request('profile/set', {
+        method: 'POST',
+        params: {
+          shop_id: this.shop_id,
+          stream: this.stream,
+          ...params
+        },
+      });
+    } catch (error) {
+      return error;
+    }
+  }
+  async getProfile(options) {
+    try {
+      return await request('profile', {
+        method: 'GET',
+        params: {
+          shop_id: this.shop_id,
+          stream: this.stream,
+          ...options
+        },
+      });
+    } catch (error) {
+      return error;
+    }
+  }
 }
 
 export default PersonaClick;
