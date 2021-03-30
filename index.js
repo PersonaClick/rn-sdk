@@ -1,4 +1,4 @@
-import {request, clearData, updSeance} from './lib/client';
+import {request, updSeance} from './lib/client';
 import { convertParams } from './lib/tracker';
 import { Platform } from 'react-native';
 

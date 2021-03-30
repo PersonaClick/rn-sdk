@@ -18,7 +18,10 @@ Also need added AsyncStorage plugin:
 ```
 yarn add @react-native-async-storage/async-storage
 ```
-
+and react-native-device-info
+```
+yarn add react-native-device-info
+```
 # Usage
 
 SDK is used for several tasks:
@@ -114,6 +117,9 @@ pcsdk.track("purchase", {
   order: 'N318',
   order_price: 29999
 });
+
+// Track user search
+pcsdk.track("search", "This is a search example");
 ```
 
 ## Product search
@@ -190,6 +196,7 @@ pcsdk.setProfile(params);
 ```js
 pcsdk.setPushTokenNotification("NEW_TOKEN");
 ```
+
 ## License
 
 PersonaClick React Native SDK is available under the MIT license. See the LICENSE file for more info.
