@@ -27,7 +27,7 @@ SDK is used for several tasks:
 2. Events tracking
 3. Product recommendations
 4. Product search
-
+5. Save profile settings
 ## Initialization
 
 Initialize SDK object and use it anywhere in your application. (!) Remember to initialize SDK only once on application launch.
@@ -171,6 +171,17 @@ pcsdk.notificationClicked({params})
   .catch((error) => {
     console.log(error);
   });
+```
+
+## Save profile settings
+
+```js
+const params = {
+  first_name: 'Jane',
+  last_name: 'Smith'
+};
+
+pcsdk.setProfile(params);
 ```
 
 ## License
