@@ -2,6 +2,9 @@ import {request, updSeance} from './lib/client';
 import { convertParams } from './lib/tracker';
 import { Platform } from 'react-native';
 
+import messaging from '@react-native-firebase/messaging';
+import PushNotification from "react-native-push-notification";
+
 //Время жизни сеанса в минутах
 export const SESSION_CODE_EXPIRE = 30;
 
@@ -160,6 +163,34 @@ class PersonaClick {
       return error;
     }
   }
+  async initPush() {
+    const authStatus = await messaging().requestPermission();
+    const enabled =
+      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+    if (enabled) {
+      messaging()
+        .getToken()
+        .then(token => {
+          this.setPushTokenNotification(token.token);
+        });
+      }
+      messaging().onMessage(async remoteMessage => {
+        this.showNotification(remoteMessage);
+      });
+    }
+  }
+  async showNotification (message) {
+    const localData = {
+      channelId: 'personaclick-push',
+      largeIconUrl: message.data.icon,
+      id: message.data.id,
+      title: message.data.title,
+      message: message.data.body
+    }
+    PushNotification.localNotification(localData);
+  };
 }
 
 export default PersonaClick;
