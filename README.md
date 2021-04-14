@@ -192,7 +192,7 @@ const params = {
  // other params
 };
 
-pcsdk.recommend(recommender_code, {params}) 
+pcsdk.recommend(recommender_code, params) 
   .then((res) => {
     console.log(res);
   })
@@ -209,7 +209,7 @@ const params = {
   type: 'mobile_push_transactional'
 };
 
-pcsdk.notificationClicked({params}) 
+pcsdk.notificationClicked(params) 
   .then((res) => {
     console.log(res);
   })
