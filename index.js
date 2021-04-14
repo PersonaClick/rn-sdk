@@ -70,8 +70,18 @@ class PersonaClick {
   }
 
   async notificationClicked(options) {
+    return await this.notificationTrack('clicked', options);
+  }
+  async notificationReceived(options) {
+    return await this.notificationTrack('received', options);
+  }
+  async notificationClosed(options) {
+    return await this.notificationTrack('closed', options);
+  }
+
+  async notificationTrack(event, options) {
     try {
-      return await request(`web_push_subscriptions/clicked`, {
+      return await request(`web_push_subscriptions/${event}`, {
         method: 'POST',
         params: {
           shop_id: this.shop_id,
@@ -173,14 +183,36 @@ class PersonaClick {
       messaging()
         .getToken()
         .then(token => {
-          this.setPushTokenNotification(token.token);
+          this.setPushTokenNotification(token);
         });
+
+      // Register handler
       messaging().onMessage(async remoteMessage => {
-        this.showNotification(remoteMessage);
+        await this.showNotification(remoteMessage);
       });
+
+      // Register background handler
+      messaging().setBackgroundMessageHandler(async remoteMessage => {
+        await this.showNotification(remoteMessage);
+      });
+
+      //Subscribe to click  notification
+      PushNotification.configure({
+        onNotification: (notification) => {
+          this.notificationClicked({
+            code: notification?.data?.id,
+            type: ''
+          });
+        }
+      })
     }
   }
   async showNotification (message){
+    await this.notificationReceived({
+      code: message.data.id,
+      type: message.data.type
+    });
+
     const localData = {
       channelId: 'personaclick-push',
       largeIconUrl: message.data.icon,
@@ -188,7 +220,7 @@ class PersonaClick {
       title: message.data.title,
       message: message.data.body
     }
-    PushNotification.localNotification(localData);
+    return PushNotification.localNotification(localData);
   };
 }
 
