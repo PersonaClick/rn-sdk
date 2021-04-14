@@ -22,6 +22,44 @@ and react-native-device-info
 ```
 yarn add react-native-device-info
 ```
+
+For push notification:
+```
+yarn add react-native-push-notification
+yarn add @react-native-firebase/app
+yarn add @react-native-firebase/messaging
+```
+## iOS manual Installation
+Open your `/ios/{projectName}/AppDelegate.m` file, and add the following:
+At the top of the file, import the Firebase SDK:
+```
+#import <Firebase.h>
+```
+Open a terminal window and navigate to the location of the Xcode project for your app
+```
+cd ios/
+pod install
+```
+
+## Android manual Installation
+
+In your `android/build.gradle`
+
+```gradle
+buildscript { 
+    dependencies {
+        ...
+        //Add this \/
+        classpath 'com.google.gms:google-services:4.3.4'
+    }
+```
+In your `android/app/build.gradle` add
+
+```gradle
+apply plugin: 'com.google.gms.google-services'
+```
+
+
 # Usage
 
 SDK is used for several tasks:
@@ -194,7 +232,7 @@ pcsdk.setProfile(params);
 ## Create new push token
 
 ```js
-pcsdk.setPushTokenNotification("NEW_TOKEN");
+pcsdk.initPush();
 ```
 
 ## License

@@ -175,13 +175,12 @@ class PersonaClick {
         .then(token => {
           this.setPushTokenNotification(token.token);
         });
-      }
       messaging().onMessage(async remoteMessage => {
         this.showNotification(remoteMessage);
       });
     }
   }
-  async showNotification (message) {
+  async showNotification (message){
     const localData = {
       channelId: 'personaclick-push',
       largeIconUrl: message.data.icon,
