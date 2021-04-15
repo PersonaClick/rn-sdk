@@ -69,6 +69,26 @@ class PersonaClick {
     }
   }
 
+  async trackEvent(event, options) {
+    try {
+      let queryParams = { event: event };
+      if (options) {
+        queryParams = Object.assign(queryParams, options);
+      }
+
+      return await request('push/custom', {
+        method: 'POST',
+        params: {
+          shop_id: this.shop_id,
+          stream: this.stream,
+          ...queryParams,
+        },
+      });
+    } catch (error) {
+      return error;
+    }
+  }
+
   async notificationClicked(options) {
     return await this.notificationTrack('clicked', options);
   }

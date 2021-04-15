@@ -66,10 +66,12 @@ SDK is used for several tasks:
 
 1. Initialize SDK and user's session
 2. Events tracking
-3. Product recommendations
-4. Product search
-5. Save profile settings
-6. Create new push token
+3. Track custom event
+4. Product recommendations
+5. Product search
+6. Save profile settings
+7. Create new push token
+
 ## Initialization
 
 Initialize SDK object and use it anywhere in your application. (!) Remember to initialize SDK only once on application launch.
@@ -158,6 +160,19 @@ pcsdk.track("purchase", {
 
 // Track user search
 pcsdk.track("search", "This is a search example");
+```
+
+##Track custom event
+```js
+// Simple tracking
+pcsdk.trackEvent('my_event');
+
+// Tracking with custom parameters
+pcsdk.trackEvent('my_event', {
+  category: "event category", 
+  label: "event label",
+  value: 100
+})
 ```
 
 ## Product search
