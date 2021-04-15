@@ -237,8 +237,31 @@ pcsdk.notificationClicked(params)
 
 ```js
 const params = {
-  first_name: 'Jane',
-  last_name: 'Smith'
+  id: 100500,
+  email: "john.doe@examplemail.com",
+  phone: "4400114527199",
+  first_name: "John",
+  last_name: "Doe",
+  birthday: "1990-03-11",
+  age: 31,
+  gender: "m",
+  location: "NY",
+  bought_something: true,
+  loyalty_id: "000001234567",
+  loyalty_card_location: "NY",
+  loyalty_status: "5% discount",
+  loyalty_bonuses: 1123,
+  loyalty_bonuses_to_next_level: 1877,
+  fb_id: "000000000354677",
+  vk_id: "vk031845",
+  telegram_id: "0125762968357835",
+  kids: [
+    {gender: "m", birthday: "2001-04-12"},
+    {gender: "f", birthday: "2015-07-28"}
+  ],
+  auto: [
+    {brand: "Nissan", model: "Qashqai", vds: "TM7N243E4G0BJG978"}
+  ]
 };
 
 pcsdk.setProfile(params);
@@ -249,6 +272,8 @@ pcsdk.setProfile(params);
 ```js
 pcsdk.initPush();
 ```
+
+## 
 
 ## License
 

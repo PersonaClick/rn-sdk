@@ -147,6 +147,11 @@ class PersonaClick {
     if (params.hasOwnProperty("birthday") && !params.birthday.match(/^\d{4}-\d{2}-\d{2}$/)) {
       delete params.birthday;
     }
+    for (let key in params) {
+      if (typeof params[key] === 'object') {
+        params[key] = JSON.stringify(params[key]);
+      }
+    }
     try {
       return await request('profile/set', {
         method: 'POST',
