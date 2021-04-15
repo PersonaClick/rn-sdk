@@ -162,7 +162,7 @@ pcsdk.track("purchase", {
 pcsdk.track("search", "This is a search example");
 ```
 
-##Track custom event
+## Track custom event
 ```js
 // Simple tracking
 pcsdk.trackEvent('my_event');
@@ -172,7 +172,7 @@ pcsdk.trackEvent('my_event', {
   category: "event category", 
   label: "event label",
   value: 100
-})
+});
 ```
 
 ## Product search
