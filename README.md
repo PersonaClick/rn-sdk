@@ -273,12 +273,17 @@ pcsdk.setProfile(params);
 // Simple init 
 pcsdk.initPush();
 
-//or with your callbacks methods for click\receive 
-pcsdk.initPush(onClickCallback, onReciveCallback, onBackgroundReceiveCallback);
+//onClick listener
+pcsdk.initPush(onClickCallback);
 
-// If onBackgroundReceiveCallback not specified, used onReceiveCallback method. 
+// onReceivetive listener
+pcsdk.initPush(false, onReceiveCallback);
 
-// onClickCallback 
+// you can use different callback for notification, when app is in background.    
+pcsdk.initPush(false, onReceiveCallback, onBackgroundReceiveCallback);
+// If onBackgroundReceiveCallback not specified, used onReceiveCallback listener. 
+
+// onClickCallback params
 {
   "bigPictureUrl": "MESSAGE_IMAGE",
   "channelId": "personaclick-push", 
@@ -293,7 +298,7 @@ pcsdk.initPush(onClickCallback, onReciveCallback, onBackgroundReceiveCallback);
   "title": "MESSAGE_TITLE", 
   "userInteraction": true
 }
-// onReceiveCallBack, onBackgroundReceiveCallback
+// onReceiveCallBack, onBackgroundReceiveCallback params
 {
   "data": {
     "action_urls": "[]", 
