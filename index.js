@@ -95,9 +95,6 @@ class PersonaClick {
   async notificationReceived(options) {
     return await this.notificationTrack('received', options);
   }
-  async notificationClosed(options) {
-    return await this.notificationTrack('closed', options);
-  }
 
   async notificationTrack(event, options) {
     try {
@@ -198,7 +195,8 @@ class PersonaClick {
       return error;
     }
   }
-  async initPush() {
+  async initPush(notifyClick, notifyReceive, notifyBgReceive)
+  {
     const authStatus = await messaging().requestPermission();
     const enabled =
       authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
@@ -213,21 +211,36 @@ class PersonaClick {
 
       // Register handler
       messaging().onMessage(async remoteMessage => {
-        await this.showNotification(remoteMessage);
+        if (!notifyReceive) {
+          await this.showNotification(remoteMessage);
+        } else{
+          notifyReceive(remoteMessage);
+        }
       });
 
       // Register background handler
       messaging().setBackgroundMessageHandler(async remoteMessage => {
-        await this.showNotification(remoteMessage);
+        if (!notifyReceive && !notifyBgReceive) {
+          await this.showNotification(remoteMessage);
+        } else if (!notifyBgReceive) {
+          notifyBgReceive(remoteMessage);
+        } else {
+          notifyReceive(remoteMessage);
+        }
       });
 
       //Subscribe to click  notification
       PushNotification.configure({
         onNotification: (notification) => {
-          this.notificationClicked({
-            code: notification?.data?.id,
-            type: ''
-          });
+          if (!notifyClick) {
+            this.notificationClicked({
+              code: notification?.data?.id,
+              type: notification?.data?.type
+            });
+          } else {
+            notifyClick(notification);
+          }
+
         }
       })
     }
@@ -238,12 +251,16 @@ class PersonaClick {
       type: message.data.type
     });
 
-    const localData = {
+    let localData = {
       channelId: 'personaclick-push',
-      largeIconUrl: message.data.icon,
-      id: message.data.id,
-      title: message.data.title,
-      message: message.data.body
+      largeIconUrl: message.data?.icon,
+      id: message.data?.id,
+      bigPictureUrl: message.data?.image,
+      title: message.data?.title,
+      message: message.data?.body,
+      userInfo: {
+        type: message.data.type
+      }
     }
     return PushNotification.localNotification(localData);
   };

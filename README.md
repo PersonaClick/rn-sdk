@@ -67,10 +67,12 @@ SDK is used for several tasks:
 1. Initialize SDK and user's session
 2. Events tracking
 3. Track custom event
-4. Product recommendations
-5. Product search
-6. Save profile settings
-7. Create new push token
+4. Track push
+5. Product recommendations
+6. Product search
+7. Save profile settings
+8. Init push
+9. Set push token notification
 
 ## Initialization
 
@@ -175,6 +177,21 @@ pcsdk.trackEvent('my_event', {
 });
 ```
 
+## Track push notifications
+
+```js
+const params = {
+  code: 'CODE',
+  type: 'TYPE'
+};
+// Track user click notification
+pcsdk.notificationClicked(params);
+
+// Track Notification received
+pcsdk.notificationReceived(params);
+
+```
+
 ## Product search
 
 ```js
@@ -208,23 +225,6 @@ const params = {
 };
 
 pcsdk.recommend(recommender_code, params) 
-  .then((res) => {
-    console.log(res);
-  })
-  .catch((error) => {
-    console.log(error);
-  });
-```
-
-## User clicked on mobile push
-
-```js
-const params = {
-  code: 'CODE',
-  type: 'mobile_push_transactional'
-};
-
-pcsdk.notificationClicked(params) 
   .then((res) => {
     console.log(res);
   })
@@ -267,10 +267,55 @@ const params = {
 pcsdk.setProfile(params);
 ```
 
-## Create new push token
+## Init push notification
 
 ```js
+// Simple init 
 pcsdk.initPush();
+
+//or with your callbacks methods for click\receive 
+pcsdk.initPush(onClickCallback, onReciveCallback, onBackgroundReceiveCallback);
+
+// If onBackgroundReceiveCallback not specified, used onReceiveCallback method. 
+
+// onClickCallback 
+{
+  "bigPictureUrl": "MESSAGE_IMAGE",
+  "channelId": "personaclick-push", 
+  "data": {
+    "id": "MESSAGE_ID",
+    "type": "MESSAGE_TYPE"
+  }, 
+  "foreground": true, 
+  "id": "MESSAGE_ID", 
+  "largeIconUrl": "MESSAGE_ICON",
+  "message": "MESSAGE_BODY", 
+  "title": "MESSAGE_TITLE", 
+  "userInteraction": true
+}
+// onReceiveCallBack, onBackgroundReceiveCallback
+{
+  "data": {
+    "action_urls": "[]", 
+    "actions": "[]",
+    "body": "MESSAGE_BODY",
+    "icon": "MESSAGE_ICON", 
+    "id": "MESSAGE_ID",
+    "image": "MESSAGE_IMAGE", 
+    "title": "MESSAGE_TITLE", 
+    "type": "MESSAGE_TYPE"
+  }, 
+  "from": "MESSAGE_FROM", 
+  "messageId": "FMC_MESSAGE_ID", 
+  "sentTime": TIMESTAMP, 
+  "ttl": TTL_VALUE
+}
+```
+
+## Set push token notification
+
+```js
+pcsdk.setPushTokenNotification('NEW_TOKEN');
 ```
 
 ## 

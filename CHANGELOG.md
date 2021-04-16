@@ -1,8 +1,18 @@
+#### 1.5.2 (Apr 16, 2021)
+##### New Features
+
+* add Push notification callbacks (open/received)
+
+##### Documentation Changes
+
+* Update README.md
+
 #### 1.5.1 (Apr 15, 2021)
 ##### Documentation Changes
 
 * Update README.md
 * Update CHANGELOG.md
+
 ##### Bug Fixes
 
 * fix array params in setProfile
