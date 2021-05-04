@@ -200,8 +200,8 @@ const type = 'instant_search'; // full_search, ...
 let search_query = 'your_search_text';
 
 pcsdk.search({
-  type,
-  search_query,
+  type: type,
+  search_query: search_query,
   // other params
 }) 
   .then((res) => {
