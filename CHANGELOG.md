@@ -1,3 +1,11 @@
+#### 1.5.3 (May 11, 2021)
+##### Bug Fixes
+
+* fix notification callbacks
+##### Documentation Changes
+
+* Update README.md
+
 #### 1.5.2 (Apr 16, 2021)
 ##### New Features
 

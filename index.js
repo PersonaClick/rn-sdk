@@ -223,9 +223,9 @@ class PersonaClick {
         if (!notifyReceive && !notifyBgReceive) {
           await this.showNotification(remoteMessage);
         } else if (!notifyBgReceive) {
-          notifyBgReceive(remoteMessage);
-        } else {
           notifyReceive(remoteMessage);
+        } else {
+          notifyBgReceive(remoteMessage);
         }
       });
 

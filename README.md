@@ -29,7 +29,7 @@ yarn add react-native-push-notification
 yarn add @react-native-firebase/app
 yarn add @react-native-firebase/messaging
 ```
-## iOS manual Installation
+## iOS Additional Installation
 Open your `/ios/{projectName}/AppDelegate.m` file, and add the following:
 At the top of the file, import the Firebase SDK:
 ```
@@ -41,7 +41,7 @@ cd ios/
 pod install
 ```
 
-## Android manual Installation
+## Android Additional Installation
 
 In your `android/build.gradle`
 
