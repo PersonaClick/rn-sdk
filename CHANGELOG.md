@@ -1,3 +1,9 @@
+#### 1.5.4 (July 8, 2021)
+##### Bug Fixes
+
+* fix push channels
+* fix string in message_id
+
 #### 1.5.3 (May 11, 2021)
 ##### Bug Fixes
 

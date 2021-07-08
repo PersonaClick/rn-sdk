@@ -10,6 +10,7 @@ export const SESSION_CODE_EXPIRE = 30;
 
 class PersonaClick {
   constructor(shop_id, stream) {
+    this.channel_id = 'personaclick-push';
     this.shop_id = shop_id;
     this.stream = stream ?? null;
     this.initialized = false;
@@ -232,17 +233,29 @@ class PersonaClick {
       //Subscribe to click  notification
       PushNotification.configure({
         onNotification: (notification) => {
-          if (!notifyClick) {
-            this.notificationClicked({
-              code: notification?.data?.id,
-              type: notification?.data?.type
-            });
-          } else {
-            notifyClick(notification);
-          }
-
+          if (notification?.userInteraction === true) {
+            if (!notifyClick) {
+              this.notificationClicked({
+                code: notification?.data?.id,
+                type: notification?.data?.type
+              });
+            } else {
+              notifyClick(notification);
+            };
+          };
         }
-      })
+      });
+
+      PushNotification.channelExists(this.channel_id, function (exists) {
+        if (!exists) {
+          PushNotification.createChannel(
+            {
+              channelId: 'personaclick-push',
+              channelName: 'pcsdk channel',
+            }
+          );
+        }
+      });
     }
   }
   async showNotification (message){
@@ -252,13 +265,13 @@ class PersonaClick {
     });
 
     let localData = {
-      channelId: 'personaclick-push',
+      channelId: this.channel_id,
       largeIconUrl: message.data?.icon,
-      id: message.data?.id,
       bigPictureUrl: message.data?.image,
       title: message.data?.title,
       message: message.data?.body,
       userInfo: {
+        message_id: message.data?.id,
         type: message.data.type
       }
     }
