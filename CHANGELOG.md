@@ -1,3 +1,6 @@
+#### 1.5.5 (July 30, 2021)
+* Update platform value
+
 #### 1.5.4 (July 8, 2021)
 ##### Bug Fixes
 

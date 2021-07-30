@@ -182,7 +182,7 @@ class PersonaClick {
     try {
       const params = {
         token: token,
-        platform: Platform.OS,
+        platform: Platform.OS === 'ios' ? 'ios_firebase' : 'android',
       }
       return await request('mobile_push_tokens', {
         method: 'POST',
