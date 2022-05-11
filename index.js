@@ -9,11 +9,12 @@ import PushNotification from "react-native-push-notification";
 export const SESSION_CODE_EXPIRE = 30;
 
 class PersonaClick {
-  constructor(shop_id, stream) {
+  constructor(shop_id, stream, dev = false) {
     this.channel_id = 'personaclick-push';
     this.shop_id = shop_id;
     this.stream = stream ?? null;
     this.initialized = false;
+    this.dev = dev;
     this.init();
   }
 
@@ -207,11 +208,17 @@ class PersonaClick {
       messaging()
         .getToken()
         .then(token => {
+          if (this.dev) {
+            console.log('new token: ', token);
+          }
           this.setPushTokenNotification(token);
         });
 
       // Register handler
       messaging().onMessage(async remoteMessage => {
+        if (this.dev) {
+          console.log('message received: ', remoteMessage);
+        }
         if (!notifyReceive) {
           await this.showNotification(remoteMessage);
         } else{
@@ -259,6 +266,9 @@ class PersonaClick {
     }
   }
   async showNotification (message){
+    if (this.dev) {
+      console.log('showNotification: ', message);
+    }
     await this.notificationReceived({
       code: message.data.id,
       type: message.data.type
