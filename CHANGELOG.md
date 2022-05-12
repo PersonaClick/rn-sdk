@@ -1,3 +1,8 @@
+#### 1.5.6 (May 12, 2022)
+* add Trigger subscription methods
+* add debug log
+* upd mobile push tracking
+
 #### 1.5.5 (July 30, 2021)
 * Update platform value
 

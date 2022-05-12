@@ -82,7 +82,7 @@ Initialize SDK object and use it anywhere in your application. (!) Remember to i
 import PersonaClick from '@personaclick/rn-sdk';
 
 ...
-const pcsdk = new PersonaClick("YOUR_SHOP_ID", "Stream")
+const pcsdk = new PersonaClick("YOUR_SHOP_ID", "Stream");
 ```
 
 ## Check init
@@ -323,6 +323,29 @@ pcsdk.initPush(false, onReceiveCallback, onBackgroundReceiveCallback);
 pcsdk.setPushTokenNotification('NEW_TOKEN');
 ```
 
+## Triggers
+###Price drop
+```js
+// Subscribing
+pcsdk.triggers('subscribe_for_product_price', {email: 'John.Doe@store.com', item: '3323', price: 160});
+
+// Unsubscribing from specific products
+pcsdk.triggers('unsubscribe_from_product_price', {email: 'John.Doe@store.com', item_ids: [3323, 100500, 'ABCDEF']});
+
+// Unsubscribing from all products
+pcsdk.triggers('unsubscribe_from_product_price', {email: 'John.Doe@store.com', item_ids: []});
+```
+###Back in Stock
+```js
+// Subscribing
+pcsdk.triggers('subscribe_for_product_available', {email: 'John.Doe@store.com', item: '3323', properties: {fashion_size: "XL"}});
+
+// Unsubscribing from specific products
+pcsdk.triggers('unsubscribe_from_product_available', {email: 'John.Doe@store.com', item_ids: [3323, 100500, 'ABCDEF']});
+
+// Unsubscribing from all products
+pcsdk.triggers('unsubscribe_from_product_available', {email: 'John.Doe@store.com', item_ids: []});
+```
 ## 
 
 ## License
