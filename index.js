@@ -15,6 +15,7 @@ class PersonaClick {
     this.stream = stream ?? null;
     this.initialized = false;
     DEBUG = debug
+    this.push_type = null;
     this.init();
   }
 
@@ -183,7 +184,7 @@ class PersonaClick {
     try {
       const params = {
         token: token,
-        platform: Platform.OS === 'ios' ? 'ios_firebase' : 'android',
+        platform: this.push_type !== null ? this.push_type : token.match(/[a-z]/) !== null  ? 'android' : 'ios',
       }
       return await request('mobile_push_tokens', {
         method: 'POST',
@@ -196,6 +197,9 @@ class PersonaClick {
     } catch (error) {
       return error;
     }
+  }
+  firebase_only(val) {
+    this.push_type = val ? 'android' : null;
   }
   async initPush(notifyClick, notifyReceive, notifyBgReceive)
   {
@@ -274,7 +278,7 @@ class PersonaClick {
     let localData = {
       channelId: this.channel_id,
       largeIconUrl: message.data?.icon,
-      bigPictureUrl: message.data?.image,
+      picture: message.data?.image,
       title: message.data?.title,
       message: message.data?.body,
       userInfo: {

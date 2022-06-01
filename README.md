@@ -270,6 +270,9 @@ pcsdk.setProfile(params);
 ## Init push notification
 
 ```js
+//Set use Firebase messaging only. Call this method before initPush; 
+pcsdk.firebase_only(true);
+
 // Simple init 
 pcsdk.initPush();
 
