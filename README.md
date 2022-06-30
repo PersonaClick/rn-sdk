@@ -26,6 +26,7 @@ yarn add react-native-device-info
 For push notification:
 ```
 yarn add react-native-push-notification
+yarn add @react-native-community/push-notification-ios
 yarn add @react-native-firebase/app
 yarn add @react-native-firebase/messaging
 ```
@@ -288,18 +289,18 @@ pcsdk.initPush(false, onReceiveCallback, onBackgroundReceiveCallback);
 
 // onClickCallback params
 {
-  "bigPictureUrl": "MESSAGE_IMAGE",
-  "channelId": "personaclick-push", 
   "data": {
+    "body": "MESSAGE_BODY",
+    "icon": "MESSAGE_ICON",
     "id": "MESSAGE_ID",
+    "image": "MESSAGE_IMAGE",
+    "title": "MESSAGE_TITLE",
     "type": "MESSAGE_TYPE"
-  }, 
-  "foreground": true, 
-  "id": "MESSAGE_ID", 
-  "largeIconUrl": "MESSAGE_ICON",
-  "message": "MESSAGE_BODY", 
-  "title": "MESSAGE_TITLE", 
-  "userInteraction": true
+  },
+  "from": "MESSAGE_FROM",
+  "messageId": "FMC_MESSAGE_ID",
+  "sentTime": TIMESTAMP,
+  "ttl": TTL_VALUE
 }
 // onReceiveCallBack, onBackgroundReceiveCallback params
 {

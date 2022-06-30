@@ -1,9 +1,10 @@
 import {request, updSeance} from './lib/client';
 import { convertParams } from './lib/tracker';
-import { Platform } from 'react-native';
+import {AppState, Platform} from 'react-native';
 
 import messaging from '@react-native-firebase/messaging';
 import PushNotification from "react-native-push-notification";
+import PushNotificationIOS from "@react-native-community/push-notification-ios";
 
 //Время жизни сеанса в минутах
 export const SESSION_CODE_EXPIRE = 30;
@@ -241,6 +242,8 @@ class PersonaClick {
 
       //Subscribe to click  notification
       PushNotification.configure({
+        popInitialNotification: true,
+        requestPermissions: true,
         onNotification: (notification) => {
           if (notification?.userInteraction === true) {
             if (!notifyClick) {
@@ -249,9 +252,24 @@ class PersonaClick {
                 type: notification?.data?.type
               });
             } else {
-              notifyClick(notification);
+              let eventData = {
+                data: {
+                  body: notification.message,
+                  icon: notification.data.icon,
+                  id: notification.data.id,
+                  image: notification.data.image,
+                  title: notification.title,
+                  type: notification.data.type,
+                },
+                from: notification.data.from,
+                messageId: notification.data.message_id,
+                sentTime: notification.data.sentTime,
+                ttl: notification.data.ttl,
+              };
+              notifyClick(eventData);
             };
           };
+          notification.finish(PushNotificationIOS.FetchResult.NoData);
         }
       });
 
@@ -277,16 +295,30 @@ class PersonaClick {
 
     let localData = {
       channelId: this.channel_id,
-      largeIconUrl: message.data?.icon,
-      picture: message.data?.image,
-      title: message.data?.title,
-      message: message.data?.body,
+      largeIconUrl: message.data.icon,
+      bigLargeIconUrl: message.data.icon,
+      bigPictureUrl: message.data.image,
+      picture: message.data.icon,
+      title: message.data.title,
+      message: message.data.body,
       userInfo: {
-        message_id: message.data?.id,
-        type: message.data.type
+        message_id: message.messageId,
+        id: message.data.id,
+        type: message.data.type,
+        icon: message.data.icon,
+        image: message.data.image,
+        from: message.from,
+        sentTime: message.sentTime,
+        ttl: message.ttl,
       }
     }
-    return PushNotification.localNotification(localData);
+
+    if (AppState.currentState === 'background') {
+      localData['date'] = new Date(Date.now() + (5 * 1000));
+      return PushNotification.localNotificationSchedule(localData)
+    } else {
+      return PushNotification.localNotification(localData);
+    }
   }
   async triggers(trigger_name, options) {
     try {

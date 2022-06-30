@@ -1,3 +1,8 @@
+#### 1.5.9 (July 29, 2022)
+* fixed ios notification display
+* change click notification params
+* upd README.md
+
 #### 1.5.7 (May 12, 2022)
 * add Trigger subscription methods
 * add debug log
