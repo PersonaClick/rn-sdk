@@ -319,7 +319,9 @@ pcsdk.initPush(false, onReceiveCallback, onBackgroundReceiveCallback);
   "sentTime": TIMESTAMP, 
   "ttl": TTL_VALUE
 }
+
 ```
+###IMPORTANT! Сall initPush method on app initialization
 
 ## Set push token notification
 
