@@ -320,14 +320,19 @@ class PersonaClick {
       return PushNotification.localNotification(localData);
     }
   }
-  async triggers(trigger_name, options) {
+
+  async triggers(trigger_name, data) {
     try {
       return await request(`subscriptions/${trigger_name}`, {
+        headers: {
+          "Content-Type": "application/json"
+        },
         method: 'POST',
         params: {
           shop_id: this.shop_id,
-          ...options,
+          stream: this.stream,
         },
+        payload: data
       });
     } catch (error) {
       return error;
