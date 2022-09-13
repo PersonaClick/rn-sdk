@@ -15,7 +15,7 @@ class PersonaClick {
     this.shop_id = shop_id;
     this.stream = stream ?? null;
     this.initialized = false;
-    DEBUG = debug
+    DEBUG = debug;
     this.push_type = null;
     this.init();
   }
@@ -61,6 +61,7 @@ class PersonaClick {
     try {
       const queryParams = await convertParams(event, options);
       return await request('push', {
+        headers: { "Content-Type": "application/json" },
         method: 'POST',
         params: {
           shop_id: this.shop_id,
@@ -81,6 +82,7 @@ class PersonaClick {
       }
 
       return await request('push/custom', {
+        headers: { "Content-Type": "application/json" },
         method: 'POST',
         params: {
           shop_id: this.shop_id,
@@ -324,15 +326,12 @@ class PersonaClick {
   async triggers(trigger_name, data) {
     try {
       return await request(`subscriptions/${trigger_name}`, {
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         method: 'POST',
-        params: {
+        params: Object.assign({
           shop_id: this.shop_id,
           stream: this.stream,
-        },
-        payload: data
+        }, data),
       });
     } catch (error) {
       return error;

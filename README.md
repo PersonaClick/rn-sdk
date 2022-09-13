@@ -334,7 +334,7 @@ pcsdk.setPushTokenNotification('NEW_TOKEN');
 ```
 
 ## Triggers
-###Price drop
+### Price drop
 ```js
 // Subscribing
 pcsdk.triggers('subscribe_for_product_price', {email: 'John.Doe@store.com', item: '3323', price: 160});
@@ -345,7 +345,7 @@ pcsdk.triggers('unsubscribe_from_product_price', {email: 'John.Doe@store.com', i
 // Unsubscribing from all products
 pcsdk.triggers('unsubscribe_from_product_price', {email: 'John.Doe@store.com', item_ids: []});
 ```
-###Back in Stock
+### Back in Stock
 ```js
 // Subscribing
 pcsdk.triggers('subscribe_for_product_available', {email: 'John.Doe@store.com', item: '3323', properties: {fashion_size: "XL"}});
