@@ -146,6 +146,19 @@ pcsdk.track("cart", {
   recommended_code: 'UNIQUE_RECOMMENDER_CODE'
 });
 
+//Send the full current cart
+pcsdk.track("cart", [
+  {
+    id: FIRST_PRODUCT_ID,
+    amount: FIRST_PRODUCT_QUANTITY
+  },
+  ...
+  {
+    id: LAST_PRODUCT_ID,
+    amount: LAST_PRODUCT_QUANTITY
+  }
+]);
+
 // Remove product from cart
 pcsdk.track("remove_from_cart", id);
 
