@@ -61,13 +61,14 @@ class PersonaClick {
     try {
       const queryParams = await convertParams(event, options);
       return await request('push', {
+        headers: { "Content-Type": "application/json" },
         method: 'POST',
         params: {
           shop_id: this.shop_id,
           stream: this.stream,
           ...queryParams,
         },
-      }, 'application/json');
+      });
     } catch (error) {
       return error;
     }
@@ -81,13 +82,14 @@ class PersonaClick {
       }
 
       return await request('push/custom', {
+        headers: { "Content-Type": "application/json" },
         method: 'POST',
         params: {
           shop_id: this.shop_id,
           stream: this.stream,
           ...queryParams,
         },
-      }, 'application/json');
+      });
     } catch (error) {
       return error;
     }
