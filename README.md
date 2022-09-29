@@ -141,7 +141,7 @@ pcsdk.track("cart", id);
 // Add product to cart with amount and track recommender
 pcsdk.track("cart", {
   id: PRODUCT_ID,
-  amount: PRODUCT_QUANTITY,
+  quantity: PRODUCT_QUANTITY,
   recommended_by: 'dynamic',
   recommended_code: 'UNIQUE_RECOMMENDER_CODE'
 });
@@ -150,12 +150,12 @@ pcsdk.track("cart", {
 pcsdk.track("cart", [
   {
     id: FIRST_PRODUCT_ID,
-    amount: FIRST_PRODUCT_QUANTITY
+    quantity: FIRST_PRODUCT_QUANTITY
   },
   ...
   {
     id: LAST_PRODUCT_ID,
-    amount: LAST_PRODUCT_QUANTITY
+    quantity: LAST_PRODUCT_QUANTITY
   }
 ]);
 
@@ -171,8 +171,8 @@ pcsdk.track("remove_wish", id);
 // Track purchase (several products)
 pcsdk.track("purchase", {
   products: [
-      {id: 37, price: 318, amount: 3},
-      {id: 187, price: 5000, amount: 1}
+      {id: 37, price: 318, quantity: 3},
+      {id: 187, price: 5000, quantity: 1}
   ],
   order: 'N318',
   order_price: 29999
