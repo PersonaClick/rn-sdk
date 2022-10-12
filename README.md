@@ -1,9 +1,9 @@
-# PersonaClick React Native SDK
+# PersonaClick React Native SDK 
 
 
 ## Installation
 
-PersonaClick React Native SDK is available through [GitHub](https://github.com/PersonaClick/rn-sdk/). To install it, run next command in terminal:
+PersonaClick React Native SDK is available through [GitHub](https://github.com/PersonaClick/rn-sdk.git). To install it, run next command in terminal:
 
 ```
 yarn add @personaclick/rn-sdk
@@ -87,13 +87,13 @@ Initialize SDK object and use it anywhere in your application. (!) Remember to i
 import PersonaClick from '@personaclick/rn-sdk';
 
 ...
-const pcsdk = new PersonaClick("YOUR_SHOP_ID", "Stream");
+const rnsdk = new PersonaClick("YOUR_SHOP_ID", "Stream");
 ```
 
 ## Check init
 
 ```js
-pcsdk.isInit(); // returns true/false
+rnsdk.isInit(); // returns true/false
 ```
 
 ## Events tracking
@@ -104,42 +104,42 @@ Track user's behavior to collect data. There are several types of events:
 
 
 // View product (simple way)
-pcsdk.track("view", 37);
+rnsdk.track("view", 37);
 
 // View product (try to avoid it)
-pcsdk.track("view", {
+rnsdk.track("view", {
     id: 37,
     stock: true
 });
 
 // View product after user clicked on recommender block
-pcsdk.track("view", {
+rnsdk.track("view", {
   id: PRODUCT_ID,
   recommended_by: 'dynamic',
   recommended_code: 'UNIQUE_RECOMMENDER_CODE'
 });
 
 // View product, after user clicked on search results
-pcsdk.track("view", {
+rnsdk.track("view", {
   id: PRODUCT_ID,
   recommended_by: 'full_search',
   recommended_code: QUERY_STRING
 });
 // ... or instant search dropdown
-pcsdk.track("view", {
+rnsdk.track("view", {
   id: PRODUCT_ID,
   recommended_by: 'instant_search',
   recommended_code: QUERY_STRING
 });
 
 // View category
-pcsdk.track("category", 100500);
+rnsdk.track("category", 100500);
 
 // Add product to cart (simple way)
-pcsdk.track("cart", id);
+rnsdk.track("cart", id);
 
 // Add product to cart with amount and track recommender
-pcsdk.track("cart", {
+rnsdk.track("cart", {
   id: PRODUCT_ID,
   quantity: PRODUCT_QUANTITY,
   recommended_by: 'dynamic',
@@ -147,7 +147,7 @@ pcsdk.track("cart", {
 });
 
 //Send the full current cart
-pcsdk.track("cart", [
+rnsdk.track("cart", [
   {
     id: FIRST_PRODUCT_ID,
     quantity: FIRST_PRODUCT_QUANTITY
@@ -160,16 +160,16 @@ pcsdk.track("cart", [
 ]);
 
 // Remove product from cart
-pcsdk.track("remove_from_cart", id);
+rnsdk.track("remove_from_cart", id);
 
 // Add product to favorities
-pcsdk.track("wish", id);
+rnsdk.track("wish", id);
 
 // Remove product from favorities
-pcsdk.track("remove_wish", id);
+rnsdk.track("remove_wish", id);
 
 // Track purchase (several products)
-pcsdk.track("purchase", {
+rnsdk.track("purchase", {
   products: [
       {id: 37, price: 318, quantity: 3},
       {id: 187, price: 5000, quantity: 1}
@@ -179,16 +179,16 @@ pcsdk.track("purchase", {
 });
 
 // Track user search
-pcsdk.track("search", "This is a search example");
+rnsdk.track("search", "This is a search example");
 ```
 
 ## Track custom event
 ```js
 // Simple tracking
-pcsdk.trackEvent('my_event');
+rnsdk.trackEvent('my_event');
 
 // Tracking with custom parameters
-pcsdk.trackEvent('my_event', {
+rnsdk.trackEvent('my_event', {
   category: "event category", 
   label: "event label",
   value: 100
@@ -203,10 +203,10 @@ const params = {
   type: 'TYPE'
 };
 // Track user click notification
-pcsdk.notificationClicked(params);
+rnsdk.notificationClicked(params);
 
 // Track Notification received
-pcsdk.notificationReceived(params);
+rnsdk.notificationReceived(params);
 
 ```
 
@@ -217,7 +217,7 @@ const type = 'instant_search'; // full_search, ...
 
 let search_query = 'your_search_text';
 
-pcsdk.search({
+rnsdk.search({
   type: type,
   search_query: search_query,
   // other params
@@ -242,7 +242,7 @@ const params = {
  // other params
 };
 
-pcsdk.recommend(recommender_code, params) 
+rnsdk.recommend(recommender_code, params) 
   .then((res) => {
     console.log(res);
   })
@@ -282,26 +282,26 @@ const params = {
   ]
 };
 
-pcsdk.setProfile(params);
+rnsdk.setProfile(params);
 ```
 
 ## Init push notification
 
 ```js
 //Set use Firebase messaging only. Call this method before initPush; 
-pcsdk.firebase_only(true);
+rnsdk.firebase_only(true);
 
 // Simple init 
-pcsdk.initPush();
+rnsdk.initPush();
 
 //onClick listener
-pcsdk.initPush(onClickCallback);
+rnsdk.initPush(onClickCallback);
 
 // onReceivetive listener
-pcsdk.initPush(false, onReceiveCallback);
+rnsdk.initPush(false, onReceiveCallback);
 
 // you can use different callback for notification, when app is in background.    
-pcsdk.initPush(false, onReceiveCallback, onBackgroundReceiveCallback);
+rnsdk.initPush(false, onReceiveCallback, onBackgroundReceiveCallback);
 // If onBackgroundReceiveCallback not specified, used onReceiveCallback listener. 
 
 // onClickCallback params
@@ -343,31 +343,31 @@ pcsdk.initPush(false, onReceiveCallback, onBackgroundReceiveCallback);
 ## Set push token notification
 
 ```js
-pcsdk.setPushTokenNotification('NEW_TOKEN');
+rnsdk.setPushTokenNotification('NEW_TOKEN');
 ```
 
 ## Triggers
 ### Price drop
 ```js
 // Subscribing
-pcsdk.triggers('subscribe_for_product_price', {email: 'John.Doe@store.com', item: '3323', price: 160});
+rnsdk.triggers('subscribe_for_product_price', {email: 'John.Doe@store.com', item: '3323', price: 160});
 
 // Unsubscribing from specific products
-pcsdk.triggers('unsubscribe_from_product_price', {email: 'John.Doe@store.com', item_ids: [3323, 100500, 'ABCDEF']});
+rnsdk.triggers('unsubscribe_from_product_price', {email: 'John.Doe@store.com', item_ids: [3323, 100500, 'ABCDEF']});
 
 // Unsubscribing from all products
-pcsdk.triggers('unsubscribe_from_product_price', {email: 'John.Doe@store.com', item_ids: []});
+rnsdk.triggers('unsubscribe_from_product_price', {email: 'John.Doe@store.com', item_ids: []});
 ```
 ### Back in Stock
 ```js
 // Subscribing
-pcsdk.triggers('subscribe_for_product_available', {email: 'John.Doe@store.com', item: '3323', properties: {fashion_size: "XL"}});
+rnsdk.triggers('subscribe_for_product_available', {email: 'John.Doe@store.com', item: '3323', properties: {fashion_size: "XL"}});
 
 // Unsubscribing from specific products
-pcsdk.triggers('unsubscribe_from_product_available', {email: 'John.Doe@store.com', item_ids: [3323, 100500, 'ABCDEF']});
+rnsdk.triggers('unsubscribe_from_product_available', {email: 'John.Doe@store.com', item_ids: [3323, 100500, 'ABCDEF']});
 
 // Unsubscribing from all products
-pcsdk.triggers('unsubscribe_from_product_available', {email: 'John.Doe@store.com', item_ids: []});
+rnsdk.triggers('unsubscribe_from_product_available', {email: 'John.Doe@store.com', item_ids: []});
 ```
 ## 
 
