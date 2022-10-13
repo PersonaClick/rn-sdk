@@ -42,6 +42,44 @@ cd ios/
 pod install
 ```
 
+On iOS, when a message is received the device silently starts your application in a background state. To get around this problem, you can configure your application. Use this property to conditionally render null ("nothing") if your app is launched in the background:
+```js
+// index.js
+import { AppRegistry } from 'react-native';
+
+function HeadlessCheck({ isHeadless }) {
+  if (isHeadless) {
+    // App has been launched in the background by iOS, ignore
+    return null;
+  }
+
+  return <App />;
+}
+
+function App() {
+  // Your application
+}
+
+AppRegistry.registerComponent('app', () => HeadlessCheck);
+```
+To inject a isHeadless prop into your app, please update your AppDelegate.m file as instructed below:
+```
+/ add this import statement at the top of your `AppDelegate.m` file
+#import "RNFBMessagingModule.h"
+
+// in "(BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions" method
+// Use `addCustomPropsToUserProps` to pass in props for initialization of your app
+// Or pass in `nil` if you have none as per below example
+// For `withLaunchOptions` please pass in `launchOptions` object
+NSDictionary *appProperties = [RNFBMessagingModule addCustomPropsToUserProps:nil withLaunchOptions:launchOptions];
+
+// Find the `RCTRootView` instance and update the `initialProperties` with your `appProperties` instance
+RCTRootView *rootView = [[RCTRootView alloc] initWithBridge:bridge
+                                             moduleName:@"nameOfYourApp"
+                                             initialProperties:appProperties];
+```
+#### iOS Background Limitation
+If the iOS Background App Refresh mode is off, your handler configured in setBackgroundMessageHandler will not be triggered.
 ## Android Additional Installation
 
 In your `android/build.gradle`
