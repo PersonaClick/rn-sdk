@@ -211,12 +211,22 @@ class MainSDK {
       authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
     if (enabled) {
-      messaging()
-        .getToken()
-        .then(token => {
-          if (DEBUG) console.log('New token: ', token);
-          this.setPushTokenNotification(token);
-        });
+      if (this.push_type === null && Platform.OS === 'ios') {
+        messaging()
+          .getAPNSToken()
+          .then(token => {
+            if (DEBUG) console.log('New APN token: ', token);
+            this.setPushTokenNotification(token);
+          });
+      } else {
+        messaging()
+          .getToken()
+          .then(token => {
+            if (DEBUG) console.log('New FCM token: ', token);
+            this.setPushTokenNotification(token);
+          });
+      }
+
 
       // Register handler
       messaging().onMessage(async remoteMessage => {
