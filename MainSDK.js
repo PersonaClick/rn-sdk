@@ -10,7 +10,6 @@ export var DEBUG = false;
 
 class MainSDK {
   constructor(shop_id, stream, debug = false) {
-    this.channel_id = SDK_PUSH_CHANNEL;
     this.shop_id = shop_id;
     this.stream = stream ?? null;
     this.initialized = false;
@@ -284,12 +283,12 @@ class MainSDK {
         }
       });
 
-      PushNotification.channelExists(this.channel_id, function (exists) {
+      PushNotification.channelExists(SDK_PUSH_CHANNEL, function (exists) {
         if (!exists) {
           PushNotification.createChannel(
             {
-              channelId: 'personaclick-push',
-              channelName: 'pcsdk channel',
+              channelId: SDK_PUSH_CHANNEL,
+              channelName: 'RNSDK channel',
             }
           );
         }
@@ -305,7 +304,7 @@ class MainSDK {
     });
 
     let localData = {
-      channelId: this.channel_id,
+      channelId: SDK_PUSH_CHANNEL,
       largeIconUrl: message.data.icon,
       bigLargeIconUrl: message.data.icon,
       bigPictureUrl: message.data.image,
