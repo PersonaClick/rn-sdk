@@ -211,6 +211,9 @@ class MainSDK {
 
     if (enabled) {
       if (this.push_type === null && Platform.OS === 'ios') {
+        if (!messaging().isDeviceRegisteredForRemoteMessages) {
+          await messaging().registerDeviceForRemoteMessages();
+        }
         messaging()
           .getAPNSToken()
           .then(token => {
