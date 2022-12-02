@@ -15,7 +15,6 @@ class MainSDK {
     this.initialized = false;
     DEBUG = debug;
     this.push_type = null;
-    this.init();
   }
 
   async init() {
