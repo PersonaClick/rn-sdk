@@ -8,7 +8,7 @@ export const SDK_PUSH_CHANNEL = 'PersonaClick';
 class PersonaClick extends MainSDK{
   constructor(shop_id, stream, debug = false) {
     super(shop_id, stream, debug);
-    super.init();
+    this.init();
   }
 }
 export default PersonaClick;
