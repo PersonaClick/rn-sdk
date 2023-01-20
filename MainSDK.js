@@ -16,7 +16,8 @@ class MainSDK  extends Performer {
     this.stream = stream ?? null;
     this.initialized = false;
     DEBUG = debug;
-    this.push_type = null;
+    this._push_type = null;
+    this._ask_push_permissions = true;
   }
 
   perform(command) {
@@ -203,7 +204,7 @@ class MainSDK  extends Performer {
       try {
         const params = {
           token: token,
-          platform: this.push_type !== null ? this.push_type : token.match(/[a-z]/) !== null ? 'android' : 'ios',
+          platform: this._push_type !== null ? this._push_type : token.match(/[a-z]/) !== null ? 'android' : 'ios',
         }
         return await request('mobile_push_tokens', {
           method: 'POST',
@@ -219,102 +220,122 @@ class MainSDK  extends Performer {
     }));
   }
   firebase_only(val) {
-    this.push_type = val ? 'android' : null;
+    this._push_type = val ? 'android' : null;
   }
+
+  askPushPermissions(val = true) {
+    this._ask_push_permissions = val;
+  }
+
+  async getPushPermission() {
+    const authStatus = await messaging().requestPermission();
+    const enabled =
+      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+    return enabled;
+  }
+
+  initPushToken() {
+    if (this._push_type === null && Platform.OS === 'ios') {
+      messaging()
+        .getAPNSToken()
+        .then(token => {
+          if (DEBUG) console.log('New APN token: ', token);
+          this.setPushTokenNotification(token);
+        });
+    } else {
+      messaging()
+        .getToken()
+        .then(token => {
+          if (DEBUG) console.log('New FCM token: ', token);
+          this.setPushTokenNotification(token);
+        });
+    }
+  }
+
+  initPushChannel () {
+    PushNotification.channelExists(SDK_PUSH_CHANNEL, function (exists) {
+      if (!exists) {
+        PushNotification.createChannel(
+          {
+            channelId: SDK_PUSH_CHANNEL,
+            channelName: 'RNSDK channel',
+          }
+        );
+      }
+    });
+  }
+
   initPush(notifyClick, notifyReceive, notifyBgReceive)
   {
-    this.push((async () => {
-      const authStatus = await messaging().requestPermission();
-      const enabled =
-        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
-      if (enabled) {
-        if (this.push_type === null && Platform.OS === 'ios') {
-          messaging()
-            .getAPNSToken()
-            .then(token => {
-              if (DEBUG) console.log('New APN token: ', token);
-              this.setPushTokenNotification(token);
-            });
-        } else {
-          messaging()
-            .getToken()
-            .then(token => {
-              if (DEBUG) console.log('New FCM token: ', token);
-              this.setPushTokenNotification(token);
-            });
-        }
-
-
-        // Register handler
-        messaging().onMessage(async remoteMessage => {
-          if (DEBUG) console.log('Message received: ', remoteMessage);
-          if (!notifyReceive) {
-            await this.showNotification(remoteMessage);
-          } else{
-            notifyReceive(remoteMessage);
+    if (this._ask_push_permissions) {
+        this.push((async () => {
+          if ( await this.getPushPermission() ) {
+            this.initPushChannel();
+            this.initPushToken();
           }
-        });
+        }));
+    }
 
-        // Register background handler
-        messaging().setBackgroundMessageHandler(async remoteMessage => {
-          if (DEBUG) console.log('Background message received: ', remoteMessage);
-
-          if (!notifyReceive && !notifyBgReceive) {
-            await this.showNotification(remoteMessage);
-          } else if (!notifyBgReceive) {
-            notifyReceive(remoteMessage);
-          } else {
-            notifyBgReceive(remoteMessage);
-          }
-        });
-
-        //Subscribe to click  notification
-        PushNotification.configure({
-          popInitialNotification: true,
-          requestPermissions: true,
-          onNotification: (notification) => {
-            if (notification?.userInteraction === true) {
-              if (!notifyClick) {
-                this.notificationClicked({
-                  code: notification?.data?.id,
-                  type: notification?.data?.type
-                });
-              } else {
-                let eventData = {
-                  data: {
-                    body: notification.message,
-                    icon: notification.data.icon,
-                    id: notification.data.id,
-                    image: notification.data.image,
-                    title: notification.title,
-                    type: notification.data.type,
-                  },
-                  from: notification.data.from,
-                  messageId: notification.data.message_id,
-                  sentTime: notification.data.sentTime,
-                  ttl: notification.data.ttl,
-                };
-                notifyClick(eventData);
-              };
-            };
-            notification.finish(PushNotificationIOS.FetchResult.NoData);
-          }
-        });
-
-        PushNotification.channelExists(SDK_PUSH_CHANNEL, function (exists) {
-          if (!exists) {
-            PushNotification.createChannel(
-              {
-                channelId: SDK_PUSH_CHANNEL,
-                channelName: 'RNSDK channel',
-              }
-            );
-          }
-        });
+    // Register handler
+    messaging().onMessage(async remoteMessage => {
+      if (DEBUG) console.log('Message received: ', remoteMessage);
+      if (!notifyReceive) {
+        await this.showNotification(remoteMessage);
+      } else {
+        notifyReceive(remoteMessage);
       }
-    }));
+    });
+
+    // Register background handler
+    messaging().setBackgroundMessageHandler(async remoteMessage => {
+      if (DEBUG) console.log('Background message received: ', remoteMessage);
+
+      if (!notifyReceive && !notifyBgReceive) {
+        await this.showNotification(remoteMessage);
+      } else if (!notifyBgReceive) {
+        notifyReceive(remoteMessage);
+      } else {
+        notifyBgReceive(remoteMessage);
+      }
+    });
+
+    //Subscribe to click  notification
+    PushNotification.configure({
+      popInitialNotification: true,
+      requestPermissions: true,
+      onNotification: (notification) => {
+        if (notification?.userInteraction === true) {
+          if (!notifyClick) {
+            this.notificationClicked({
+              code: notification?.data?.id,
+              type: notification?.data?.type
+            });
+          } else {
+            let eventData = {
+              data: {
+                body: notification.message,
+                icon: notification.data.icon,
+                id: notification.data.id,
+                image: notification.data.image,
+                title: notification.title,
+                type: notification.data.type,
+              },
+              from: notification.data.from,
+              messageId: notification.data.message_id,
+              sentTime: notification.data.sentTime,
+              ttl: notification.data.ttl,
+            };
+            notifyClick(eventData);
+          }
+          ;
+        }
+        ;
+        notification.finish(PushNotificationIOS.FetchResult.NoData);
+      }
+    });
 
   }
   async showNotification (message){
