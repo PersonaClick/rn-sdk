@@ -273,9 +273,6 @@ rnsdk.search({
   .then((res) => {
     console.log(res);
   })
-  .catch((error) => {
-    console.log(error);
-  });
 ```
 
 ## Product recommendations
@@ -294,9 +291,6 @@ rnsdk.recommend(recommender_code, params)
   .then((res) => {
     console.log(res);
   })
-  .catch((error) => {
-    console.log(error);
-  });
 ```
 
 ## Save profile settings

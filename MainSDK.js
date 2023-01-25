@@ -126,36 +126,44 @@ class MainSDK  extends Performer {
   }
 
   recommend(recommender_code, options) {
-    this.push((async () => {
-      try {
-        return await request(`recommend/${recommender_code}`, {
-          params: {
-            shop_id: this.shop_id,
-            stream: this.stream,
-            recommender_code,
-            ...options,
-          },
-        });
-      } catch (error) {
-        return error;
-      }
-    }));
+    return new Promise((resolve, reject) => {
+      this.push((() => {
+        try {
+          request(`recommend/${recommender_code}`, {
+            params: {
+              shop_id: this.shop_id,
+              stream: this.stream,
+              recommender_code,
+              ...options,
+            },
+          }).then( res => {
+            resolve(res)
+          });
+        } catch (error) {
+          reject(error)
+        }
+      }));
+    })
   }
 
   search(options) {
-    this.push((async () => {
-      try {
-        return await request('search', {
-          params: {
-            shop_id: this.shop_id,
-            stream: this.stream,
-            ...options,
-          },
-        });
-      } catch (error) {
-        return error;
-      }
-    }))
+    return new Promise((resolve, reject) => {
+      this.push((() => {
+        try {
+          request('search', {
+            params: {
+              shop_id: this.shop_id,
+              stream: this.stream,
+              ...options,
+            },
+          }).then( res => {
+            resolve(res);
+          });
+        } catch (error) {
+          reject(error)
+        }
+      }))
+    })
   }
 
   setProfile(params) {
