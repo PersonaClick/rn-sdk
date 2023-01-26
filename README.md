@@ -327,6 +327,15 @@ const params = {
 rnsdk.setProfile(params);
 ```
 
+## Read profile info
+
+```js
+rnsdk.getProfile()
+  .then((res) => {
+      console.log(res);
+    })
+```
+
 ## Init push notification
 
 ```js

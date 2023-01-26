@@ -190,21 +190,24 @@ class MainSDK  extends Performer {
       }
     }));
   }
-  getProfile(options) {
-    this.push((async () => {
-      try {
-        return await request('profile', {
-          method: 'GET',
-          params: {
-            shop_id: this.shop_id,
-            stream: this.stream,
-            ...options
-          },
-        });
-      } catch (error) {
-        return error;
-      }
-    }))
+  getProfile() {
+    return new Promise((resolve, reject) => {
+      this.push((() => {
+        try {
+          request('profile', {
+            method: 'GET',
+            params: {
+              shop_id: this.shop_id,
+              stream: this.stream,
+            },
+          }).then( res =>{
+            resolve(res);
+          });
+        } catch (error) {
+          reject(error);
+        }
+      }))
+    });
   }
 
   setPushTokenNotification(token) {
