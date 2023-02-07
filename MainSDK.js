@@ -113,6 +113,7 @@ class MainSDK  extends Performer {
       try {
         return await request(`track/${event}`, {
           method: 'POST',
+          headers: {"Content-Type": "application/json"},
           params: {
             shop_id: this.shop_id,
             stream: this.stream,
@@ -178,6 +179,7 @@ class MainSDK  extends Performer {
       }
       try {
         return await request('profile/set', {
+          headers: {"Content-Type": "application/json"},
           method: 'POST',
           params: {
             shop_id: this.shop_id,
@@ -278,7 +280,7 @@ class MainSDK  extends Performer {
     });
   }
 
-  initPush(notifyClick, notifyReceive, notifyBgReceive)
+  initPush(notifyClick = false, notifyReceive = false, notifyBgReceive = false)
   {
 
     if (this._ask_push_permissions) {
@@ -333,6 +335,7 @@ class MainSDK  extends Performer {
                 image: notification.data.image,
                 title: notification.title,
                 type: notification.data.type,
+                event: notification.data.event,
               },
               from: notification.data.from,
               messageId: notification.data.message_id,
