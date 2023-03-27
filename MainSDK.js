@@ -6,6 +6,8 @@ import PushNotification from "react-native-push-notification";
 import PushNotificationIOS from "@react-native-community/push-notification-ios";
 import {SDK_PUSH_CHANNEL} from "./index";
 import Performer from './lib/performer';
+import pushData from "./lib/pushData";
+
 export var DEBUG = false;
 
 class MainSDK  extends Performer {
@@ -18,6 +20,8 @@ class MainSDK  extends Performer {
     DEBUG = debug;
     this._push_type = null;
     this._ask_push_permissions = true;
+    this.push_payload = [];
+    this.pushData = new pushData( this.push_payload );
   }
 
   perform(command) {
@@ -295,6 +299,7 @@ class MainSDK  extends Performer {
     // Register handler
     messaging().onMessage(async remoteMessage => {
       if (DEBUG) console.log('Message received: ', remoteMessage);
+      this.pushData.push(remoteMessage);
       if (!notifyReceive) {
         await this.showNotification(remoteMessage);
       } else {
@@ -305,7 +310,7 @@ class MainSDK  extends Performer {
     // Register background handler
     messaging().setBackgroundMessageHandler(async remoteMessage => {
       if (DEBUG) console.log('Background message received: ', remoteMessage);
-
+      this.pushData.push(remoteMessage);
       if (!notifyReceive && !notifyBgReceive) {
         await this.showNotification(remoteMessage);
       } else if (!notifyBgReceive) {
@@ -327,26 +332,10 @@ class MainSDK  extends Performer {
               type: notification?.data?.type
             });
           } else {
-            let eventData = {
-              data: {
-                body: notification.message,
-                icon: notification.data.icon,
-                id: notification.data.id,
-                image: notification.data.image,
-                title: notification.title,
-                type: notification.data.type,
-                event: notification.data.event,
-              },
-              from: notification.data.from,
-              messageId: notification.data.message_id,
-              sentTime: notification.data.sentTime,
-              ttl: notification.data.ttl,
-            };
-            notifyClick(eventData);
+            this.pushData.push(notification);
+            notifyClick(this.pushData.get(notification.data.message_id));
           }
-          ;
         }
-        ;
         notification.finish(PushNotificationIOS.FetchResult.NoData);
       }
     });

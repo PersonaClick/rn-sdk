@@ -189,7 +189,7 @@ rnsdk.track("cart", id);
 // Add product to cart with amount and track recommender
 rnsdk.track("cart", {
   id: PRODUCT_ID,
-  quantity: PRODUCT_QUANTITY,
+  amount: PRODUCT_AMOUNT,
   recommended_by: 'dynamic',
   recommended_code: 'UNIQUE_RECOMMENDER_CODE'
 });
@@ -198,12 +198,12 @@ rnsdk.track("cart", {
 rnsdk.track("cart", [
   {
     id: FIRST_PRODUCT_ID,
-    quantity: FIRST_PRODUCT_QUANTITY
+    amount: FIRST_PRODUCT_AMOUNT
   },
   ...
   {
     id: LAST_PRODUCT_ID,
-    quantity: LAST_PRODUCT_QUANTITY
+    amount: LAST_PRODUCT_AMOUNT
   }
 ]);
 
@@ -219,8 +219,8 @@ rnsdk.track("remove_wish", id);
 // Track purchase (several products)
 rnsdk.track("purchase", {
   products: [
-      {id: 37, price: 318, quantity: 3},
-      {id: 187, price: 5000, quantity: 1}
+      {id: 37, price: 318, amount: 3},
+      {id: 187, price: 5000, amount: 1}
   ],
   order: 'N318',
   order_price: 29999
@@ -328,7 +328,6 @@ rnsdk.setProfile(params);
 ```
 
 ## Read profile info
-
 ```js
 rnsdk.getProfile()
   .then((res) => {
