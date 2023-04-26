@@ -1,4 +1,4 @@
-import {request, updSeance} from './lib/client';
+import {initLocker, request, setInitLocker, updSeance} from './lib/client';
 import { convertParams } from './lib/tracker';
 import {AppState, Platform} from 'react-native';
 import messaging from '@react-native-firebase/messaging';
@@ -284,8 +284,12 @@ class MainSDK  extends Performer {
     });
   }
 
-  initPush(notifyClick = false, notifyReceive = false, notifyBgReceive = false)
+  async initPush(notifyClick = false, notifyReceive = false, notifyBgReceive = false)
   {
+
+    const lock = await initLocker();
+    if (lock && lock.state == true && ((new Date()).getTime() < lock.expires )) return false;
+    await setInitLocker(true);
 
     if (this._ask_push_permissions) {
         this.push((async () => {
