@@ -22,6 +22,7 @@ class MainSDK  extends Performer {
     this._ask_push_permissions = true;
     this.push_payload = [];
     this.pushData = new pushData( this.push_payload );
+    this.lastMessageIds = [];
   }
 
   perform(command) {
@@ -253,7 +254,8 @@ class MainSDK  extends Performer {
     return enabled;
   }
 
-  initPushToken() {
+  initPushToken(removeOld = false) {
+    if (removeOld) this.deleteToken();
     if (this._push_type === null && Platform.OS === 'ios') {
       messaging()
         .getAPNSToken()
@@ -286,22 +288,26 @@ class MainSDK  extends Performer {
 
   async initPush(notifyClick = false, notifyReceive = false, notifyBgReceive = false)
   {
-
     const lock = await initLocker();
-    if (lock && lock.state == true && ((new Date()).getTime() < lock.expires )) return false;
+    if ((lock && lock.hasOwnProperty('state') && lock.state === true && ((new Date()).getTime() < lock.expires ) )) return false;
     await setInitLocker(true);
 
     if (this._ask_push_permissions) {
         this.push((async () => {
           if ( await this.getPushPermission() ) {
             this.initPushChannel();
-            this.initPushToken();
+            this.initPushToken(true);
           }
         }));
     }
 
     // Register handler
     messaging().onMessage(async remoteMessage => {
+      if (this.lastMessageIds.includes(remoteMessage.messageId)){
+        return false
+      } else {
+        this.lastMessageIds.push(remoteMessage.messageId);
+      }
       if (DEBUG) console.log('Message received: ', remoteMessage);
       this.pushData.push(remoteMessage);
       if (!notifyReceive) {
@@ -313,6 +319,11 @@ class MainSDK  extends Performer {
 
     // Register background handler
     messaging().setBackgroundMessageHandler(async remoteMessage => {
+      if (this.lastMessageIds.includes(remoteMessage.messageId)){
+        return false
+      } else {
+        this.lastMessageIds.push(remoteMessage.messageId);
+      }
       if (DEBUG) console.log('Background message received: ', remoteMessage);
       this.pushData.push(remoteMessage);
       if (!notifyReceive && !notifyBgReceive) {
@@ -396,6 +407,9 @@ class MainSDK  extends Performer {
         return error;
       }
     }));
+  }
+  deleteToken(){
+    messaging().deleteToken();
   }
 }
 
