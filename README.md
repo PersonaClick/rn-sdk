@@ -419,6 +419,38 @@ rnsdk.triggers('unsubscribe_from_product_available', {email: 'John.Doe@store.com
 // Unsubscribing from all products
 rnsdk.triggers('unsubscribe_from_product_available', {email: 'John.Doe@store.com', item_ids: []});
 ```
+## Subscriptions
+### Manage subscriptions
+```js
+// Subscribe user to all kids of email campaigns and SMS
+rnsdk.subscriptions('manage', {
+  email: 'my@example.com',
+  phone: '+100000000000',
+  email_bulk: true,
+  email_chain: true,
+  email_transactional: true,
+  sms_bulk: true,
+  sms_chain: true,
+  sms_transactional: true
+});
+
+// Change only specific subscriptions
+rnsdk.subscriptions('manage', {
+  email: 'my@example.com',
+  phone: '+100000000000',
+  email_chain: true,
+  sms_bulk: true,
+  sms_transactional: true
+});
+
+// Change without phone
+rnsdk.subscriptions('manage', {
+  email: 'my@example.com',
+  email_chain: true,
+  sms_bulk: true,
+  sms_transactional: true
+});
+```
 ## 
 
 ## License

@@ -411,6 +411,9 @@ class MainSDK  extends Performer {
   deleteToken(){
     messaging().deleteToken();
   }
+  subscriptions(action, data) {
+    this.triggers(action, data)
+  }
 }
 
 export default MainSDK;
