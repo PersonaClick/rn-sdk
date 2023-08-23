@@ -510,7 +510,7 @@ rnsdk.segments('remove', {
 ### Get user segments
 ```js
 // Using all possible identifiers
-rnsdk.segments('get', function(segments) {
+rnsdk.segments('get').then(res => {
   // segments (type: array of objects)
   // each object has the following properties:
   // "id" as Segment ID
