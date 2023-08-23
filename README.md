@@ -125,6 +125,10 @@ SDK is used for several tasks:
 10. Triggers
     1. Price drop
     2. Back in Stock
+11. Segments
+    1. Add user to a segment
+    2. Remove user from a segment
+    3. Get user segments
 
 
 ## Initialization
@@ -419,7 +423,6 @@ rnsdk.triggers('unsubscribe_from_product_available', {email: 'John.Doe@store.com
 // Unsubscribing from all products
 rnsdk.triggers('unsubscribe_from_product_available', {email: 'John.Doe@store.com', item_ids: []});
 ```
-## Subscriptions
 ### Manage subscriptions
 ```js
 // Subscribe user to all kids of email campaigns and SMS
@@ -449,6 +452,69 @@ rnsdk.subscriptions('manage', {
   email_chain: true,
   sms_bulk: true,
   sms_transactional: true
+});
+```
+## Segments
+### Add user to a segment
+```js
+// Using all possible identifiers
+rnsdk.segments('add', {
+  "email": "jane@example.com",
+  "phone": "+10000000000",
+  "segment_id": "SEGMENT_ID"
+});
+
+// With phone only
+rnsdk.segments('add', {
+  "phone": "+10000000000",
+  "segment_id": "SEGMENT_ID"
+});
+
+// With email only
+rnsdk.segments('add', {
+  "email": "jane@example.com",
+  "segment_id": "SEGMENT_ID"
+});
+
+// Without any contacts: `did` is used automatically
+rnsdk.segments('add', {
+  "segment_id": "SEGMENT_ID"
+});
+```
+### Remove user from a segment
+```js
+// Using all possible identifiers
+rnsdk.segments('remove', {
+  "email": "jane@example.com",
+  "phone": "+10000000000",
+  "segment_id": "SEGMENT_ID"
+});
+
+// With phone only
+rnsdk.segments('remove', {
+  "phone": "+10000000000",
+  "segment_id": "SEGMENT_ID"
+});
+
+// With email only
+rnsdk.segments('remove', {
+  "email": "jane@example.com",
+  "segment_id": "SEGMENT_ID"
+});
+
+// Without any contacts: `did` is used automatically
+rnsdk.segments('remove', {
+  "segment_id": "SEGMENT_ID"
+});
+```
+### Get user segments
+```js
+// Using all possible identifiers
+rnsdk.segments('get', function(segments) {
+  // segments (type: array of objects)
+  // each object has the following properties:
+  // "id" as Segment ID
+  // "type" as Segment Type ("dynamic", "static")
 });
 ```
 ## 

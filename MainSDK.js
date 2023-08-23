@@ -414,6 +414,22 @@ class MainSDK  extends Performer {
   subscriptions(action, data) {
     this.triggers(action, data)
   }
+  segments(action, data) {
+    this.push((async () => {
+      try {
+        return await request(`segments/${action}`, {
+          headers: {"Content-Type": "application/json"},
+          method: action === 'get' ? 'GET' : 'POST',
+          params: Object.assign({
+            shop_id: this.shop_id,
+            stream: this.stream,
+          }, data),
+        });
+      } catch (error) {
+        return error;
+      }
+    }));
+  }
 }
 
 export default MainSDK;
