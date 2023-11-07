@@ -108,7 +108,13 @@ In your `android/app/build.gradle` add
 apply plugin: 'com.google.gms.google-services'
 ```
 
-
+in `android/app/src/main/AndroidManifest.xml` add
+```gradle
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
+                     android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"
+                     android:minSdkVersion="33"/>
+```
 # Usage
 
 SDK is used for several tasks:

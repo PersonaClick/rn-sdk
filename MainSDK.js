@@ -1,4 +1,4 @@
-import {initLocker, request, setInitLocker, updSeance} from './lib/client';
+import {initLocker, request, setInitLocker, updSeance, getPushData, updPushData, removePushMessage} from './lib/client';
 import { convertParams } from './lib/tracker';
 import {AppState, Platform} from 'react-native';
 import messaging from '@react-native-firebase/messaging';
@@ -21,7 +21,6 @@ class MainSDK  extends Performer {
     this._push_type = null;
     this._ask_push_permissions = true;
     this.push_payload = [];
-    this.pushData = new pushData( this.push_payload );
     this.lastMessageIds = [];
   }
 
@@ -293,12 +292,12 @@ class MainSDK  extends Performer {
     await setInitLocker(true);
 
     if (this._ask_push_permissions) {
-        this.push((async () => {
-          if ( await this.getPushPermission() ) {
-            this.initPushChannel();
-            this.initPushToken(true);
-          }
-        }));
+      this.push((async () => {
+        if ( await this.getPushPermission() ) {
+          this.initPushChannel();
+          this.initPushToken(true);
+        }
+      }));
     }
 
     // Register handler
@@ -309,7 +308,7 @@ class MainSDK  extends Performer {
         this.lastMessageIds.push(remoteMessage.messageId);
       }
       if (DEBUG) console.log('Message received: ', remoteMessage);
-      this.pushData.push(remoteMessage);
+      await updPushData(remoteMessage);
       if (!notifyReceive) {
         await this.showNotification(remoteMessage);
       } else {
@@ -324,8 +323,8 @@ class MainSDK  extends Performer {
       } else {
         this.lastMessageIds.push(remoteMessage.messageId);
       }
-      if (DEBUG) console.log('Background message received: ', remoteMessage);
-      this.pushData.push(remoteMessage);
+      if (DEBUG) console.log('Background message received: ', remoteMessage);;
+      await updPushData(remoteMessage);
       if (!notifyReceive && !notifyBgReceive) {
         await this.showNotification(remoteMessage);
       } else if (!notifyBgReceive) {
@@ -339,26 +338,29 @@ class MainSDK  extends Performer {
     PushNotification.configure({
       popInitialNotification: true,
       requestPermissions: true,
-      onNotification: (notification) => {
+      onNotification: async (notification) => {
+        await updPushData(notification);
         if (notification?.userInteraction === true) {
           if (!notifyClick) {
-            this.notificationClicked({
-              code: notification?.data?.id,
-              type: notification?.data?.type
-            });
+            this.onClickPush(notification);
           } else {
-            this.pushData.push(notification);
-            notifyClick(this.pushData.get(notification.data.message_id));
+            getPushData(notification.data.message_id).then(data => {
+              notifyClick(data);
+            })
+
           }
         }
         notification.finish(PushNotificationIOS.FetchResult.NoData);
       }
     });
+    PushNotification.popInitialNotification((notification) => {
+      this.onClickPush(notification);
+    });
 
   }
   async showNotification (message){
     if (DEBUG) console.log('Show notification: ', message);
-
+    updPushData(message);
     await this.notificationReceived({
       code: message.data.id,
       type: message.data.type
@@ -369,7 +371,7 @@ class MainSDK  extends Performer {
       largeIconUrl: message.data.icon,
       bigLargeIconUrl: message.data.icon,
       bigPictureUrl: message.data.image,
-      picture: message.data.icon,
+      picture: message.data.image,
       title: message.data.title,
       message: message.data.body,
       userInfo: {
@@ -433,6 +435,65 @@ class MainSDK  extends Performer {
         }
       }));
     })
+  }
+  async onClickPush (notification) {
+    const messageId = notification.data.message_id || notification.data['google.message_id'];
+    let pushData = await getPushData(messageId);
+    if ( pushData.length === 0 || !pushData[0].data.event) {
+      return false;
+    }
+    await removePushMessage(messageId);
+    this.notificationClicked({
+      code: notification?.data?.id,
+      type: notification?.data?.type
+    });
+    let message_event = JSON.parse(pushData[0].data.event),
+      message_url = '';
+    switch (message_event.type) {
+      case "web":
+        message_url = message_event.uri;
+        break;
+      case "product":
+        try {
+          await request(`products/get?item_id=${message_event.uri}&shop_id=${this.shop_id}`, {
+            method: 'GET',
+            headers: {"Content-Type": "application/json"},
+            params: {
+              shop_id: this.shop_id,
+              stream: this.stream,
+            },
+          }).then(data => {
+            message_url = data.url
+          });
+
+        } catch (error) {
+          return error;
+        }
+        break;
+      case "category":
+        try {
+          await request(`category/${message_event.uri}?shop_id=${this.shop_id}`, {
+            method: 'GET',
+            headers: {"Content-Type": "application/json"},
+            params: {
+              shop_id: this.shop_id,
+              stream: this.stream,
+            },
+          }).then(data => {
+            message_url = data.categories.find(x => x.id === message_event.uri).url;
+          });
+        } catch (error) {
+          return error;
+        }
+        break;
+    }
+
+    const supported = await Linking.openURL(message_url);
+    if (supported) {
+      await Linking.openURL(message_url);
+    } else {
+      console.log(`error open URL: ${message_url}`);
+    }
   }
 }
 
