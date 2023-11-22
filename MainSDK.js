@@ -7,7 +7,9 @@ import {
   updPushData,
   removePushMessage,
   getData,
-  generateSid
+  generateSid,
+  getSavedPushToken,
+  savePushToken
 } from './lib/client';
 import { convertParams } from './lib/tracker';
 import {AppState, Platform} from 'react-native';
@@ -250,6 +252,11 @@ class MainSDK  extends Performer {
             stream: this.stream,
             ...params
           },
+        }).then(async (data)=> {
+          if (data.status === "success") {
+            await savePushToken(token);
+          }
+          return data;
         });
       } catch (error) {
         return error;
@@ -273,8 +280,13 @@ class MainSDK  extends Performer {
     return enabled;
   }
 
-  initPushToken(removeOld = false) {
-    if (removeOld) this.deleteToken();
+  async initPushToken(removeOld = false) {
+    let savedToken = await getSavedPushToken();
+    if (removeOld) {
+      await this.deleteToken();
+      savedToken = false;
+    }
+    if (savedToken) return savedToken;
     if (this._push_type === null && Platform.OS === 'ios') {
       messaging()
         .getAPNSToken()
@@ -315,7 +327,7 @@ class MainSDK  extends Performer {
       this.push((async () => {
         if ( await this.getPushPermission() ) {
           this.initPushChannel();
-          this.initPushToken(true);
+          await this.initPushToken(false);
         }
       }));
     }
@@ -430,8 +442,10 @@ class MainSDK  extends Performer {
       }
     }));
   }
-  deleteToken(){
-    messaging().deleteToken();
+  async deleteToken(){
+    return savePushToken(false).then(async () => {
+      await messaging().deleteToken();
+    });
   }
   subscriptions(action, data) {
     this.triggers(action, data)
