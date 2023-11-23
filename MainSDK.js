@@ -72,7 +72,14 @@ class MainSDK  extends Performer {
           });
         }
 
-        updSeance(response?.did, response?.seance).then(()=>{
+        updSeance(response?.did, response?.seance).then(async ()=>{
+          if (this._ask_push_permissions) {
+            if ( await this.getPushPermission() ) {
+              this.initPushChannel();
+              await this.initPushToken(false);
+            }
+          }
+
           this.initialized = true;
           this.performQueue();
         });
