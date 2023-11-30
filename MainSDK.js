@@ -73,15 +73,11 @@ class MainSDK  extends Performer {
         }
 
         updSeance(response?.did, response?.seance).then(async ()=>{
-          if (this._ask_push_permissions) {
-            if ( await this.getPushPermission() ) {
-              this.initPushChannel();
-              await this.initPushToken(false);
-            }
-          }
-
           this.initialized = true;
           this.performQueue();
+          this.push((async () => {
+            await this.initPush();
+          }))
         });
       } catch (error) {
         this.initialized = false;
@@ -92,6 +88,15 @@ class MainSDK  extends Performer {
 
   isInit = () => this.initialized;
 
+  pushReceivedListener = async function (remoteMessage) {
+    await this.showNotification(remoteMessage);
+  };
+  pushBgReceivedListener = async function (remoteMessage) {
+    await this.showNotification(remoteMessage);
+  };
+  pushClickListener = async function (remoteMessage) {
+    this.onClickPush(remoteMessage);
+  };
   track(event, options) {
     this.push((async () => {
       try {
@@ -349,6 +354,9 @@ class MainSDK  extends Performer {
         }
       }));
     }
+    if (notifyClick) this.pushClickListener = notifyClick;
+    if (notifyReceive) this.pushReceivedListener = notifyReceive;
+    if (notifyBgReceive) this.pushBgReceivedListener = notifyBgReceive;
 
     // Register handler
     messaging().onMessage(async remoteMessage => {
@@ -359,11 +367,7 @@ class MainSDK  extends Performer {
       }
       if (DEBUG) console.log('Message received: ', remoteMessage);
       await updPushData(remoteMessage);
-      if (!notifyReceive) {
-        await this.showNotification(remoteMessage);
-      } else {
-        notifyReceive(remoteMessage);
-      }
+      await this.pushReceivedListener(remoteMessage);
     });
 
     // Register background handler
@@ -375,13 +379,7 @@ class MainSDK  extends Performer {
       }
       if (DEBUG) console.log('Background message received: ', remoteMessage);;
       await updPushData(remoteMessage);
-      if (!notifyReceive && !notifyBgReceive) {
-        await this.showNotification(remoteMessage);
-      } else if (!notifyBgReceive) {
-        notifyReceive(remoteMessage);
-      } else {
-        notifyBgReceive(remoteMessage);
-      }
+      await this.pushBgReceivedListener(remoteMessage);
     });
 
     //Subscribe to click  notification
@@ -392,10 +390,10 @@ class MainSDK  extends Performer {
         await updPushData(notification);
         if (notification?.userInteraction === true) {
           if (!notifyClick) {
-            this.onClickPush(notification);
+            this.pushClickListener(notification)
           } else {
             getPushData(notification.data.message_id).then(data => {
-              notifyClick(data);
+              this.pushClickListener(data)
             })
 
           }
@@ -404,7 +402,7 @@ class MainSDK  extends Performer {
       }
     });
     PushNotification.popInitialNotification((notification) => {
-      if (notification) this.onClickPush(notification);
+      if (notification) this.pushClickListener(notification);
     });
 
   }
