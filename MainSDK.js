@@ -12,7 +12,7 @@ import {
   savePushToken
 } from './lib/client';
 import { convertParams } from './lib/tracker';
-import {AppState, Platform} from 'react-native';
+import {AppState, PermissionsAndroid, Platform} from 'react-native';
 import messaging from '@react-native-firebase/messaging';
 import PushNotification from "react-native-push-notification";
 import PushNotificationIOS from "@react-native-community/push-notification-ios";
@@ -279,12 +279,23 @@ class MainSDK  extends Performer {
   }
 
   async getPushPermission() {
-    const authStatus = await messaging().requestPermission();
-    const enabled =
-      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-    return enabled;
+    let result = false;
+    if(Platform.OS ==="android" && Platform.Version >= 33){
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+        );
+        result = granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err){
+        console.log(err);
+      }
+    } else {
+      const authStatus = await messaging().requestPermission();
+      result =
+        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+    }
+    return result;
   }
 
   async initPushToken(removeOld = false) {
