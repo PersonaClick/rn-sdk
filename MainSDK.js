@@ -288,7 +288,7 @@ class MainSDK  extends Performer {
     if(Platform.OS ==="android" && Platform.Version >= 33){
       try {
         const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS ? PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS : PermissionsAndroid.PERMISSIONS.POST_NOTIFICATION
         );
         result = granted === PermissionsAndroid.RESULTS.GRANTED;
       } catch (err){
@@ -393,7 +393,7 @@ class MainSDK  extends Performer {
             this.pushClickListener(notification)
           } else {
             getPushData(notification.data.message_id).then(data => {
-              this.pushClickListener(data)
+              this.pushClickListener(data && data.length > 0 ? data[0] : false )
             })
 
           }
