@@ -11,4 +11,5 @@ class PersonaClick extends MainSDK{
     this.init();
   }
 }
+
 export default PersonaClick;

@@ -1,3 +1,4 @@
+import { Linking } from 'react-native';
 import {
   initLocker,
   request,
@@ -19,6 +20,39 @@ import PushNotificationIOS from "@react-native-community/push-notification-ios";
 import {SDK_PUSH_CHANNEL} from "./index";
 import Performer from './lib/performer';
 import DeviceInfo from 'react-native-device-info';
+
+/**
+ * @typedef {Object} Event
+ * @property {string} type
+ * @property {string} uri
+ */
+
+/**
+ * @typedef {Object} GoogleData
+ * @property {string} message_id
+ */
+
+/**
+ * @typedef {Object} Data
+ * @property {string} message_id
+ * @property {string} from
+ * @property {number} ttl
+ * @property {number} sentTime
+ * @property {string} id
+ * @property {string} type
+ * @property {GoogleData} google
+ */
+
+/**
+ * @typedef {Object} Notification
+ * @property {Data} [data]
+ * @property {boolean} userInteraction
+ * @property {boolean} foreground
+ * @property {string} channelId
+ * @property {string} id
+ * @property {string} message
+ * @property {string} title
+ */
 
 export var DEBUG = false;
 
@@ -94,8 +128,13 @@ class MainSDK  extends Performer {
   pushBgReceivedListener = async function (remoteMessage) {
     await this.showNotification(remoteMessage);
   };
+  /**
+   *
+   * @param {Notification} remoteMessage
+   * @returns {Promise<void>}
+   */
   pushClickListener = async function (remoteMessage) {
-    this.onClickPush(remoteMessage);
+    await this.onClickPush(remoteMessage);
   };
   track(event, options) {
     this.push((async () => {
@@ -382,7 +421,7 @@ class MainSDK  extends Performer {
       await this.pushBgReceivedListener(remoteMessage);
     });
 
-    //Subscribe to click  notification
+    /** Subscribe to click notification */
     PushNotification.configure({
       popInitialNotification: true,
       requestPermissions: true,
@@ -390,25 +429,25 @@ class MainSDK  extends Performer {
         await updPushData(notification);
         if (notification?.userInteraction === true) {
           if (!notifyClick) {
-            this.pushClickListener(notification)
+            await this.pushClickListener(notification)
           } else {
-            getPushData(notification.data.message_id).then(data => {
-              this.pushClickListener(data && data.length > 0 ? data[0] : false )
-            })
-
+            const data = await getPushData(notification.data.message_id)
+            await this.pushClickListener(data && data.length > 0 ? data[0] : false)
           }
         }
         notification.finish(PushNotificationIOS.FetchResult.NoData);
       }
     });
-    PushNotification.popInitialNotification((notification) => {
-      if (notification) this.pushClickListener(notification);
+    PushNotification.popInitialNotification(async (notification) => {
+      if (!notification) return;
+
+      await this.pushClickListener(notification);
     });
 
   }
   async showNotification (message){
     if (DEBUG) console.log('Show notification: ', message);
-    updPushData(message);
+    await updPushData(message);
     await this.notificationReceived({
       code: message.data.id,
       type: message.data.type
@@ -486,19 +525,29 @@ class MainSDK  extends Performer {
       }));
     })
   }
+
+  /**
+   * @param {Notification} [notification]
+   * @returns {Promise<*|boolean>}
+   */
   async onClickPush (notification) {
     const messageId = notification.data.message_id || notification.data['google.message_id'];
     let pushData = await getPushData(messageId);
-    if ( pushData.length === 0 || !pushData[0].data.event) {
-      return false;
-    }
+    if (pushData.length === 0) return false;
+
     await removePushMessage(messageId);
     this.notificationClicked({
       code: notification?.data?.id,
       type: notification?.data?.type
     });
-    let message_event = JSON.parse(pushData[0].data.event),
-      message_url = '';
+
+    /** @type {string|undefined} */
+    const event = pushData[0].data.event;
+    if (!event) return false;
+
+    /** @type {Event|null} */
+    const message_event = JSON.parse(event);
+    let message_url = '';
     switch (message_event.type) {
       case "web":
         message_url = message_event.uri;
