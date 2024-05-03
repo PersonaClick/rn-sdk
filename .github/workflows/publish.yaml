@@ -24,9 +24,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-
-      - name: Install
-        run: yarn install --inline-builds
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Publish
         env:
