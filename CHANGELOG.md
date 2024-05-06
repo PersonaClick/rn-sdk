@@ -1,117 +1,95 @@
-#### 1.5.9 (July 29, 2022)
-* fixed ios notification display
-* change click notification params
-* upd README.md
+## 1.6.38 (2024-05-06)
 
+
+### Features
+
+* add array to track wish request (da7bc28)
+* add custom properties to track purchase request (d58f5af)
+* add persona-synchronization.yaml (17ddf01)
+
+
+
+## 1.6.37 (2024-05-03)
+
+
+### Features
+
+* add array to track wish request (da7bc28)
+* add custom properties to track purchase request (d58f5af)
+* add persona-synchronization.yaml (17ddf01)
+
+
+
+## 1.6.36 (2024-05-02)
+
+
+### Features
+
+* add array to track wish request (da7bc28)
+* add custom properties to track purchase request (d58f5af)
+* add persona-synchronization.yaml (17ddf01)
+
+
+
+## 1.6.35 (2024-05-02)
+
+
+### Features
+
+* add array to track wish request (da7bc28)
+* add custom properties to track purchase request (d58f5af)
+* add persona-synchronization.yaml (17ddf01)
+
+
+
+## 1.6.34 (2024-04-23)
+
+
+### Features
+
+* add array to track wish request (da7bc28)
+* add custom properties to track purchase request (d58f5af)
+
+
+
+## 1.6.33 (2024-04-23)
+
+
+### Features
+
+* add new action step to identify base commit in master (95930a9)
+* connect sdk to dev app (48788fa)
+* move to sdk (85a1e1e)
+* swap auto-changelog for standard-changelog (ec88b46)
+
+
+
+### Changelog
+
+All notable changes to this project will be documented in this file. Dates are displayed in UTC.
+
+#### 1.6.31
+
+- Chore: test app config `#6`
+- Feat: add react native sdk `#2`
+- Feat: application for local development `#1`
+- Fix: click event `#5`
+- Feat: auto generating changelog on publish `#4`
+- fix/click-notification-code `#2`
+- Fix/push notification `#1`
+
+<!-- auto-changelog-above -->
 #### 1.5.7 (May 12, 2022)
+##### Changes
 * add Trigger subscription methods
 * add debug log
 * upd mobile push tracking
 
-#### 1.5.5 (July 30, 2021)
-* Update platform value
-
-#### 1.5.4 (July 8, 2021)
-##### Bug Fixes
-
-* fix push channels
-* fix string in message_id
-
-#### 1.5.3 (May 11, 2021)
-##### Bug Fixes
-
-* fix notification callbacks
-##### Documentation Changes
-
-* Update README.md
-
-#### 1.5.2 (Apr 16, 2021)
-##### New Features
-
-* add Push notification callbacks (open/received)
-
-##### Documentation Changes
-
-* Update README.md
-
-#### 1.5.1 (Apr 15, 2021)
-##### Documentation Changes
-
-* Update README.md
-* Update CHANGELOG.md
-
-##### Bug Fixes
-
-* fix array params in setProfile
-
-#### 1.5.0 (Apr 15, 2021)
-##### New Features
-* add custom event tracking
-
-#### 1.4.1 (Apr 14, 2021)
-##### Documentation Changes
-
-* Update README.md
-
-#### 1.4.0 (Apr 14, 2021)
-
-##### New Features
-
-* Add FCM support
-* initPush() method
-
-#### 1.3.2 (Mar 31, 2021)
-
-##### Documentation Changes
-
-* Update README.md
-
+#### 1.5.6 (Feb 15, 2022)
 ##### Changes
 
-* removed deprecated functions
-
-##### 
-
-#### 1.3.1 (Mar 30, 2021)
+* Update the event tracking to json format
 
 ##### Documentation Changes
 
 * Update README.md
-
-#### 1.3.0 (Mar 30, 2021)
-
-##### New Features
-
-* setPushTokenNotification method
-
-#### 1.2.1 (Mar 30, 2021)
-
-##### Bug Fixes
-
-* fixed birthday property in setProfile
-
-#### 1.2.0 (Mar 30, 2021)
-
-##### Documentation Changes
-
-* added setProfile examples
-
-##### New Features
-
-* setProfile method
-
-## 1.1.1 (Mar 26, 2021)
-
-##### Documentation Changes
-
-* Update README.md, add examples
-
-##### Bug Fixes
-
-* fixed events tracking
-
-## 1.0.1
-
-##### New Features
-
-* session expire
