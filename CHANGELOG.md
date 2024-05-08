@@ -1,3 +1,14 @@
+## 1.6.40 (2024-05-08)
+
+
+### Features
+
+* add array to track wish request (da7bc28)
+* add custom properties to track purchase request (d58f5af)
+* add persona-synchronization.yaml (17ddf01)
+
+
+
 ## 1.6.39 (2024-05-06)
 
 
