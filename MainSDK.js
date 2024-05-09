@@ -1,4 +1,5 @@
-import { Linking } from 'react-native';
+import { AndroidNotificationSetting } from '@notifee/react-native';
+import { Linking }                    from 'react-native';
 import {
   initLocker,
   request,
@@ -11,7 +12,7 @@ import {
   generateSid,
   getSavedPushToken,
   savePushToken
-} from './lib/client';
+}                                     from './lib/client';
 import { convertParams } from './lib/tracker';
 import {AppState, PermissionsAndroid, Platform} from 'react-native';
 import messaging from '@react-native-firebase/messaging';
@@ -19,6 +20,7 @@ import PushNotification from "react-native-push-notification";
 import PushNotificationIOS from "@react-native-community/push-notification-ios";
 import {SDK_PUSH_CHANNEL} from "./index";
 import Performer from './lib/performer';
+import notifee from '@notifee/react-native'
 import DeviceInfo from 'react-native-device-info';
 
 /**
@@ -330,6 +332,10 @@ class MainSDK  extends Performer {
           PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS ? PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS : PermissionsAndroid.PERMISSIONS.POST_NOTIFICATION
         );
         result = granted === PermissionsAndroid.RESULTS.GRANTED;
+        const settings = await notifee.getNotificationSettings()
+        if (settings.android.alarm === AndroidNotificationSetting.DISABLED) {
+          await notifee.openAlarmPermissionSettings()
+        }
       } catch (err){
         console.log(err);
       }

@@ -1,12 +1,11 @@
 {
   "name": "@personaclick/rn-sdk",
-  "version": "1.6.40",
+  "version": "1.7.1",
   "description": "PersonaClick React Native SDK",
-  "main": "index.js",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/PersonaClick/rn-sdk.git"
+  "exports": {
+    ".": "./index.js"
   },
+  "main": "index.js",
   "author": "PersonaClick",
   "license": "MIT",
   "keywords": [
@@ -16,23 +15,25 @@
     "PersonaClick",
     "@PersonaClick/rn-sdk"
   ],
-  "bugs": {
-    "url": "https://github.com/PersonaClick/rn-sdk/issues"
-  },
   "dependencies": {
     "@jest/create-cache-key-function": "^26.6.2",
     "axios": "^0.21.1",
     "react-native-device-info": "^8.0.7"
   },
   "devDependencies": {
+    "@notifee/react-native": "7.8.2",
+    "@react-native-async-storage/async-storage": "1.22.0",
+    "@react-native-community/push-notification-ios": "1.11.0",
+    "@react-native-firebase/messaging": "18.8.0",
     "@testing-library/jest-native": "^4.0.4",
+    "@types/react-native-push-notification": "8",
     "jest": "26.4.0",
     "react": "^17.0.2",
     "react-native": "^0.64.0",
+    "react-native-push-notification": "8.1.1",
     "react-test-renderer": "^17.0.2",
     "standard-changelog": "5.0.0"
   },
-  "homepage": "https://github.com/PersonaClick/rn-sdk#readme",
   "directories": {
     "lib": "lib"
   },
@@ -52,5 +53,12 @@
   "publishConfig": {
     "access": "public"
   },
-  "packageManager": "yarn@4.1.0"
+  "packageManager": "yarn@4.1.0",
+  "peerDependencies": {
+    "@notifee/react-native": "^7.8.2",
+    "@react-native-async-storage/async-storage": "^1.23.1",
+    "@react-native-community/push-notification-ios": "^1.11.0",
+    "@react-native-firebase/messaging": "^19.2.2",
+    "react-native-push-notification": "^8.1.1"
+  }
 }
