@@ -1,4 +1,4 @@
-## 1.6.40 (2024-05-08)
+## 1.7.1 (2024-05-09)
 
 
 ### Features
@@ -6,71 +6,7 @@
 * add array to track wish request (da7bc28)
 * add custom properties to track purchase request (d58f5af)
 * add persona-synchronization.yaml (17ddf01)
-
-
-
-## 1.6.39 (2024-05-06)
-
-
-### Features
-
-* add array to track wish request (da7bc28)
-* add custom properties to track purchase request (d58f5af)
-* add persona-synchronization.yaml (17ddf01)
-
-
-
-## 1.6.38 (2024-05-06)
-
-
-### Features
-
-* add array to track wish request (da7bc28)
-* add custom properties to track purchase request (d58f5af)
-* add persona-synchronization.yaml (17ddf01)
-
-
-
-## 1.6.37 (2024-05-03)
-
-
-### Features
-
-* add array to track wish request (da7bc28)
-* add custom properties to track purchase request (d58f5af)
-* add persona-synchronization.yaml (17ddf01)
-
-
-
-## 1.6.36 (2024-05-02)
-
-
-### Features
-
-* add array to track wish request (da7bc28)
-* add custom properties to track purchase request (d58f5af)
-* add persona-synchronization.yaml (17ddf01)
-
-
-
-## 1.6.35 (2024-05-02)
-
-
-### Features
-
-* add array to track wish request (da7bc28)
-* add custom properties to track purchase request (d58f5af)
-* add persona-synchronization.yaml (17ddf01)
-
-
-
-## 1.6.34 (2024-04-23)
-
-
-### Features
-
-* add array to track wish request (da7bc28)
-* add custom properties to track purchase request (d58f5af)
+* BREAKING CHANGE use @notifee/react-native for requesting alarm permissions (0e23088)
 
 
 
@@ -83,12 +19,6 @@
 * connect sdk to dev app (48788fa)
 * move to sdk (85a1e1e)
 * swap auto-changelog for standard-changelog (ec88b46)
-
-
-
-### Changelog
-
-All notable changes to this project will be documented in this file. Dates are displayed in UTC.
 
 #### 1.6.31
 
