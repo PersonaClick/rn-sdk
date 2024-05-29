@@ -226,6 +226,24 @@ class MainSDK  extends Performer {
     })
   }
 
+  cart() {
+    return new Promise((resolve, reject) => {
+      this.push((() => {
+        try {
+          request('products/cart', {
+            params: {
+              shop_id: this.shop_id,
+            },
+          }).then( res => {
+            resolve(res)
+          });
+        } catch (error) {
+          reject(error)
+        }
+      }));
+    })
+  }
+
   search(options) {
     return new Promise((resolve, reject) => {
       this.push((() => {

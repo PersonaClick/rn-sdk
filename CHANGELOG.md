@@ -1,3 +1,20 @@
+## 1.7.2 (2024-05-29)
+
+
+### Features
+
+* add array to track wish request (da7bc28)
+* add cart method (7a0dd8b)
+* add custom properties to track purchase request (d58f5af)
+* add new action step to identify base commit in master (95930a9)
+* add persona-synchronization.yaml (17ddf01)
+* BREAKING CHANGE use @notifee/react-native for requesting alarm permissions (0e23088)
+* connect sdk to dev app (48788fa)
+* move to sdk (85a1e1e)
+* swap auto-changelog for standard-changelog (ec88b46)
+
+
+
 ## 1.7.1 (2024-05-09)
 
 
