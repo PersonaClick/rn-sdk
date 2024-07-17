@@ -11,8 +11,10 @@ import {
   getData,
   generateSid,
   getSavedPushToken,
-  savePushToken
-}                                     from './lib/client';
+  savePushToken,
+  getLastPushTokenSentDate,
+  saveLastPushTokenSentDate
+} from './lib/client';
 import { convertParams } from './lib/tracker';
 import {AppState, PermissionsAndroid, Platform} from 'react-native';
 import messaging from '@react-native-firebase/messaging';
@@ -22,6 +24,7 @@ import {SDK_PUSH_CHANNEL} from "./index";
 import Performer from './lib/performer';
 import notifee from '@notifee/react-native'
 import DeviceInfo from 'react-native-device-info';
+import {isOverOneWeekAgo} from './utils';
 
 /**
  * @typedef {Object} Event
@@ -59,7 +62,7 @@ import DeviceInfo from 'react-native-device-info';
 export var DEBUG = false;
 
 class MainSDK  extends Performer {
-  constructor(shop_id, stream, debug = false) {
+  constructor(shop_id, stream, debug = false, autoSendPushToken = true) {
     let queue = [];
     super(queue);
     this.shop_id = shop_id;
@@ -70,6 +73,7 @@ class MainSDK  extends Performer {
     this._ask_push_permissions = true;
     this.push_payload = [];
     this.lastMessageIds = [];
+    this.autoSendPushToken = autoSendPushToken;
   }
 
   perform(command) {
@@ -114,6 +118,9 @@ class MainSDK  extends Performer {
           this.push((async () => {
             await this.initPush();
           }))
+          if (this.isInit() && this.autoSendPushToken) {
+            await this.sendPushToken();
+          }
         });
       } catch (error) {
         this.initialized = false;
@@ -309,6 +316,35 @@ class MainSDK  extends Performer {
     });
   }
 
+  /**
+   * Checks if the last sent date of the push token is over one week ago and if push permissions should be asked.
+   * @returns {Promise<boolean>} A promise that resolves to true if a new token needs to be sent, false otherwise.
+   */
+  async checkPushToken() {
+      const lastSentDate = await getLastPushTokenSentDate();
+      return !lastSentDate || isOverOneWeekAgo(lastSentDate) && this._ask_push_permissions;
+  }
+
+  /**
+   * Sends a new push token if permissions are granted.
+   * @returns {Promise<void>} A promise that resolves when the token sending process is complete.
+   */
+  async sendPushToken() {
+    try {
+      if (await this.checkPushToken()) {
+        this.push((async () => {
+          if (await this.getPushPermission()) {
+            this.initPushChannel();
+            await this.initPushToken(false);
+            await saveLastPushTokenSentDate(new Date());
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('Error sending token:', error);
+    }
+  }
+
   setPushTokenNotification(token) {
     this.push((async () => {
       try {
@@ -326,6 +362,7 @@ class MainSDK  extends Performer {
         }).then(async (data)=> {
           if (data.status === "success") {
             await savePushToken(token);
+            await saveLastPushTokenSentDate(new Date());
           }
           return data;
         });
