@@ -44,6 +44,7 @@ import {isOverOneWeekAgo} from './utils';
  * @property {number} ttl
  * @property {number} sentTime
  * @property {string} id
+ * @property {string | undefined} event
  * @property {string} type
  * @property {GoogleData} google
  */
@@ -131,20 +132,31 @@ class MainSDK  extends Performer {
 
   isInit = () => this.initialized;
 
+  /**
+   * @param {import('@react-native-firebase/messaging').RemoteMessage} remoteMessage
+   * @returns {Promise<void>}
+   */
   pushReceivedListener = async function (remoteMessage) {
     await this.showNotification(remoteMessage);
   };
+
+  /**
+   * @param {import('@react-native-firebase/messaging').RemoteMessage} remoteMessage
+   * @returns {Promise<void>}
+   */
   pushBgReceivedListener = async function (remoteMessage) {
     await this.showNotification(remoteMessage);
   };
+
   /**
    *
-   * @param {Notification} remoteMessage
+   * @param {Omit<import('react-native-push-notification').ReceivedNotification, 'userInfo'>} remoteMessage
    * @returns {Promise<void>}
    */
   pushClickListener = async function (remoteMessage) {
     await this.onClickPush(remoteMessage);
   };
+
   track(event, options) {
     this.push((async () => {
       try {
@@ -187,13 +199,35 @@ class MainSDK  extends Performer {
     }));
   }
 
+  /**
+   * Track user clicked/tapped on notification
+   * @param {NotificationEventOptions} options
+   */
   notificationClicked(options) {
     return this.notificationTrack('clicked', options);
   }
-  notificationReceived(options) {
-    return this.notificationTrack('received', options);
+
+  /**
+   * Track notification shown to user
+   * @param {NotificationEventOptions} options
+   */
+  notificationOpened(options) {
+    return this.notificationTrack('opened', options);
   }
 
+  /**
+   * Track notification delivered to user device
+   * @param {NotificationEventOptions} options
+   */
+  notificationDelivered(options) {
+    return this.notificationTrack('delivered', options);
+  }
+
+  /**
+   * Send notification track
+   * @param {'opened' | 'clicked' | 'delivered'} event
+   * @param {{ type: 'bulk' | 'chain' | 'transactional' | string, code: string }} options
+   */
   notificationTrack(event, options) {
     this.push((async () => {
       try {
@@ -440,6 +474,13 @@ class MainSDK  extends Performer {
     });
   }
 
+  /**
+   * Init push
+   * @param {boolean | Function} notifyClick
+   * @param {boolean | Function} notifyReceive
+   * @param {boolean | Function} notifyBgReceive
+   * @returns {Promise<boolean>}
+   */
   async initPush(notifyClick = false, notifyReceive = false, notifyBgReceive = false)
   {
     const lock = await initLocker();
@@ -465,7 +506,13 @@ class MainSDK  extends Performer {
       } else {
         this.lastMessageIds.push(remoteMessage.messageId);
       }
-      if (DEBUG) console.log('Message received: ', remoteMessage);
+
+      await this.notificationDelivered({
+        code: remoteMessage.data.id,
+        type: remoteMessage.data.type
+      })
+      if (DEBUG) console.log('Message delivered: ', remoteMessage);
+
       await updPushData(remoteMessage);
       await this.pushReceivedListener(remoteMessage);
     });
@@ -477,7 +524,13 @@ class MainSDK  extends Performer {
       } else {
         this.lastMessageIds.push(remoteMessage.messageId);
       }
-      if (DEBUG) console.log('Background message received: ', remoteMessage);;
+
+      await this.notificationDelivered({
+        code: remoteMessage.data.id,
+        type: remoteMessage.data.type
+      })
+      if (DEBUG) console.log('Background message delivered: ', remoteMessage);
+
       await updPushData(remoteMessage);
       await this.pushBgReceivedListener(remoteMessage);
     });
@@ -506,14 +559,21 @@ class MainSDK  extends Performer {
     });
 
   }
+
+  /**
+   * Show push notification to user
+   * @param {{ data: { id: string, type: string }}} message
+   * @returns {Promise<void>}
+   */
   async showNotification (message){
     if (DEBUG) console.log('Show notification: ', message);
     await updPushData(message);
-    await this.notificationReceived({
+    await this.notificationOpened({
       code: message.data.id,
       type: message.data.type
     });
 
+    /** @type {import('react-native-push-notification').PushNotificationScheduleObject} */
     let localData = {
       channelId: SDK_PUSH_CHANNEL,
       largeIconUrl: message.data.icon,
@@ -535,9 +595,11 @@ class MainSDK  extends Performer {
     }
 
     if (AppState.currentState === 'background') {
+      if (DEBUG) console.log('Background: ', message);
       localData['date'] = new Date(Date.now() + (5 * 1000));
       return PushNotification.localNotificationSchedule(localData)
     } else {
+      if (DEBUG) console.log('Foreground: ', message);
       return PushNotification.localNotification(localData);
     }
   }
@@ -588,8 +650,8 @@ class MainSDK  extends Performer {
   }
 
   /**
-   * @param {Notification} [notification]
-   * @returns {Promise<*|boolean>}
+   * @param {import('react-native-push-notification').ReceivedNotification} [notification]
+   * @returns {Promise<boolean | Error | void>}
    */
   async onClickPush (notification) {
     const messageId = notification.data.message_id || notification.data['google.message_id'];
@@ -602,11 +664,10 @@ class MainSDK  extends Performer {
       type: notification?.data?.type
     });
 
-    /** @type {string|undefined} */
     const event = pushData[0].data.event;
     if (!event) return false;
 
-    /** @type {Event|null} */
+    /** @type {Event | null} */
     const message_event = JSON.parse(event);
     let message_url = '';
     switch (message_event.type) {
