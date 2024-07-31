@@ -1,3 +1,28 @@
+## 1.7.4 (2024-07-31)
+
+
+### Features
+
+* add array to track wish request (da7bc28)
+* add autoSendPushToken argument (2826b68)
+* add cart method (7a0dd8b)
+* add custom properties to track purchase request (d58f5af)
+* add date check (a9b7069)
+* add function to send token after app initialization (7a7bd29)
+* add functions to get and push token sent date in storage (75e5ce0)
+* add new action step to identify base commit in master (95930a9)
+* add persona-synchronization.yaml (17ddf01)
+* add types (ffec1d5)
+* add types to functions (1cf1b75)
+* BREAKING CHANGE use @notifee/react-native for requesting alarm permissions (0e23088)
+* check application initialization (152e928)
+* connect sdk to dev app (48788fa)
+* move to sdk (85a1e1e)
+* **sdk:** track mobile pushes (eadf5f4)
+* swap auto-changelog for standard-changelog (ec88b46)
+
+
+
 ## 1.7.3 (2024-07-17)
 
 
