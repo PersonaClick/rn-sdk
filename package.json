@@ -1,6 +1,6 @@
 {
   "name": "@personaclick/rn-sdk",
-  "version": "1.7.4",
+  "version": "1.8.0",
   "description": "PersonaClick React Native SDK",
   "exports": {
     ".": "./index.js"
@@ -21,7 +21,6 @@
     "react-native-device-info": "^8.0.7"
   },
   "devDependencies": {
-    "@notifee/react-native": "7.8.2",
     "@react-native-async-storage/async-storage": "1.22.0",
     "@react-native-community/push-notification-ios": "1.11.0",
     "@react-native-firebase/messaging": "18.8.0",
@@ -33,6 +32,12 @@
     "react-native-push-notification": "8.1.1",
     "react-test-renderer": "^17.0.2",
     "standard-changelog": "5.0.0"
+  },
+  "peerDependencies": {
+    "@react-native-async-storage/async-storage": "^1.23.1",
+    "@react-native-community/push-notification-ios": "^1.11.0",
+    "@react-native-firebase/messaging": "^19.2.2",
+    "react-native-push-notification": "^8.1.1"
   },
   "directories": {
     "lib": "lib"
@@ -53,12 +58,5 @@
   "publishConfig": {
     "access": "public"
   },
-  "packageManager": "yarn@4.1.0",
-  "peerDependencies": {
-    "@notifee/react-native": "^7.8.2",
-    "@react-native-async-storage/async-storage": "^1.23.1",
-    "@react-native-community/push-notification-ios": "^1.11.0",
-    "@react-native-firebase/messaging": "^19.2.2",
-    "react-native-push-notification": "^8.1.1"
-  }
+  "packageManager": "yarn@4.1.0"
 }
