@@ -283,17 +283,26 @@ class MainSDK  extends Performer {
     })
   }
 
+  /**
+   * Executes a search with the given parameters. If no parameters are provided or if they are empty, a blank search is performed.
+   *
+   * @param {SearchOptions|undefined} [options] - An object of parameters for the search or undefined.
+   * @returns {Promise<SearchResponse>} - A promise that resolves with the search results.
+   * @throws {Error} - Error thrown when the request fails.
+   */
   search(options) {
     return new Promise((resolve, reject) => {
       this.push((() => {
         try {
-          request('search', {
+          const endpoint = !options || Object.keys(options).length === 0 ? 'search/blank' : 'search';
+
+          request(endpoint, {
             params: {
               shop_id: this.shop_id,
               stream: this.stream,
-              ...options,
+              ...(options || {}),
             },
-          }).then( res => {
+          }).then(res => {
             resolve(res);
           });
         } catch (error) {
