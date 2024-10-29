@@ -1,6 +1,6 @@
 {
   "name": "@personaclick/rn-sdk",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "description": "PersonaClick React Native SDK",
   "exports": {
     ".": "./index.js"

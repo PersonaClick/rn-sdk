@@ -1,4 +1,4 @@
-import { Linking }                    from 'react-native';
+import { Linking }                                from 'react-native';
 import {
   initLocker,
   request,
@@ -13,16 +13,16 @@ import {
   savePushToken,
   getLastPushTokenSentDate,
   saveLastPushTokenSentDate
-} from './lib/client';
-import { convertParams } from './lib/tracker';
-import {AppState, PermissionsAndroid, Platform} from 'react-native';
-import messaging from '@react-native-firebase/messaging';
-import PushNotification from "react-native-push-notification";
-import PushNotificationIOS from "@react-native-community/push-notification-ios";
-import {SDK_PUSH_CHANNEL} from "./index";
-import Performer from './lib/performer';
-import DeviceInfo from 'react-native-device-info';
-import {isOverOneWeekAgo} from './utils';
+}                                                 from './lib/client';
+import { convertParams }                          from './lib/tracker';
+import { AppState, PermissionsAndroid, Platform } from 'react-native';
+import messaging                                  from '@react-native-firebase/messaging';
+import PushNotification                           from "react-native-push-notification";
+import PushNotificationIOS                        from "@react-native-community/push-notification-ios";
+import { SDK_PUSH_CHANNEL }                       from "./index";
+import Performer                                  from './lib/performer';
+import DeviceInfo                                 from 'react-native-device-info';
+import { blankSearchRequest, isOverOneWeekAgo }   from './utils';
 
 /**
  * @typedef {Object} Event
@@ -284,7 +284,7 @@ class MainSDK  extends Performer {
   }
 
   /**
-   * Executes a search with the given parameters. If no parameters are provided or if they are empty, a blank search is performed.
+   * Executes a search with the given parameters.
    *
    * @param {SearchOptions|undefined} [options] - An object of parameters for the search or undefined.
    * @returns {Promise<SearchResponse>} - A promise that resolves with the search results.
@@ -294,15 +294,13 @@ class MainSDK  extends Performer {
     return new Promise((resolve, reject) => {
       this.push((() => {
         try {
-          const endpoint = !options || Object.keys(options).length === 0 ? 'search/blank' : 'search';
-
-          request(endpoint, {
+          request('search', {
             params: {
               shop_id: this.shop_id,
               stream: this.stream,
-              ...(options || {}),
+              ...options,
             },
-          }).then(res => {
+          }).then( res => {
             resolve(res);
           });
         } catch (error) {
@@ -310,6 +308,15 @@ class MainSDK  extends Performer {
         }
       }))
     })
+  }
+
+  /**
+   * Executes a blank search.
+   *
+   * @returns {Promise<Object>} - A promise with the request result.
+   */
+  searchBlank() {
+    return blankSearchRequest(this.shop_id, this.stream);
   }
 
   setProfile(params) {
