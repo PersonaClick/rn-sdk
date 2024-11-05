@@ -13,16 +13,16 @@ import {
   savePushToken,
   getLastPushTokenSentDate,
   saveLastPushTokenSentDate
-}                                                 from './lib/client';
-import { convertParams }                          from './lib/tracker';
-import { AppState, PermissionsAndroid, Platform } from 'react-native';
-import messaging                                  from '@react-native-firebase/messaging';
-import PushNotification                           from "react-native-push-notification";
-import PushNotificationIOS                        from "@react-native-community/push-notification-ios";
-import { SDK_PUSH_CHANNEL }                       from "./index";
-import Performer                                  from './lib/performer';
-import DeviceInfo                                 from 'react-native-device-info';
-import { blankSearchRequest, isOverOneWeekAgo }   from './utils';
+} from './lib/client';
+import { convertParams } from './lib/tracker';
+import {AppState, PermissionsAndroid, Platform} from 'react-native';
+import messaging from '@react-native-firebase/messaging';
+import PushNotification from "react-native-push-notification";
+import PushNotificationIOS from "@react-native-community/push-notification-ios";
+import {SDK_PUSH_CHANNEL} from "./index";
+import Performer from './lib/performer';
+import DeviceInfo from 'react-native-device-info';
+import {blankSearchRequest, isOverOneWeekAgo} from './utils';
 
 /**
  * @typedef {Object} Event
@@ -93,7 +93,7 @@ class MainSDK  extends Performer {
           streamError.name = 'Init error';
           throw streamError;
         }
-        const storageData = await getData();
+        const storageData = await getData(this.shop_id);
         let response = null;
 
         if ( storageData?.did ) {
@@ -102,7 +102,7 @@ class MainSDK  extends Performer {
             response.sid = response.seance = generateSid();
           }
         } else {
-          response = await request('init', {
+          response = await request('init', this.shop_id, {
             params: {
               did: Platform.OS === 'android' ? await DeviceInfo.getAndroidId() : await DeviceInfo.syncUniqueId() || '',
               shop_id: this.shop_id,
@@ -111,7 +111,7 @@ class MainSDK  extends Performer {
           });
         }
 
-        updSeance(response?.did, response?.seance).then(async ()=>{
+        updSeance(this.shop_id, response?.did, response?.seance).then(async ()=>{
           this.initialized = true;
           this.performQueue();
           this.push((async () => {
@@ -159,7 +159,7 @@ class MainSDK  extends Performer {
     this.push((async () => {
       try {
         const queryParams = await convertParams(event, options);
-        return await request('push', {
+        return await request('push', this.shop_id, {
           headers: {"Content-Type": "application/json"},
           method: 'POST',
           params: {
@@ -182,7 +182,7 @@ class MainSDK  extends Performer {
           queryParams = Object.assign(queryParams, options);
         }
 
-        return await request('push/custom', {
+        return await request('push/custom', this.shop_id, {
           headers: {"Content-Type": "application/json"},
           method: 'POST',
           params: {
@@ -229,7 +229,7 @@ class MainSDK  extends Performer {
   notificationTrack(event, options) {
     this.push((async () => {
       try {
-        return await request(`track/${event}`, {
+        return await request(`track/${event}`, this.shop_id, {
           method: 'POST',
           headers: {"Content-Type": "application/json"},
           params: {
@@ -248,7 +248,7 @@ class MainSDK  extends Performer {
     return new Promise((resolve, reject) => {
       this.push((() => {
         try {
-          request(`recommend/${recommender_code}`, {
+          request(`recommend/${recommender_code}`, this.shop_id, {
             params: {
               shop_id: this.shop_id,
               stream: this.stream,
@@ -269,7 +269,7 @@ class MainSDK  extends Performer {
     return new Promise((resolve, reject) => {
       this.push((() => {
         try {
-          request('products/cart', {
+          request('products/cart', this.shop_id, {
             params: {
               shop_id: this.shop_id,
             },
@@ -294,7 +294,7 @@ class MainSDK  extends Performer {
     return new Promise((resolve, reject) => {
       this.push((() => {
         try {
-          request('search', {
+          request('search', this.shop_id, {
             params: {
               shop_id: this.shop_id,
               stream: this.stream,
@@ -330,7 +330,7 @@ class MainSDK  extends Performer {
         }
       }
       try {
-        return await request('profile/set', {
+        return await request('profile/set', this.shop_id, {
           headers: {"Content-Type": "application/json"},
           method: 'POST',
           params: {
@@ -348,7 +348,7 @@ class MainSDK  extends Performer {
     return new Promise((resolve, reject) => {
       this.push((() => {
         try {
-          request('profile', {
+          request('profile', this.shop_id, {
             method: 'GET',
             params: {
               shop_id: this.shop_id,
@@ -369,7 +369,7 @@ class MainSDK  extends Performer {
    * @returns {Promise<boolean>} A promise that resolves to true if a new token needs to be sent, false otherwise.
    */
   async checkPushToken() {
-      const lastSentDate = await getLastPushTokenSentDate();
+      const lastSentDate = await getLastPushTokenSentDate(this.shop_id);
       return !lastSentDate || isOverOneWeekAgo(lastSentDate) && this._ask_push_permissions;
   }
 
@@ -384,7 +384,7 @@ class MainSDK  extends Performer {
           if (await this.getPushPermission()) {
             this.initPushChannel();
             await this.initPushToken(false);
-            await saveLastPushTokenSentDate(new Date());
+            await saveLastPushTokenSentDate(new Date(), this.shop_id);
           }
         }));
       }
@@ -400,7 +400,7 @@ class MainSDK  extends Performer {
           token: token,
           platform: this._push_type !== null ? this._push_type : token.match(/[a-z]/) !== null ? 'android' : 'ios',
         }
-        return await request('mobile_push_tokens', {
+        return await request('mobile_push_tokens', this.shop_id, {
           method: 'POST',
           params: {
             shop_id: this.shop_id,
@@ -409,8 +409,8 @@ class MainSDK  extends Performer {
           },
         }).then(async (data)=> {
           if (data.status === "success") {
-            await savePushToken(token);
-            await saveLastPushTokenSentDate(new Date());
+            await savePushToken(token, this.shop_id);
+            await saveLastPushTokenSentDate(new Date(), this.shop_id);
           }
           return data;
         });
@@ -448,7 +448,7 @@ class MainSDK  extends Performer {
   }
 
   async initPushToken(removeOld = false) {
-    let savedToken = await getSavedPushToken();
+    let savedToken = await getSavedPushToken(this.shop_id);
     if (removeOld) {
       await this.deleteToken();
       savedToken = false;
@@ -493,9 +493,9 @@ class MainSDK  extends Performer {
    */
   async initPush(notifyClick = false, notifyReceive = false, notifyBgReceive = false)
   {
-    const lock = await initLocker();
+    const lock = await initLocker(this.shop_id);
     if ((lock && lock.hasOwnProperty('state') && lock.state === true && ((new Date()).getTime() < lock.expires ) )) return false;
-    await setInitLocker(true);
+    await setInitLocker(true, this.shop_id);
 
     if (this._ask_push_permissions) {
       this.push((async () => {
@@ -523,7 +523,7 @@ class MainSDK  extends Performer {
       })
       if (DEBUG) console.log('Message delivered: ', remoteMessage);
 
-      await updPushData(remoteMessage);
+      await updPushData(remoteMessage, this.shop_id);
       await this.pushReceivedListener(remoteMessage);
     });
 
@@ -541,7 +541,7 @@ class MainSDK  extends Performer {
       })
       if (DEBUG) console.log('Background message delivered: ', remoteMessage);
 
-      await updPushData(remoteMessage);
+      await updPushData(remoteMessage, this.shop_id);
       await this.pushBgReceivedListener(remoteMessage);
     });
 
@@ -550,12 +550,12 @@ class MainSDK  extends Performer {
       popInitialNotification: true,
       requestPermissions: true,
       onNotification: async (notification) => {
-        await updPushData(notification);
+        await updPushData(notification, this.shop_id);
         if (notification?.userInteraction === true) {
           if (!notifyClick) {
             await this.pushClickListener(notification)
           } else {
-            const data = await getPushData(notification.data.message_id)
+            const data = await getPushData(notification.data.message_id, this.shop_id)
             await this.pushClickListener(data && data.length > 0 ? data[0] : false)
           }
         }
@@ -577,7 +577,7 @@ class MainSDK  extends Performer {
    */
   async showNotification (message){
     if (DEBUG) console.log('Show notification: ', message);
-    await updPushData(message);
+    await updPushData(message, this.shop_id);
     await this.notificationOpened({
       code: message.data.id,
       type: message.data.type
@@ -617,7 +617,7 @@ class MainSDK  extends Performer {
   triggers(trigger_name, data) {
     this.push((async () => {
       try {
-        return await request(`subscriptions/${trigger_name}`, {
+        return await request(`subscriptions/${trigger_name}`, this.shop_id, {
           headers: {"Content-Type": "application/json"},
           method: 'POST',
           params: Object.assign({
@@ -631,7 +631,7 @@ class MainSDK  extends Performer {
     }));
   }
   async deleteToken(){
-    return savePushToken(false).then(async () => {
+    return savePushToken(false, this.shop_id).then(async () => {
       await messaging().deleteToken();
     });
   }
@@ -642,7 +642,7 @@ class MainSDK  extends Performer {
     return new Promise((resolve, reject) => {
       this.push((() => {
         try {
-          request(`segments/${action}`, {
+          request(`segments/${action}`, this.shop_id, {
             headers: {"Content-Type": "application/json"},
             method: action === 'get' ? 'GET' : 'POST',
             params: Object.assign({
@@ -665,10 +665,10 @@ class MainSDK  extends Performer {
    */
   async onClickPush (notification) {
     const messageId = notification.data.message_id || notification.data['google.message_id'];
-    let pushData = await getPushData(messageId);
+    let pushData = await getPushData(messageId, this.shop_id);
     if (pushData.length === 0) return false;
 
-    await removePushMessage(messageId);
+    await removePushMessage(messageId, this.shop_id);
     this.notificationClicked({
       code: notification?.data?.id,
       type: notification?.data?.type
@@ -686,7 +686,7 @@ class MainSDK  extends Performer {
         break;
       case "product":
         try {
-          await request(`products/get?item_id=${message_event.uri}&shop_id=${this.shop_id}`, {
+          await request(`products/get?item_id=${message_event.uri}&shop_id=${this.shop_id}`, this.shop_id,{
             method: 'GET',
             headers: {"Content-Type": "application/json"},
             params: {
@@ -703,7 +703,7 @@ class MainSDK  extends Performer {
         break;
       case "category":
         try {
-          await request(`category/${message_event.uri}?shop_id=${this.shop_id}`, {
+          await request(`category/${message_event.uri}?shop_id=${this.shop_id}`, this.shop_id, {
             method: 'GET',
             headers: {"Content-Type": "application/json"},
             params: {
