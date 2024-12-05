@@ -597,7 +597,7 @@ class MainSDK  extends Performer {
         id: message.data.id,
         type: message.data.type,
         icon: message.data.icon,
-        image: message.data.image,
+        image: message.data.image_url ? message.data.image_url : message.data.image,
         from: message.from,
         sentTime: message.sentTime,
         ttl: message.ttl,
