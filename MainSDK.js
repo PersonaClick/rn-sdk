@@ -69,7 +69,6 @@ class MainSDK  extends Performer {
     this.initialized = false;
     DEBUG = debug;
     this._push_type = null;
-    this._ask_push_permissions = true;
     this.push_payload = [];
     this.lastMessageIds = [];
     this.autoSendPushToken = autoSendPushToken;
@@ -114,9 +113,7 @@ class MainSDK  extends Performer {
         updSeance(this.shop_id, response?.did, response?.seance).then(async ()=>{
           this.initialized = true;
           this.performQueue();
-          this.push((async () => {
-            await this.initPush();
-          }))
+          this.initPushChannelAndToken();
           if (this.isInit() && this.autoSendPushToken) {
             await this.sendPushToken();
           }
@@ -370,7 +367,7 @@ class MainSDK  extends Performer {
    */
   async checkPushToken() {
       const lastSentDate = await getLastPushTokenSentDate(this.shop_id);
-      return !lastSentDate || isOverOneWeekAgo(lastSentDate) && this._ask_push_permissions;
+      return !lastSentDate || isOverOneWeekAgo(lastSentDate);
   }
 
   /**
@@ -421,10 +418,6 @@ class MainSDK  extends Performer {
   }
   firebase_only(val) {
     this._push_type = val ? 'android' : null;
-  }
-
-  askPushPermissions(val = true) {
-    this._ask_push_permissions = val;
   }
 
   async getPushPermission() {
@@ -484,6 +477,15 @@ class MainSDK  extends Performer {
     });
   }
 
+  initPushChannelAndToken() {
+    this.push((async () => {
+      if (await this.getPushPermission()) {
+        this.initPushChannel();
+        await this.initPushToken(false);
+      }
+    }));
+  }
+
   /**
    * Init push
    * @param {boolean | Function} notifyClick
@@ -497,14 +499,7 @@ class MainSDK  extends Performer {
     if ((lock && lock.hasOwnProperty('state') && lock.state === true && ((new Date()).getTime() < lock.expires ) )) return false;
     await setInitLocker(true, this.shop_id);
 
-    if (this._ask_push_permissions) {
-      this.push((async () => {
-        if ( await this.getPushPermission() ) {
-          this.initPushChannel();
-          await this.initPushToken(false);
-        }
-      }));
-    }
+    this.initPushChannelAndToken()
     if (notifyClick) this.pushClickListener = notifyClick;
     if (notifyReceive) this.pushReceivedListener = notifyReceive;
     if (notifyBgReceive) this.pushBgReceivedListener = notifyBgReceive;
