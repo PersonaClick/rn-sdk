@@ -19,6 +19,7 @@
  * @property {string} [exclude] - Comma separated list of products IDs to exclude from search results.
  * @property {string} [email] - Email.
  * @property {string} [merchants] - Comma separated list of merchants.
+ * @property {string} [excluded_merchants] - Comma separated list of excluded merchants.
  * @property {string} [filters_search_by] - Available options for filter: name, quantity, popularity.
  * @property {number} [brand_limit=1000] - Limits the number of brands in the response.
  */
