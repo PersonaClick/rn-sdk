@@ -33,11 +33,14 @@ import {blankSearchRequest, isOverOneWeekAgo} from './utils';
 /**
  * @typedef {Object} GoogleData
  * @property {string} message_id
+ * @property {string} ["gcm.message_id"]
  */
 
 /**
  * @typedef {Object} Data
  * @property {string} message_id
+ * @property {string} ["google.message_id"]
+ * @property {string} ["gcm.message_id"]
  * @property {string} from
  * @property {number} ttl
  * @property {number} sentTime
@@ -550,7 +553,8 @@ class MainSDK  extends Performer {
           if (!notifyClick) {
             await this.pushClickListener(notification)
           } else {
-            const data = await getPushData(notification.data.message_id, this.shop_id)
+            const messageId = notification.data.message_id || notification.data['google.message_id'] || notification.data['gcm.message_id']
+            const data = await getPushData(messageId, this.shop_id)
             await this.pushClickListener(data && data.length > 0 ? data[0] : false)
           }
         }
@@ -659,7 +663,7 @@ class MainSDK  extends Performer {
    * @returns {Promise<boolean | Error | void>}
    */
   async onClickPush (notification) {
-    const messageId = notification.data.message_id || notification.data['google.message_id'];
+    const messageId = notification.data.message_id || notification.data['google.message_id'] || notification.data['gcm.message_id'];
     let pushData = await getPushData(messageId, this.shop_id);
     if (pushData.length === 0) return false;
 
