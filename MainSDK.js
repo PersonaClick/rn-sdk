@@ -1,28 +1,37 @@
-import { Linking }                                from 'react-native';
-import {
-  initLocker,
-  request,
-  setInitLocker,
-  updSeance,
-  getPushData,
-  updPushData,
-  removePushMessage,
-  getData,
-  generateSid,
-  getSavedPushToken,
-  savePushToken,
-  getLastPushTokenSentDate,
-  saveLastPushTokenSentDate
-} from './lib/client';
-import { convertParams } from './lib/tracker';
-import {AppState, PermissionsAndroid, Platform} from 'react-native';
-import messaging from '@react-native-firebase/messaging';
-import PushNotification from "react-native-push-notification";
-import PushNotificationIOS from "@react-native-community/push-notification-ios";
-import {SDK_PUSH_CHANNEL} from "./index";
-import Performer from './lib/performer';
-import DeviceInfo from 'react-native-device-info';
-import {blankSearchRequest, isOverOneWeekAgo} from './utils';
+import { Linking } from 'react-native'
+import { initLocker } from './lib/client'
+import { request } from './lib/client'
+import { setInitLocker } from './lib/client'
+import { updSeance } from './lib/client'
+import { getPushData } from './lib/client'
+import { updPushData } from './lib/client'
+import { removePushMessage } from './lib/client'
+import { getData } from './lib/client'
+import { generateSid } from './lib/client'
+import { getSavedPushToken } from './lib/client'
+import { savePushToken } from './lib/client'
+import { getLastPushTokenSentDate } from './lib/client'
+import { saveLastPushTokenSentDate } from './lib/client'
+import { convertParams } from './lib/tracker'
+import { PermissionsAndroid } from 'react-native'
+import { Platform } from 'react-native'
+import { getMessaging } from '@react-native-firebase/messaging'
+import { onMessage } from '@react-native-firebase/messaging'
+import { setBackgroundMessageHandler } from '@react-native-firebase/messaging'
+import { getToken } from '@react-native-firebase/messaging'
+import { getAPNSToken } from '@react-native-firebase/messaging'
+import { deleteToken } from '@react-native-firebase/messaging'
+import { onNotificationOpenedApp } from '@react-native-firebase/messaging'
+import notifee from '@notifee/react-native'
+import { AndroidImportance } from '@notifee/react-native'
+import { AndroidStyle } from '@notifee/react-native'
+import { EventType } from '@notifee/react-native'
+import { AuthorizationStatus } from '@notifee/react-native'
+import { SDK_PUSH_CHANNEL } from './index'
+import Performer from './lib/performer'
+import DeviceInfo from 'react-native-device-info'
+import { blankSearchRequest } from './utils'
+import { isOverOneWeekAgo } from './utils'
 
 /**
  * @typedef {Object} Event
@@ -61,140 +70,157 @@ import {blankSearchRequest, isOverOneWeekAgo} from './utils';
  * @property {string} title
  */
 
-export var DEBUG = false;
+export var DEBUG = false
 
-class MainSDK  extends Performer {
+class MainSDK extends Performer {
   constructor(shop_id, stream, debug = false, autoSendPushToken = true) {
-    let queue = [];
-    super(queue);
-    this.shop_id = shop_id;
-    this.stream = stream ?? null;
-    this.initialized = false;
-    DEBUG = debug;
-    this._push_type = null;
-    this.push_payload = [];
-    this.lastMessageIds = [];
-    this.autoSendPushToken = autoSendPushToken;
+    let queue = []
+    super(queue)
+    this.shop_id = shop_id
+    this.stream = stream ?? null
+    this.initialized = false
+    DEBUG = debug
+    this._push_type = null
+    this.push_payload = []
+    this.lastMessageIds = []
+    this.autoSendPushToken = autoSendPushToken
+    this.messaging = getMessaging()
   }
 
   perform(command) {
-    command();
+    command()
   }
 
   init() {
-    (async () => {
+    ;(async () => {
       try {
         if (!this.shop_id || typeof this.shop_id !== 'string') {
-          const initError = new Error('Parameter "shop_id" is required as a string.');
-          initError.name = 'Init error';
-          throw initError;
+          const initError = new Error(
+            'Parameter "shop_id" is required as a string.'
+          )
+          initError.name = 'Init error'
+          throw initError
         }
 
         if (this.stream && typeof this.stream !== 'string') {
-          const streamError = new Error('Parameter "stream" must be a string.');
-          streamError.name = 'Init error';
-          throw streamError;
+          const streamError = new Error('Parameter "stream" must be a string.')
+          streamError.name = 'Init error'
+          throw streamError
         }
-        const storageData = await getData(this.shop_id);
-        let response = null;
+        const storageData = await getData(this.shop_id)
+        let response = null
 
-        if ( storageData?.did ) {
-          response = storageData;
-          if ( !storageData?.seance || !storageData?.expires || (new Date()).getTime() > storageData?.expires ) {
-            response.sid = response.seance = generateSid();
+        if (storageData?.did) {
+          response = storageData
+          if (
+            !storageData?.seance ||
+            !storageData?.expires ||
+            new Date().getTime() > storageData?.expires
+          ) {
+            response.sid = response.seance = generateSid()
           }
         } else {
           response = await request('init', this.shop_id, {
             params: {
-              did: Platform.OS === 'android' ? await DeviceInfo.getAndroidId() : await DeviceInfo.syncUniqueId() || '',
+              did:
+                Platform.OS === 'android'
+                  ? await DeviceInfo.getAndroidId()
+                  : (await DeviceInfo.syncUniqueId()) || '',
               shop_id: this.shop_id,
               stream: this.stream,
             },
-          });
+          })
         }
 
-        updSeance(this.shop_id, response?.did, response?.seance).then(async ()=>{
-          this.initialized = true;
-          this.performQueue();
-          this.initPushChannelAndToken();
-          if (this.isInit() && this.autoSendPushToken) {
-            await this.sendPushToken();
+        updSeance(this.shop_id, response?.did, response?.seance).then(
+          async () => {
+            this.initialized = true
+            this.performQueue()
+            this.initPushChannelAndToken()
+            if (this.isInit() && this.autoSendPushToken) {
+              await this.sendPushToken()
+            }
           }
-        });
+        )
       } catch (error) {
-        this.initialized = false;
-        return error;
+        this.initialized = false
+        return error
       }
-    })();
+    })()
   }
 
-  isInit = () => this.initialized;
+  isInit = () => this.initialized
+
+  getToken = () => {
+    return getSavedPushToken(this.shop_id).then((token) => {
+      if (DEBUG) console.log(token)
+      return token
+    })
+  }
 
   /**
    * @param {import('@react-native-firebase/messaging').RemoteMessage} remoteMessage
    * @returns {Promise<void>}
    */
   pushReceivedListener = async function (remoteMessage) {
-    await this.showNotification(remoteMessage);
-  };
+    await this.showNotification(remoteMessage)
+  }
 
   /**
    * @param {import('@react-native-firebase/messaging').RemoteMessage} remoteMessage
    * @returns {Promise<void>}
    */
   pushBgReceivedListener = async function (remoteMessage) {
-    await this.showNotification(remoteMessage);
-  };
+    await this.showNotification(remoteMessage)
+  }
 
   /**
-   *
-   * @param {Omit<import('react-native-push-notification').ReceivedNotification, 'userInfo'>} remoteMessage
    * @returns {Promise<void>}
    */
-  pushClickListener = async function (remoteMessage) {
-    await this.onClickPush(remoteMessage);
-  };
+  pushClickListener = async function (event) {
+    await this.onClickPush(event)
+  }
 
   track(event, options) {
-    this.push((async () => {
+    this.push(async () => {
       try {
-        const queryParams = await convertParams(event, options);
+        const queryParams = await convertParams(event, options)
         return await request('push', this.shop_id, {
-          headers: {"Content-Type": "application/json"},
+          headers: { 'Content-Type': 'application/json' },
           method: 'POST',
           params: {
             shop_id: this.shop_id,
             stream: this.stream,
             ...queryParams,
           },
-        });
+        })
       } catch (error) {
-        return error;
+        return error
       }
-    }));
+    })
   }
 
   trackEvent(event, options) {
-    this.push((async () => {
+    this.push(async () => {
       try {
-        let queryParams = {event: event};
+        let queryParams = { event: event }
         if (options) {
-          queryParams = Object.assign(queryParams, options);
+          queryParams = Object.assign(queryParams, options)
         }
 
         return await request('push/custom', this.shop_id, {
-          headers: {"Content-Type": "application/json"},
+          headers: { 'Content-Type': 'application/json' },
           method: 'POST',
           params: {
             shop_id: this.shop_id,
             stream: this.stream,
             ...queryParams,
           },
-        });
+        })
       } catch (error) {
-        return error;
+        return error
       }
-    }));
+    })
   }
 
   /**
@@ -202,7 +228,7 @@ class MainSDK  extends Performer {
    * @param {NotificationEventOptions} options
    */
   notificationClicked(options) {
-    return this.notificationTrack('clicked', options);
+    return this.notificationTrack('clicked', options)
   }
 
   /**
@@ -210,7 +236,7 @@ class MainSDK  extends Performer {
    * @param {NotificationEventOptions} options
    */
   notificationOpened(options) {
-    return this.notificationTrack('opened', options);
+    return this.notificationTrack('opened', options)
   }
 
   /**
@@ -218,7 +244,7 @@ class MainSDK  extends Performer {
    * @param {NotificationEventOptions} options
    */
   notificationDelivered(options) {
-    return this.notificationTrack('delivered', options);
+    return this.notificationTrack('delivered', options)
   }
 
   /**
@@ -227,26 +253,26 @@ class MainSDK  extends Performer {
    * @param {{ type: 'bulk' | 'chain' | 'transactional' | string, code: string }} options
    */
   notificationTrack(event, options) {
-    this.push((async () => {
+    this.push(async () => {
       try {
         return await request(`track/${event}`, this.shop_id, {
           method: 'POST',
-          headers: {"Content-Type": "application/json"},
+          headers: { 'Content-Type': 'application/json' },
           params: {
             shop_id: this.shop_id,
             stream: this.stream,
             ...options,
           },
-        });
+        })
       } catch (error) {
-        return error;
+        return error
       }
-    }));
+    })
   }
 
   recommend(recommender_code, options) {
     return new Promise((resolve, reject) => {
-      this.push((() => {
+      this.push(() => {
         try {
           request(`recommend/${recommender_code}`, this.shop_id, {
             params: {
@@ -255,31 +281,31 @@ class MainSDK  extends Performer {
               recommender_code,
               ...options,
             },
-          }).then( res => {
+          }).then((res) => {
             resolve(res)
-          });
+          })
         } catch (error) {
           reject(error)
         }
-      }));
+      })
     })
   }
 
   cart() {
     return new Promise((resolve, reject) => {
-      this.push((() => {
+      this.push(() => {
         try {
           request('products/cart', this.shop_id, {
             params: {
               shop_id: this.shop_id,
             },
-          }).then( res => {
+          }).then((res) => {
             resolve(res)
-          });
+          })
         } catch (error) {
           reject(error)
         }
-      }));
+      })
     })
   }
 
@@ -292,7 +318,7 @@ class MainSDK  extends Performer {
    */
   search(options) {
     return new Promise((resolve, reject) => {
-      this.push((() => {
+      this.push(() => {
         try {
           request('search', this.shop_id, {
             params: {
@@ -300,13 +326,13 @@ class MainSDK  extends Performer {
               stream: this.stream,
               ...options,
             },
-          }).then( res => {
-            resolve(res);
-          });
+          }).then((res) => {
+            resolve(res)
+          })
         } catch (error) {
           reject(error)
         }
-      }))
+      })
     })
   }
 
@@ -316,37 +342,40 @@ class MainSDK  extends Performer {
    * @returns {Promise<Object>} - A promise with the request result.
    */
   searchBlank() {
-    return blankSearchRequest(this.shop_id, this.stream);
+    return blankSearchRequest(this.shop_id, this.stream)
   }
 
   setProfile(params) {
-    this.push((async () => {
-      if (params.hasOwnProperty("birthday") && !params.birthday.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        delete params.birthday;
+    this.push(async () => {
+      if (
+        params.hasOwnProperty('birthday') &&
+        !params.birthday.match(/^\d{4}-\d{2}-\d{2}$/)
+      ) {
+        delete params.birthday
       }
       for (let key in params) {
         if (typeof params[key] === 'object') {
-          params[key] = JSON.stringify(params[key]);
+          params[key] = JSON.stringify(params[key])
         }
       }
       try {
         return await request('profile/set', this.shop_id, {
-          headers: {"Content-Type": "application/json"},
+          headers: { 'Content-Type': 'application/json' },
           method: 'POST',
           params: {
             shop_id: this.shop_id,
             stream: this.stream,
-            ...params
+            ...params,
           },
-        });
+        })
       } catch (error) {
-        return error;
+        return error
       }
-    }));
+    })
   }
   getProfile() {
     return new Promise((resolve, reject) => {
-      this.push((() => {
+      this.push(() => {
         try {
           request('profile', this.shop_id, {
             method: 'GET',
@@ -354,14 +383,14 @@ class MainSDK  extends Performer {
               shop_id: this.shop_id,
               stream: this.stream,
             },
-          }).then( res =>{
-            resolve(res);
-          });
+          }).then((res) => {
+            resolve(res)
+          })
         } catch (error) {
-          reject(error);
+          reject(error)
         }
-      }))
-    });
+      })
+    })
   }
 
   /**
@@ -369,8 +398,8 @@ class MainSDK  extends Performer {
    * @returns {Promise<boolean>} A promise that resolves to true if a new token needs to be sent, false otherwise.
    */
   async checkPushToken() {
-      const lastSentDate = await getLastPushTokenSentDate(this.shop_id);
-      return !lastSentDate || isOverOneWeekAgo(lastSentDate);
+    const lastSentDate = await getLastPushTokenSentDate(this.shop_id)
+    return !lastSentDate || isOverOneWeekAgo(lastSentDate)
   }
 
   /**
@@ -380,113 +409,133 @@ class MainSDK  extends Performer {
   async sendPushToken() {
     try {
       if (await this.checkPushToken()) {
-        this.push((async () => {
+        this.push(async () => {
           if (await this.getPushPermission()) {
-            this.initPushChannel();
-            await this.initPushToken(false);
-            await saveLastPushTokenSentDate(new Date(), this.shop_id);
+            this.initPushChannel()
+            await this.initPushToken(false)
+            await saveLastPushTokenSentDate(new Date(), this.shop_id)
           }
-        }));
+        })
       }
     } catch (error) {
-      console.error('Error sending token:', error);
+      console.error('Error sending token:', error)
     }
   }
 
   setPushTokenNotification(token) {
-    this.push((async () => {
+    this.push(async () => {
       try {
         const params = {
           token: token,
-          platform: this._push_type !== null ? this._push_type : token.match(/[a-z]/) !== null ? 'android' : 'ios',
+          platform:
+            this._push_type !== null
+              ? this._push_type
+              : token.match(/[a-z]/) !== null
+                ? 'android'
+                : 'ios',
         }
         return await request('mobile_push_tokens', this.shop_id, {
           method: 'POST',
           params: {
             shop_id: this.shop_id,
             stream: this.stream,
-            ...params
+            ...params,
           },
-        }).then(async (data)=> {
-          if (data.status === "success") {
-            await savePushToken(token, this.shop_id);
-            await saveLastPushTokenSentDate(new Date(), this.shop_id);
+        }).then(async (data) => {
+          if (data.status === 'success') {
+            await savePushToken(token, this.shop_id)
+            await saveLastPushTokenSentDate(new Date(), this.shop_id)
           }
-          return data;
-        });
+          return data
+        })
       } catch (error) {
-        return error;
+        return error
       }
-    }));
+    })
   }
   firebase_only(val) {
-    this._push_type = val ? 'android' : null;
+    this._push_type = val ? 'android' : null
   }
 
+  /**
+   * Are push notificaitons allowed
+   * @returns {Promise<boolean>}
+   */
   async getPushPermission() {
-    let result = false;
-    if(Platform.OS ==="android" && Platform.Version >= 33){
+    let result = false
+    if (Platform.OS === 'android' && Platform.Version >= 33) {
       try {
         const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS ? PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS : PermissionsAndroid.PERMISSIONS.POST_NOTIFICATION
-        );
-        result = granted === PermissionsAndroid.RESULTS.GRANTED;
-      } catch (err){
-        console.log(err);
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+            ? PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+            : PermissionsAndroid.PERMISSIONS.POST_NOTIFICATION
+        )
+        result = granted === PermissionsAndroid.RESULTS.GRANTED
+      } catch (err) {
+        console.log(err)
       }
     } else {
-      const authStatus = await messaging().requestPermission();
-      result =
-        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+      const settings = await notifee.requestPermission()
+
+      if (settings.authorizationStatus === AuthorizationStatus.DENIED) {
+        if (DEBUG) console.log('User denied permissions request')
+        return false
+      } else if (
+        settings.authorizationStatus === AuthorizationStatus.AUTHORIZED
+      ) {
+        if (DEBUG) console.log('User granted permissions request')
+        return true
+      } else if (
+        settings.authorizationStatus === AuthorizationStatus.PROVISIONAL
+      ) {
+        if (DEBUG) console.log('User provisionally granted permissions request')
+        return true
+      }
+
+      return false
     }
-    return result;
   }
 
   async initPushToken(removeOld = false) {
-    let savedToken = await getSavedPushToken(this.shop_id);
+    let savedToken = await getSavedPushToken(this.shop_id)
     if (removeOld) {
-      await this.deleteToken();
-      savedToken = false;
+      await this.deleteToken()
+      savedToken = false
     }
-    if (savedToken) return savedToken;
+
+    if (savedToken) {
+      if (DEBUG) console.log('Old valid FCM token: ', savedToken)
+      return savedToken
+    }
+
     if (this._push_type === null && Platform.OS === 'ios') {
-      messaging()
-        .getAPNSToken()
-        .then(token => {
-          if (DEBUG) console.log('New APN token: ', token);
-          this.setPushTokenNotification(token);
-        });
+      getAPNSToken(this.messaging).then((token) => {
+        if (DEBUG) console.log('New APN token: ', token)
+        this.setPushTokenNotification(token)
+      })
     } else {
-      messaging()
-        .getToken()
-        .then(token => {
-          if (DEBUG) console.log('New FCM token: ', token);
-          this.setPushTokenNotification(token);
-        });
+      getToken(this.messaging).then((token) => {
+        if (DEBUG) console.log('New FCM token: ', token)
+        this.setPushTokenNotification(token)
+      })
     }
   }
 
-  initPushChannel () {
-    PushNotification.channelExists(SDK_PUSH_CHANNEL, function (exists) {
-      if (!exists) {
-        PushNotification.createChannel(
-          {
-            channelId: SDK_PUSH_CHANNEL,
-            channelName: 'RNSDK channel',
-          }
-        );
-      }
-    });
+  async initPushChannel() {
+    await notifee.createChannel({
+      id: SDK_PUSH_CHANNEL,
+      name: 'RNSDK channel',
+      importance: AndroidImportance.HIGH,
+    })
   }
 
   initPushChannelAndToken() {
-    this.push((async () => {
-      if (await this.getPushPermission()) {
-        this.initPushChannel();
-        await this.initPushToken(false);
-      }
-    }));
+    this.push(async () => {
+      const granted = await this.getPushPermission()
+      if (!granted) return
+      await this.initPushChannel()
+      await this.initPushToken(false)
+    })
   }
 
   /**
@@ -496,77 +545,115 @@ class MainSDK  extends Performer {
    * @param {boolean | Function} notifyBgReceive
    * @returns {Promise<boolean>}
    */
-  async initPush(notifyClick = false, notifyReceive = false, notifyBgReceive = false)
-  {
-    const lock = await initLocker(this.shop_id);
-    if ((lock && lock.hasOwnProperty('state') && lock.state === true && ((new Date()).getTime() < lock.expires ) )) return false;
-    await setInitLocker(true, this.shop_id);
+  async initPush(
+    notifyClick = false,
+    notifyReceive = false,
+    notifyBgReceive = false
+  ) {
+    const lock = await initLocker(this.shop_id)
+    if (
+      lock &&
+      lock.hasOwnProperty('state') &&
+      lock.state === true &&
+      new Date().getTime() < lock.expires
+    ) {
+      return false
+    }
+
+    await setInitLocker(true, this.shop_id)
 
     this.initPushChannelAndToken()
-    if (notifyClick) this.pushClickListener = notifyClick;
-    if (notifyReceive) this.pushReceivedListener = notifyReceive;
-    if (notifyBgReceive) this.pushBgReceivedListener = notifyBgReceive;
+    if (notifyClick) this.pushClickListener = notifyClick
+    if (notifyReceive) this.pushReceivedListener = notifyReceive
+    if (notifyBgReceive) this.pushBgReceivedListener = notifyBgReceive
 
     // Register handler
-    messaging().onMessage(async remoteMessage => {
-      if (this.lastMessageIds.includes(remoteMessage.messageId)){
+    onMessage(this.messaging, async (remoteMessage) => {
+      if (this.lastMessageIds.includes(remoteMessage.messageId)) {
         return false
       } else {
-        this.lastMessageIds.push(remoteMessage.messageId);
+        this.lastMessageIds.push(remoteMessage.messageId)
       }
 
       await this.notificationDelivered({
         code: remoteMessage.data.id,
-        type: remoteMessage.data.type
+        type: remoteMessage.data.type,
       })
-      if (DEBUG) console.log('Message delivered: ', remoteMessage);
+      if (DEBUG) console.log('Message delivered: ', remoteMessage)
 
-      await updPushData(remoteMessage, this.shop_id);
-      await this.pushReceivedListener(remoteMessage);
-    });
+      await updPushData(remoteMessage, this.shop_id)
+      await this.pushReceivedListener(remoteMessage)
+    })
 
     // Register background handler
-    messaging().setBackgroundMessageHandler(async remoteMessage => {
-      if (this.lastMessageIds.includes(remoteMessage.messageId)){
+    setBackgroundMessageHandler(this.messaging, async (remoteMessage) => {
+      if (this.lastMessageIds.includes(remoteMessage.messageId)) {
         return false
       } else {
-        this.lastMessageIds.push(remoteMessage.messageId);
+        this.lastMessageIds.push(remoteMessage.messageId)
       }
 
       await this.notificationDelivered({
         code: remoteMessage.data.id,
-        type: remoteMessage.data.type
+        type: remoteMessage.data.type,
       })
-      if (DEBUG) console.log('Background message delivered: ', remoteMessage);
+      if (DEBUG) console.log('Background message delivered: ', remoteMessage)
 
-      await updPushData(remoteMessage, this.shop_id);
-      await this.pushBgReceivedListener(remoteMessage);
-    });
+      await updPushData(remoteMessage, this.shop_id)
+      await this.pushBgReceivedListener(remoteMessage)
+    })
+
+    // Register background handler
+    onNotificationOpenedApp(this.messaging, async (remoteMessage) => {
+      if (this.lastMessageIds.includes(remoteMessage.messageId)) {
+        return false
+      } else {
+        this.lastMessageIds.push(remoteMessage.messageId)
+      }
+
+      await this.notificationDelivered({
+        code: remoteMessage.data.id,
+        type: remoteMessage.data.type,
+      })
+      if (DEBUG) console.log('App opened via notification', remoteMessage)
+
+      await updPushData(remoteMessage, this.shop_id)
+      await this.pushBgReceivedListener(remoteMessage)
+    })
 
     /** Subscribe to click notification */
-    PushNotification.configure({
-      popInitialNotification: true,
-      requestPermissions: true,
-      onNotification: async (notification) => {
-        await updPushData(notification, this.shop_id);
-        if (notification?.userInteraction === true) {
-          if (!notifyClick) {
-            await this.pushClickListener(notification)
-          } else {
-            const messageId = notification.data.message_id || notification.data['google.message_id'] || notification.data['gcm.message_id']
-            const data = await getPushData(messageId, this.shop_id)
-            await this.pushClickListener(data && data.length > 0 ? data[0] : false)
-          }
+    notifee.onForegroundEvent(async ({ type, detail }) => {
+      if (type === EventType.PRESS && detail.notification) {
+        const n = detail.notification
+        const data = n.data || {}
+        await updPushData({ data, messageId: data.message_id }, this.shop_id)
+        if (!notifyClick) {
+          await this.pushClickListener({ data })
+        } else {
+          const messageId =
+            data.message_id ||
+            data['google.message_id'] ||
+            data['gcm.message_id']
+          const stored = await getPushData(messageId, this.shop_id)
+          await this.pushClickListener(
+            stored && stored.length > 0 ? stored[0] : { data }
+          )
         }
-        notification.finish(PushNotificationIOS.FetchResult.NoData);
       }
-    });
-    PushNotification.popInitialNotification(async (notification) => {
-      if (!notification) return;
+    })
 
-      await this.pushClickListener(notification);
-    });
+    notifee.onBackgroundEvent(async ({ type, detail }) => {
+      if (type === EventType.PRESS && detail.notification) {
+        const data = detail.notification.data || {}
+        await this.pushClickListener({ data })
+      }
+    })
 
+    const initial = await notifee.getInitialNotification()
+    if (initial?.notification) {
+      const data = initial.notification.data || {}
+      await this.pushClickListener({ data })
+    }
   }
 
   /**
@@ -574,87 +661,90 @@ class MainSDK  extends Performer {
    * @param {{ data: { id: string, type: string }}} message
    * @returns {Promise<void>}
    */
-  async showNotification (message){
-    if (DEBUG) console.log('Show notification: ', message);
-    await updPushData(message, this.shop_id);
+  async showNotification(message) {
+    if (DEBUG) console.log('Show notification: ', message)
+    await updPushData(message, this.shop_id)
     await this.notificationOpened({
       code: message.data.id,
-      type: message.data.type
-    });
-
-    /** @type {import('react-native-push-notification').PushNotificationScheduleObject} */
-    let localData = {
+      type: message.data.type,
+    })
+    await this.initPushChannel()
+    const data = {
+      ...(message.messageId && { message_id: message.messageId }),
+      ...(message.data.id && { id: message.data.id }),
+      ...(message.data.type && { type: message.data.type }),
+      ...(message.data.icon && { icon: message.data.icon }),
+      ...(message.data.image_url && { image: message.data.image_url }),
+      ...(message.data.image && { image: message.data.image }),
+      ...(message.from && { from: message.from }),
+      ...(message.sentTime && { sentTime: `${message.sentTime}` }),
+      ...(message.ttl && { ttl: `${message.ttl}` }),
+    }
+    const android = {
       channelId: SDK_PUSH_CHANNEL,
-      largeIconUrl: message.data.icon,
-      bigLargeIconUrl: message.data.icon,
-      bigPictureUrl: message.data.image,
-      picture: message.data.image,
+      pressAction: { id: 'default' },
+      ...(message.data.icon && { largeIcon: message.data.icon }),
+      ...(message.data.image && {
+        type: AndroidStyle.BIGPICTURE,
+        picture: message.data.image,
+      }),
+    }
+    await notifee.displayNotification({
       title: message.data.title,
-      message: message.data.body,
-      userInfo: {
-        message_id: message.messageId,
-        id: message.data.id,
-        type: message.data.type,
-        icon: message.data.icon,
-        image: message.data.image_url ? message.data.image_url : message.data.image,
-        from: message.from,
-        sentTime: message.sentTime,
-        ttl: message.ttl,
-      }
-    }
-
-    if (AppState.currentState === 'background') {
-      if (DEBUG) console.log('Background: ', message);
-      localData['date'] = new Date(Date.now() + (5 * 1000));
-      return PushNotification.localNotificationSchedule(localData)
-    } else {
-      if (DEBUG) console.log('Foreground: ', message);
-      return PushNotification.localNotification(localData);
-    }
+      body: message.data.body,
+      data,
+      android,
+    })
   }
 
   triggers(trigger_name, data) {
-    this.push((async () => {
+    this.push(async () => {
       try {
         return await request(`subscriptions/${trigger_name}`, this.shop_id, {
-          headers: {"Content-Type": "application/json"},
+          headers: { 'Content-Type': 'application/json' },
           method: 'POST',
-          params: Object.assign({
-            shop_id: this.shop_id,
-            stream: this.stream,
-          }, data),
-        });
+          params: Object.assign(
+            {
+              shop_id: this.shop_id,
+              stream: this.stream,
+            },
+            data
+          ),
+        })
       } catch (error) {
-        return error;
+        return error
       }
-    }));
+    })
   }
-  async deleteToken(){
+  async deleteToken() {
     return savePushToken(false, this.shop_id).then(async () => {
-      await messaging().deleteToken();
-    });
+      await deleteToken(this.messaging)
+    })
   }
   subscriptions(action, data) {
     this.triggers(action, data)
   }
   segments(action, data) {
     return new Promise((resolve, reject) => {
-      this.push((() => {
+      this.push(() => {
         try {
           request(`segments/${action}`, this.shop_id, {
-            headers: {"Content-Type": "application/json"},
+            headers: { 'Content-Type': 'application/json' },
             method: action === 'get' ? 'GET' : 'POST',
-            params: Object.assign({
-              shop_id: this.shop_id,
-              stream: this.stream,
-            }, data),
-          }).then(res => {
+            params: Object.assign(
+              {
+                shop_id: this.shop_id,
+                stream: this.stream,
+              },
+              data
+            ),
+          }).then((res) => {
             resolve(res)
-          });
+          })
         } catch (error) {
           reject(error)
         }
-      }));
+      })
     })
   }
 
@@ -662,69 +752,81 @@ class MainSDK  extends Performer {
    * @param {import('react-native-push-notification').ReceivedNotification} [notification]
    * @returns {Promise<boolean | Error | void>}
    */
-  async onClickPush (notification) {
-    const messageId = notification.data.message_id || notification.data['google.message_id'] || notification.data['gcm.message_id'];
-    let pushData = await getPushData(messageId, this.shop_id);
-    if (pushData.length === 0) return false;
+  async onClickPush(notification) {
+    const messageId =
+      notification.data?.message_id ||
+      notification.data?.['google.message_id'] ||
+      notification.data?.['gcm.message_id']
+    let pushData = await getPushData(messageId, this.shop_id)
+    if (pushData.length === 0) return false
 
-    await removePushMessage(messageId, this.shop_id);
+    await removePushMessage(messageId, this.shop_id)
     this.notificationClicked({
       code: notification?.data?.id,
-      type: notification?.data?.type
-    });
+      type: notification?.data?.type,
+    })
 
-    const event = pushData[0].data.event;
-    if (!event) return false;
+    const event = pushData[0].data.event
+    if (!event) return false
 
     /** @type {Event | null} */
-    const message_event = JSON.parse(event);
-    let message_url = '';
+    const message_event = JSON.parse(event)
+    let message_url = ''
     switch (message_event.type) {
-      case "web":
-        message_url = message_event.uri;
-        break;
-      case "product":
+      case 'web':
+        message_url = message_event.uri
+        break
+      case 'product':
         try {
-          await request(`products/get?item_id=${message_event.uri}&shop_id=${this.shop_id}`, this.shop_id,{
-            method: 'GET',
-            headers: {"Content-Type": "application/json"},
-            params: {
-              shop_id: this.shop_id,
-              stream: this.stream,
-            },
-          }).then(data => {
+          await request(
+            `products/get?item_id=${message_event.uri}&shop_id=${this.shop_id}`,
+            this.shop_id,
+            {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' },
+              params: {
+                shop_id: this.shop_id,
+                stream: this.stream,
+              },
+            }
+          ).then((data) => {
             message_url = data.url
-          });
-
+          })
         } catch (error) {
-          return error;
+          return error
         }
-        break;
-      case "category":
+        break
+      case 'category':
         try {
-          await request(`category/${message_event.uri}?shop_id=${this.shop_id}`, this.shop_id, {
-            method: 'GET',
-            headers: {"Content-Type": "application/json"},
-            params: {
-              shop_id: this.shop_id,
-              stream: this.stream,
-            },
-          }).then(data => {
-            message_url = data.categories.find(x => x.id === message_event.uri).url;
-          });
+          await request(
+            `category/${message_event.uri}?shop_id=${this.shop_id}`,
+            this.shop_id,
+            {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' },
+              params: {
+                shop_id: this.shop_id,
+                stream: this.stream,
+              },
+            }
+          ).then((data) => {
+            message_url = data.categories.find(
+              (x) => x.id === message_event.uri
+            ).url
+          })
         } catch (error) {
-          return error;
+          return error
         }
-        break;
+        break
     }
 
-    const supported = await Linking.openURL(message_url);
+    const supported = await Linking.openURL(message_url)
     if (supported) {
-      await Linking.openURL(message_url);
+      await Linking.openURL(message_url)
     } else {
-      console.log(`error open URL: ${message_url}`);
+      console.log(`error open URL: ${message_url}`)
     }
   }
 }
 
-export default MainSDK;
+export default MainSDK
