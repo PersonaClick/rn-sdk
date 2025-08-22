@@ -1,3 +1,23 @@
+## 3.1.3 (2025-08-22)
+
+
+### Bug Fixes
+
+* **gcm:** message variability (544eb08)
+
+
+### Features
+
+* **common:** bump version (ce7e70d)
+* **sdk:** bump device-info (1d1f10e)
+* **sdk:** getToken to use correct token (d07df14)
+* **sdk:** in-app push notifications (#51) (6fa0296)
+* **sdk:** include types for exclude_brands (#50) (cd1d301)
+* **sdk:** rm jest (d0cce5d)
+* **sdk:** sid token generation (4a34846)
+
+
+
 ## 3.1.2 (2025-08-22)
 
 

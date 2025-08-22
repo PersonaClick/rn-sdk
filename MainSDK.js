@@ -13,6 +13,7 @@ import { savePushToken } from './lib/client'
 import { getLastPushTokenSentDate } from './lib/client'
 import { saveLastPushTokenSentDate } from './lib/client'
 import { convertParams } from './lib/tracker'
+import { NotificationManager } from './lib/notification'
 import { PermissionsAndroid } from 'react-native'
 import { Platform } from 'react-native'
 import { getMessaging } from '@react-native-firebase/messaging'
@@ -120,7 +121,10 @@ class MainSDK extends Performer {
             response.sid = response.seance = generateSid()
           }
         } else {
-          const did = Platform.OS === 'android' ? await DeviceInfo.getAndroidId() : (await DeviceInfo.syncUniqueId()) || '';
+          const did =
+            Platform.OS === 'android'
+              ? await DeviceInfo.getAndroidId()
+              : (await DeviceInfo.syncUniqueId()) || ''
           if (DEBUG) console.log('Device ID: ', did)
 
           response = await request('init', this.shop_id, {
@@ -152,12 +156,14 @@ class MainSDK extends Performer {
   isInit = () => this.initialized
 
   getToken = () => {
-    return this.initPushToken().then((token) => {
-      if (DEBUG) console.log(token)
-      return token
-    }).catch((error) => {
-      console.error(error)
-    })
+    return this.initPushToken()
+      .then((token) => {
+        if (DEBUG) console.log(token)
+        return token
+      })
+      .catch((error) => {
+        console.error(error)
+      })
   }
 
   /**
@@ -510,22 +516,22 @@ class MainSDK extends Performer {
       return savedToken
     }
 
-    let pushToken;
+    let pushToken
 
     if (this._push_type === null && Platform.OS === 'ios') {
       getAPNSToken(this.messaging).then((token) => {
         if (DEBUG) console.log('New APN token: ', token)
         this.setPushTokenNotification(token)
-        pushToken = token;
+        pushToken = token
       })
     } else {
       getToken(this.messaging).then((token) => {
         if (DEBUG) console.log('New FCM token: ', token)
         this.setPushTokenNotification(token)
-        pushToken = token;
+        pushToken = token
       })
     }
-    return pushToken;
+    return pushToken
   }
 
   async initPushChannel() {
@@ -833,6 +839,13 @@ class MainSDK extends Performer {
     } else {
       console.log(`error open URL: ${message_url}`)
     }
+  }
+
+  /**
+   * @param {import('@notifee/react-native').Notification} [params]
+   */
+  async showInAppNotification(params) {
+    NotificationManager.showNotification(params)
   }
 }
 
