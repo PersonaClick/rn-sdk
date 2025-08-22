@@ -1,6 +1,6 @@
 {
   "name": "@personaclick/rn-sdk",
-  "version": "3.1.2",
+  "version": "3.1.3",
   "description": "PersonaClick React Native SDK",
   "type": "module",
   "exports": {
@@ -43,7 +43,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "changelog": "conventional-changelog -i CHANGELOG.md -s --commit-path . -p angular"
+    "changelog": "conventional-changelog -i CHANGELOG.md -s --commit-path . -p angular -t @personaclick/rn-sdk-"
   },
   "publishConfig": {
     "access": "public"
