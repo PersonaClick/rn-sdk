@@ -120,12 +120,12 @@ class MainSDK extends Performer {
             response.sid = response.seance = generateSid()
           }
         } else {
+          const did = Platform.OS === 'android' ? await DeviceInfo.getAndroidId() : (await DeviceInfo.syncUniqueId()) || '';
+          if (DEBUG) console.log('Device ID: ', did)
+
           response = await request('init', this.shop_id, {
             params: {
-              did:
-                Platform.OS === 'android'
-                  ? await DeviceInfo.getAndroidId()
-                  : (await DeviceInfo.syncUniqueId()) || '',
+              did,
               shop_id: this.shop_id,
               stream: this.stream,
             },
@@ -152,9 +152,11 @@ class MainSDK extends Performer {
   isInit = () => this.initialized
 
   getToken = () => {
-    return getSavedPushToken(this.shop_id).then((token) => {
+    return this.initPushToken().then((token) => {
       if (DEBUG) console.log(token)
       return token
+    }).catch((error) => {
+      console.error(error)
     })
   }
 
@@ -508,17 +510,22 @@ class MainSDK extends Performer {
       return savedToken
     }
 
+    let pushToken;
+
     if (this._push_type === null && Platform.OS === 'ios') {
       getAPNSToken(this.messaging).then((token) => {
         if (DEBUG) console.log('New APN token: ', token)
         this.setPushTokenNotification(token)
+        pushToken = token;
       })
     } else {
       getToken(this.messaging).then((token) => {
         if (DEBUG) console.log('New FCM token: ', token)
         this.setPushTokenNotification(token)
+        pushToken = token;
       })
     }
+    return pushToken;
   }
 
   async initPushChannel() {
