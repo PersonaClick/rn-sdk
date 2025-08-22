@@ -1,6 +1,6 @@
 {
   "name": "@personaclick/rn-sdk",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "description": "PersonaClick React Native SDK",
   "type": "module",
   "exports": {
@@ -25,11 +25,11 @@
     "@react-native-async-storage/async-storage": "1.22.0",
     "@react-native-firebase/app": "^23",
     "@react-native-firebase/messaging": "^23",
+    "conventional-changelog-cli": "5.0.0",
     "react": "^19.1.0",
     "react-native": "^0.81.0",
     "react-native-device-info": "^14.0.4",
-    "react-test-renderer": "^17.0.2",
-    "standard-changelog": "5.0.0"
+    "react-test-renderer": "^17.0.2"
   },
   "peerDependencies": {
     "@notifee/react-native": "^9.1.8",
@@ -43,7 +43,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "changelog": "standard-changelog --commit-path ."
+    "changelog": "conventional-changelog -i CHANGELOG.md -s --commit-path . -p angular"
   },
   "publishConfig": {
     "access": "public"
