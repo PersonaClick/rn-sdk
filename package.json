@@ -1,7 +1,8 @@
 {
   "name": "@personaclick/rn-sdk",
-  "version": "3.0.1",
+  "version": "3.1.1",
   "description": "PersonaClick React Native SDK",
+  "type": "module",
   "exports": {
     ".": "./index.js"
   },
@@ -16,8 +17,7 @@
     "@PersonaClick/rn-sdk"
   ],
   "dependencies": {
-    "axios": "^0.21.1",
-    "react-native-device-info": "^8.0.7"
+    "axios": "^0.21.1"
   },
   "devDependencies": {
     "@jest/create-cache-key-function": "^26.6.2",
@@ -25,10 +25,9 @@
     "@react-native-async-storage/async-storage": "1.22.0",
     "@react-native-firebase/app": "^23",
     "@react-native-firebase/messaging": "^23",
-    "@testing-library/jest-native": "^4.0.4",
-    "jest": "26.4.0",
     "react": "^19.1.0",
     "react-native": "^0.81.0",
+    "react-native-device-info": "^14.0.4",
     "react-test-renderer": "^17.0.2",
     "standard-changelog": "5.0.0"
   },
@@ -36,23 +35,15 @@
     "@notifee/react-native": "^9.1.8",
     "@react-native-async-storage/async-storage": "^1.23.1",
     "@react-native-firebase/app": "^23",
-    "@react-native-firebase/messaging": "^23"
+    "@react-native-firebase/messaging": "^23",
+    "react-native-device-info": "^14.0.4"
   },
   "directories": {
     "lib": "lib"
   },
   "scripts": {
-    "test": "jest",
+    "test": "node --test",
     "changelog": "standard-changelog --commit-path ."
-  },
-  "jest": {
-    "preset": "react-native",
-    "transform": {
-      "^.+\\.js$": "<rootDir>/node_modules/react-native/jest/preprocessor.js"
-    },
-    "transformIgnorePatterns": [
-      "node_modules/(?!(jest-)?react-native|@react-native|@react-navigation)"
-    ]
   },
   "publishConfig": {
     "access": "public"
