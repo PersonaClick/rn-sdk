@@ -20,18 +20,18 @@ Also need added AsyncStorage plugin:
 yarn add @react-native-async-storage/async-storage
 ```
 
-and react-native-device-info
-
-```
-yarn add react-native-device-info
-```
-
 For push notification:
 
 ```
 yarn add @react-native-firebase/app
 yarn add @react-native-firebase/messaging
 yarn add @notifee/react-native
+```
+
+**Note:** The `react-native-device-info` package is no longer automatically installed. If you want to automatically get the device ID (as it was before), you need to manually install this package. Alternatively, you can provide the device ID manually through the `deviceInfo` parameter in the constructor.
+
+```
+yarn add react-native-device-info
 ```
 
 ## iOS Additional Installation
@@ -161,9 +161,29 @@ Initialize SDK object and use it anywhere in your application. (!) Remember to i
 ```js
 import PersonaClick from '@personaclick/rn-sdk';
 
-...
+// Basic usage
 const rnsdk = new PersonaClick("YOUR_SHOP_ID", "Stream");
+
+// To provide device ID manually
+const rnsdk = new PersonaClick("YOUR_SHOP_ID", "Stream", false, true, {
+  id: "CUSTOM_DEVICE_ID"
+});
+
+// With debug mode
+const rnsdk = new PersonaClick("YOUR_SHOP_ID", "Stream", true);
+
+// With all parameters
+const rnsdk = new PersonaClick("YOUR_SHOP_ID", "Stream", false, true, {
+  id: "CUSTOM_DEVICE_ID"
+});
 ```
+
+**Constructor parameters:**
+- `shop_id` (string, required): Shop ID
+- `stream` (string, optional): Stream name
+- `debug` (boolean, optional): Debug mode, default: false
+- `autoSendPushToken` (boolean, optional): Auto send push token, default: true
+- `deviceInfo` (object, optional): Device information, used if `id` value exists
 
 ## Check init
 
