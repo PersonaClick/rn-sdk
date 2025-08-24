@@ -30,7 +30,6 @@ import { EventType } from '@notifee/react-native'
 import { AuthorizationStatus } from '@notifee/react-native'
 import { SDK_PUSH_CHANNEL } from './index'
 import Performer from './lib/performer'
-import DeviceInfo from 'react-native-device-info'
 import { blankSearchRequest } from './utils'
 import { isOverOneWeekAgo } from './utils'
 
@@ -74,7 +73,7 @@ import { isOverOneWeekAgo } from './utils'
 export var DEBUG = false
 
 class MainSDK extends Performer {
-  constructor(shop_id, stream, debug = false, autoSendPushToken = true) {
+  constructor(shop_id, stream, debug = false, autoSendPushToken = true, deviceInfo = null) {
     let queue = []
     super(queue)
     this.shop_id = shop_id
@@ -86,6 +85,7 @@ class MainSDK extends Performer {
     this.lastMessageIds = []
     this.autoSendPushToken = autoSendPushToken
     this.messaging = getMessaging()
+    this.deviceInfo = deviceInfo
   }
 
   perform(command) {
@@ -121,10 +121,24 @@ class MainSDK extends Performer {
             response.sid = response.seance = generateSid()
           }
         } else {
-          const did =
-            Platform.OS === 'android'
-              ? await DeviceInfo.getAndroidId()
-              : (await DeviceInfo.syncUniqueId()) || ''
+          let did = ''
+          
+          // Eğer constructor'da deviceInfo verilmişse ve id değeri varsa onu kullan
+          if (this.deviceInfo && this.deviceInfo.id) {
+            did = this.deviceInfo.id
+          } else {
+            // Eski yöntem - DeviceInfo paketi varsa kullan
+            try {
+              const DeviceInfo = await import('react-native-device-info')
+              did = Platform.OS === 'android'
+                ? await DeviceInfo.default.getAndroidId()
+                : (await DeviceInfo.default.syncUniqueId()) || ''
+            } catch (error) {
+              if (DEBUG) console.log('DeviceInfo paketi bulunamadı, device ID alınamadı')
+              did = ''
+            }
+          }
+          
           if (DEBUG) console.log('Device ID: ', did)
 
           response = await request('init', this.shop_id, {
