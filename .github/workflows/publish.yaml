@@ -8,24 +8,32 @@ on:
   workflow_dispatch:
 
 jobs:
-  run:
+  publish:
+    name: Publish to npm and create release
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: master
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: '18'
+          node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(npm pkg get version | tr -d '"')
+          TARBALL=$(npm pack)
+          mv "$TARBALL" "package.tgz"
+          gh release create "v$VERSION" ./package.tgz --title="v$VERSION" --generate-notes
