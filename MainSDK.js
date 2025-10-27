@@ -30,7 +30,6 @@ import { EventType } from '@notifee/react-native'
 import { AuthorizationStatus } from '@notifee/react-native'
 import { SDK_PUSH_CHANNEL } from './index'
 import Performer from './lib/performer'
-import DeviceInfo from 'react-native-device-info'
 import { blankSearchRequest } from './utils'
 import { isOverOneWeekAgo } from './utils'
 
@@ -44,6 +43,11 @@ import { isOverOneWeekAgo } from './utils'
  * @typedef {Object} GoogleData
  * @property {string} message_id
  * @property {string} ["gcm.message_id"]
+ */
+
+/**
+ * @typedef {Object} DeviceInfo
+ * @property {string} id
  */
 
 /**
@@ -74,7 +78,20 @@ import { isOverOneWeekAgo } from './utils'
 export var DEBUG = false
 
 class MainSDK extends Performer {
-  constructor(shop_id, stream, debug = false, autoSendPushToken = true) {
+  /**
+   * @param {string} shop_id
+   * @param {string} stream
+   * @param {boolean?} debug
+   * @param {boolean?} autoSendPushToken
+   * @param {DeviceInfo?} deviceInfo
+   */
+  constructor(
+    shop_id,
+    stream,
+    debug = false,
+    autoSendPushToken = true,
+    deviceInfo = null
+  ) {
     let queue = []
     super(queue)
     this.shop_id = shop_id
@@ -86,12 +103,20 @@ class MainSDK extends Performer {
     this.lastMessageIds = []
     this.autoSendPushToken = autoSendPushToken
     this.messaging = getMessaging()
+    this.deviceInfo = deviceInfo
   }
 
+  /**
+   * @param {Function} command
+   * @returns {void}
+   */
   perform(command) {
     command()
   }
 
+  /**
+   * @returns {void}
+   */
   init() {
     ;(async () => {
       try {
@@ -121,11 +146,24 @@ class MainSDK extends Performer {
             response.sid = response.seance = generateSid()
           }
         } else {
-          const did =
-            Platform.OS === 'android'
-              ? await DeviceInfo.getAndroidId()
-              : (await DeviceInfo.syncUniqueId()) || ''
-          if (DEBUG) console.log('Device ID: ', did)
+          let did
+
+          if (this.deviceInfo && this.deviceInfo.id) {
+            did = this.deviceInfo.id
+          } else {
+            try {
+              const DeviceInfo = await import('react-native-device-info')
+              did =
+                Platform.OS === 'android'
+                  ? await DeviceInfo.getAndroidId()
+                  : (await DeviceInfo.syncUniqueId()) || ''
+            } catch (e) {
+              console.error(
+                `Device ID is not present in init args, but also 'react-native-device-info' is not present: ${JSON.stringify(e, undefined, 2)}`
+              )
+              did = ''
+            }
+          }
 
           response = await request('init', this.shop_id, {
             params: {
@@ -153,8 +191,14 @@ class MainSDK extends Performer {
     })()
   }
 
+  /**
+   * @returns {boolean}
+   */
   isInit = () => this.initialized
 
+  /**
+   * @returns {Promise<string | undefined>}
+   */
   getToken = () => {
     return this.initPushToken()
       .then((token) => {
@@ -208,6 +252,11 @@ class MainSDK extends Performer {
     })
   }
 
+  /**
+   * @param {string} event
+   * @param {Record<string, any>} options
+   * @returns {void}
+   */
   trackEvent(event, options) {
     this.push(async () => {
       try {
@@ -278,6 +327,11 @@ class MainSDK extends Performer {
     })
   }
 
+  /**
+   * @param {string} recommender_code
+   * @param {Record<string, any>} options
+   * @returns {Promise<any>}
+   */
   recommend(recommender_code, options) {
     return new Promise((resolve, reject) => {
       this.push(() => {
@@ -299,6 +353,9 @@ class MainSDK extends Performer {
     })
   }
 
+  /**
+   * @returns {Promise<any>}
+   */
   cart() {
     return new Promise((resolve, reject) => {
       this.push(() => {
@@ -347,12 +404,16 @@ class MainSDK extends Performer {
   /**
    * Executes a blank search.
    *
-   * @returns {Promise<Object>} - A promise with the request result.
+   * @returns {Promise<Record<string, any>} - A promise with the request result.
    */
   searchBlank() {
     return blankSearchRequest(this.shop_id, this.stream)
   }
 
+  /**
+   * @param {Record<string, any>} params
+   * @returns {void}
+   */
   setProfile(params) {
     this.push(async () => {
       if (
@@ -381,6 +442,10 @@ class MainSDK extends Performer {
       }
     })
   }
+
+  /**
+   * @returns {Promise<any>}
+   */
   getProfile() {
     return new Promise((resolve, reject) => {
       this.push(() => {
@@ -430,6 +495,10 @@ class MainSDK extends Performer {
     }
   }
 
+  /**
+   * @param {string} token
+   * @returns {void}
+   */
   setPushTokenNotification(token) {
     this.push(async () => {
       try {
@@ -461,6 +530,7 @@ class MainSDK extends Performer {
       }
     })
   }
+
   firebase_only(val) {
     this._push_type = val ? 'android' : null
   }
@@ -504,6 +574,10 @@ class MainSDK extends Performer {
     }
   }
 
+  /**
+   * @param {boolean} removeOld
+   * @returns {Promise<string, Error>}
+   */
   async initPushToken(removeOld = false) {
     let savedToken = await getSavedPushToken(this.shop_id)
     if (removeOld) {
@@ -534,6 +608,9 @@ class MainSDK extends Performer {
     return pushToken
   }
 
+  /**
+   * @returns {Promise<void>}
+   */
   async initPushChannel() {
     await notifee.createChannel({
       id: SDK_PUSH_CHANNEL,
@@ -542,6 +619,9 @@ class MainSDK extends Performer {
     })
   }
 
+  /**
+   * @returns {void}
+   */
   initPushChannelAndToken() {
     this.push(async () => {
       const granted = await this.getPushPermission()
@@ -710,6 +790,11 @@ class MainSDK extends Performer {
     })
   }
 
+  /**
+   * @param {string} trigger_name
+   * @param {Record<string, any>} data
+   * @returns {void}
+   */
   triggers(trigger_name, data) {
     this.push(async () => {
       try {
@@ -729,14 +814,29 @@ class MainSDK extends Performer {
       }
     })
   }
+
+  /**
+   * @returns {Promise<void>}
+   */
   async deleteToken() {
     return savePushToken(false, this.shop_id).then(async () => {
       await deleteToken(this.messaging)
     })
   }
+
+  /**
+   * @param {string} action
+   * @param {Record<string, any>} data
+   * @returns {void}
+   */
   subscriptions(action, data) {
     this.triggers(action, data)
   }
+
+  /**
+   * @param {string} action
+   * @param {Record<string, any>} data
+   */
   segments(action, data) {
     return new Promise((resolve, reject) => {
       this.push(() => {
