@@ -2,50 +2,60 @@
 
 ## Installation
 
-PersonaClick React Native SDK is available through [GitHub](https://github.com/PersonaClick/rn-sdk.git). To install it, run next command in terminal:
+PersonaClick React Native SDK is available through [GitHub](https://github.com/PersonaClick/rn-sdk.git).\
+To install it, run next command in terminal:
 
-```
-yarn add @personaclick/rn-sdk
+```sh
+yarn add @personaclick/react-native-sdk
 ```
 
 or
 
-```
+```sh
 yarn add https://github.com/PersonaClick/rn-sdk.git
 ```
 
 Also need added AsyncStorage plugin:
 
-```
+```sh
 yarn add @react-native-async-storage/async-storage
 ```
 
-and react-native-device-info
-
-```
-yarn add react-native-device-info
-```
+> [!Note]
+> Starting from 4.0.0 we support [Expo](https://expo.dev). This means that\
+> 'react-native-device-info' no longer is required.
+> If your app does not use Expo, you either:
+>
+> 1. have to install 'react-native-device-info':
+>
+>    ```sh
+>    yarn add react-native-device-info
+>    ```
+>
+> 2. or provide your own unique device ID generation function
+>    See 'Initialization' below
 
 For push notification:
 
-```
+```sh
 yarn add @react-native-firebase/app
 yarn add @react-native-firebase/messaging
 yarn add @notifee/react-native
 ```
 
-## iOS Additional Installation
+### iOS Additional Installation
 
 Open your `/ios/{projectName}/AppDelegate.m` file, and add the following:
 At the top of the file, import the Firebase SDK:
 
-```
+```swift
 #import <Firebase.h>
 ```
 
-Open a terminal window and navigate to the location of the Xcode project for your app
+Open a terminal window and navigate to the location of the Xcode project for\
+your app
 
-```
+```sh
 cd ios/
 pod install
 ```
@@ -61,7 +71,10 @@ Disable auto-registration the device
 }
 ```
 
-On iOS, when a message is received the device silently starts your application in a background state. To get around this problem, you can configure your application. Use this property to conditionally render null ("nothing") if your app is launched in the background:
+On iOS, when a message is received the device silently starts your application\
+in a background state. To get around this problem, you can configure your\
+application. Use this property to conditionally render null ("nothing") if your\
+app is launched in the background:
 
 ```js
 // index.js
@@ -83,9 +96,10 @@ function App() {
 AppRegistry.registerComponent('app', () => HeadlessCheck)
 ```
 
-To inject a isHeadless prop into your app, please update your AppDelegate.m file as instructed below:
+To inject a isHeadless prop into your app, please update your AppDelegate.m\
+file as instructed below:
 
-```
+```swift
 / add this import statement at the top of your `AppDelegate.m` file
 #import "RNFBMessagingModule.h"
 
@@ -103,9 +117,10 @@ RCTRootView *rootView = [[RCTRootView alloc] initWithBridge:bridge
 
 #### iOS Background Limitation
 
-If the iOS Background App Refresh mode is off, your handler configured in setBackgroundMessageHandler will not be triggered.
+If the iOS Background App Refresh mode is off, your handler configured in\
+setBackgroundMessageHandler will not be triggered.
 
-## Android Additional Installation
+### Android Additional Installation
 
 In your `android/build.gradle`
 
@@ -124,16 +139,7 @@ In your `android/app/build.gradle` add
 apply plugin: 'com.google.gms.google-services'
 ```
 
-in `android/app/src/main/AndroidManifest.xml` add
-
-```gradle
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
-                     android:maxSdkVersion="32"/>
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM"
-                     android:minSdkVersion="33"/>
-```
-
-# Usage
+## Usage
 
 SDK is used for several tasks:
 
@@ -156,13 +162,40 @@ SDK is used for several tasks:
 
 ## Initialization
 
-Initialize SDK object and use it anywhere in your application. (!) Remember to initialize SDK only once on application launch.
+Initialize SDK object and use it anywhere in your application. (!) Remember to\
+initialize SDK only once on application launch.
 
 ```js
-import PersonaClick from '@personaclick/rn-sdk';
+import PersonaClick from '@PersonaClick/react-native-sdk'
 
-...
-const rnsdk = new PersonaClick("YOUR_SHOP_ID", "Stream");
+// If you do not use Expo and have 'react-native-device-info' installed
+const rnsdk = new PersonaClick('YOUR_SHOP_ID', 'Stream')
+
+// If you use Expo:
+import * as Application from 'expo-application'
+import * as SecureStore from 'expo-secure-store'
+import 'react-native-get-random-values'
+import { v4 as uuidv4 } from 'uuid'
+
+// Use this function to create unique ID for each app Installation
+// or create your own implementation
+async function getDeviceId() {
+  if (Application.getAndroidId) {
+    return Application.getAndroidId()
+  }
+
+  let uniqueId = await SecureStore.getItemAsync('uniqueId')
+  if (!uniqueId) {
+    uniqueId = uuidv4()
+    await SecureStore.setItemAsync('uniqueId', uniqueId)
+  }
+
+  return uniqueId
+}
+
+const rnsdk = new PersonaClick('YOUR_SHOP_ID', 'Stream', false, true, {
+  id: await getDeviceId(),
+})
 ```
 
 ## Check init
@@ -279,7 +312,7 @@ const params = {
 rnsdk.notificationClicked(params)
 
 // Track Notification received
-rnsdk.notificationReceived(params)
+rnsdk.notificationOpened(params)
 ```
 
 ## Product search
@@ -313,6 +346,14 @@ const params = {
 }
 
 rnsdk.recommend(recommender_code, params).then((res) => {
+  console.log(res)
+})
+```
+
+## Shopping cart
+
+```js
+rnsdk.cart().then((res) => {
   console.log(res)
 })
 ```
@@ -570,8 +611,7 @@ rnsdk.segments('get').then((res) => {
 })
 ```
 
-##
-
 ## License
 
-PersonaClick React Native SDK is available under the MIT license. See the LICENSE file for more info.
+PersonaClick React Native SDK is available under the MIT license.
+See the LICENSE file for more info.
