@@ -502,21 +502,27 @@ class MainSDK extends Performer {
   setPushTokenNotification(token) {
     this.push(async () => {
       try {
-        const params = {
-          token: token,
-          platform:
-            this._push_type !== null
-              ? this._push_type
-              : token.match(/[a-z]/) !== null
-                ? 'android'
-                : 'ios',
+        let platform
+
+        if (this._push_type !== null) {
+          platform = this._push_type
+        } else {
+          if (Platform.OS === 'ios') {
+            platform = 'ios'
+          } else {
+            platform = 'android'
+          }
         }
+
+        if (DEBUG) console.log(`Push token platform: '${platform}'`)
+
         return await request('mobile_push_tokens', this.shop_id, {
           method: 'POST',
           params: {
             shop_id: this.shop_id,
             stream: this.stream,
-            ...params,
+            token,
+            platform,
           },
         }).then(async (data) => {
           if (data.status === 'success') {
