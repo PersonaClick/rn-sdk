@@ -1,4 +1,4 @@
-import REES46 from '../index'
+import REES46 from '../index.js'
 
 jest.mock('react-native-device-info', () => {})
 jest.mock('@react-native-firebase/messaging', () => {})
