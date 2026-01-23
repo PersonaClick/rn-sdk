@@ -14,10 +14,12 @@ import { getLastPushTokenSentDate } from './lib/client'
 import { saveLastPushTokenSentDate } from './lib/client'
 import { convertParams } from './lib/tracker'
 import { NotificationManager } from './lib/notification'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { PermissionsAndroid } from 'react-native'
 import { Platform } from 'react-native'
 import { getMessaging } from '@react-native-firebase/messaging'
 import { onMessage } from '@react-native-firebase/messaging'
+import firebase from '@react-native-firebase/app'
 import { setBackgroundMessageHandler } from '@react-native-firebase/messaging'
 import { getToken } from '@react-native-firebase/messaging'
 import { getAPNSToken } from '@react-native-firebase/messaging'
@@ -32,6 +34,8 @@ import { SDK_PUSH_CHANNEL } from './index'
 import Performer from './lib/performer'
 import { blankSearchRequest } from './utils'
 import { isOverOneWeekAgo } from './utils'
+import { getStorageKey } from './utils'
+import { SDK_API_URL } from './index'
 
 /**
  * @typedef {Object} Event
@@ -96,14 +100,21 @@ class MainSDK extends Performer {
     super(queue)
     this.shop_id = shop_id
     this.stream = stream ?? null
+    this.deviceId = ''
+    this.userSeance = ''
+    this.segment = ''
     this.initialized = false
     DEBUG = debug
     this._push_type = null
     this.push_payload = []
     this.lastMessageIds = []
     this.autoSendPushToken = autoSendPushToken
-    this.messaging = getMessaging()
     this.deviceInfo = deviceInfo
+    
+    // Firebase is initialized automatically by native modules
+    // Initialize messaging lazily when needed
+    this.messaging = null
+    this._initMessaging()
   }
 
   /**
@@ -114,29 +125,91 @@ class MainSDK extends Performer {
     command()
   }
 
+  async initializeSegment() {
+    const key = getStorageKey('segment', this.shop_id)
+    const segments = ['A', 'B']
+
+    try {
+      const stored = await AsyncStorage.getItem(key)
+      if (stored && segments.includes(stored)) {
+        this.segment = stored
+        return stored
+      }
+
+      const generated = segments[Math.round(Math.random())]
+      this.segment = generated
+      await AsyncStorage.setItem(key, generated)
+      return generated
+    } catch (error) {
+      const generated = segments[Math.round(Math.random())]
+      this.segment = generated
+      return generated
+    }
+  }
+
+  _initMessaging() {
+    // Initialize Firebase messaging lazily
+    // Firebase is initialized automatically by native modules in React Native
+    // getMessaging() can be called directly without checking firebase.apps
+    try {
+      // Check if Firebase is available before initializing messaging
+      if (firebase.apps && firebase.apps.length > 0) {
+        this.messaging = getMessaging()
+      } else {
+        // Firebase not initialized - this is OK for SDK features that don't require push
+        this.messaging = null
+        if (DEBUG) console.log('Firebase not initialized - push features will be disabled')
+      }
+    } catch (error) {
+      console.warn('Firebase messaging initialization failed:', error)
+      this.messaging = null
+    }
+  }
+
+  _ensureMessaging() {
+    if (!this.messaging) {
+      this._initMessaging()
+    }
+    return this.messaging
+  }
+
   /**
    * @returns {void}
    */
   init() {
     ;(async () => {
       try {
+        if (DEBUG) console.log('[SDK Init] Starting initialization...')
+        
         if (!this.shop_id || typeof this.shop_id !== 'string') {
           const initError = new Error(
             'Parameter "shop_id" is required as a string.'
           )
           initError.name = 'Init error'
+          if (DEBUG) console.error('[SDK Init] Error:', initError)
           throw initError
         }
 
         if (this.stream && typeof this.stream !== 'string') {
           const streamError = new Error('Parameter "stream" must be a string.')
           streamError.name = 'Init error'
+          if (DEBUG) console.error('[SDK Init] Error:', streamError)
           throw streamError
         }
+        
+        if (DEBUG) console.log('[SDK Init] Shop ID:', this.shop_id, 'Stream:', this.stream)
+
+        // JS SDK behavior: initialize segment before init request
+        await this.initializeSegment()
+        
         const storageData = await getData(this.shop_id)
+        if (DEBUG) console.log('[SDK Init] Storage data:', storageData)
+        
         let response = null
 
         if (storageData?.did) {
+          if (DEBUG) console.log('[SDK Init] Using cached device ID:', storageData.did)
+          this.deviceId = storageData.did
           response = storageData
           if (
             !storageData?.seance ||
@@ -144,9 +217,11 @@ class MainSDK extends Performer {
             new Date().getTime() > storageData?.expires
           ) {
             response.sid = response.seance = generateSid()
+            if (DEBUG) console.log('[SDK Init] Generated new session ID:', response.sid)
           }
         } else {
-          let did
+          if (DEBUG) console.log('[SDK Init] Making init request to API...')
+          let did = ''
 
           if (this.deviceInfo && this.deviceInfo.id) {
             did = this.deviceInfo.id
@@ -159,33 +234,74 @@ class MainSDK extends Performer {
                   : (await DeviceInfo.syncUniqueId()) || ''
             } catch (e) {
               console.error(
-                `Device ID is not present in init args, but also 'react-native-device-info' is not present: ${JSON.stringify(e, undefined, 2)}`
+                `Device ID is not present in init args, but also 'react-native-device-info' is not present: ${JSON.stringify(
+                  e,
+                  undefined,
+                  2
+                )}`
               )
               did = ''
             }
           }
 
-          response = await request('init', this.shop_id, {
-            params: {
-              did,
-              shop_id: this.shop_id,
-              stream: this.stream,
-            },
-          })
+          const params = {
+            shop_id: this.shop_id,
+            stream: this.stream,
+          }
+          if (did) {
+            params.did = did
+          }
+
+          response = await request('init', this.shop_id, { params })
+          
+          if (DEBUG) console.log('[SDK Init] API response:', response)
+          
+          // Check if response is an error
+          if (response instanceof Error || (response && response.message)) {
+            const error = response instanceof Error ? response : new Error(response.message || 'Init request failed')
+            if (DEBUG) console.error('[SDK Init] API error:', error)
+            this.initialized = false
+            throw error
+          }
         }
 
-        updSeance(this.shop_id, response?.did, response?.seance).then(
-          async () => {
-            this.initialized = true
-            this.performQueue()
-            this.initPushChannelAndToken()
-            if (this.isInit() && this.autoSendPushToken) {
-              await this.sendPushToken()
-            }
-          }
-        )
+        if (!response || (!response.did && !storageData?.did)) {
+          const error = new Error('Invalid response from init: missing device ID')
+          if (DEBUG) console.error('[SDK Init] Error:', error, 'Response:', response)
+          this.initialized = false
+          throw error
+        }
+
+        const didToUse = response?.did || storageData?.did || ''
+        this.deviceId = didToUse
+        this.userSeance = response?.seance || response?.sid || ''
+        if (!this.segment && response?.segment) {
+          this.segment = response.segment
+        }
+
+        if (DEBUG) console.log('[SDK Init] Updating session...')
+        await updSeance(this.shop_id, didToUse, response?.seance)
+        
+        this.initialized = true
+        if (DEBUG) console.log('[SDK Init] SDK initialized successfully!')
+        
+        // Initialize messaging after SDK is initialized
+        this._initMessaging()
+        this.performQueue()
+        this.initPushChannelAndToken()
+        if (this.isInit() && this.autoSendPushToken) {
+          await this.sendPushToken()
+        }
       } catch (error) {
         this.initialized = false
+        console.error('[SDK Init] Initialization failed:', error)
+        if (DEBUG) {
+          console.error('[SDK Init] Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          })
+        }
         return error
       }
     })()
@@ -195,6 +311,21 @@ class MainSDK extends Performer {
    * @returns {boolean}
    */
   isInit = () => this.initialized
+
+  /**
+   * Gets the current device ID, ensuring it's synchronized with storage
+   * @returns {Promise<string>} The device ID
+   */
+  async getDeviceId() {
+    // Always get the latest deviceId from storage to ensure synchronization
+    const storageData = await getData(this.shop_id)
+    const deviceId = storageData?.did || this.deviceId || ''
+    // Update instance variable for consistency
+    if (deviceId && deviceId !== this.deviceId) {
+      this.deviceId = deviceId
+    }
+    return deviceId
+  }
 
   /**
    * @returns {Promise<string | undefined>}
@@ -345,6 +476,302 @@ class MainSDK extends Performer {
             },
           }).then((res) => {
             resolve(res)
+          })
+        } catch (error) {
+          reject(error)
+        }
+      })
+    })
+  }
+
+  /**
+   * Fetch stories data for a given code
+   * @param {string} code - Stories code identifier
+   * @returns {Promise<Object>} - Promise that resolves with stories data
+   */
+  getStories(code) {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          // Get current deviceId from storage to ensure it's up-to-date
+          const storageData = await getData(this.shop_id)
+          const deviceId = storageData?.did || this.deviceId || ''
+          if (deviceId && deviceId !== this.deviceId) {
+            this.deviceId = deviceId
+          }
+          
+          const requestParams = {
+            shop_id: this.shop_id,
+            did: deviceId,
+          }
+          
+          console.log('[getStories] Making request with params:', {
+            url: `stories/${code}`,
+            shop_id: this.shop_id,
+            did: deviceId,
+            code: code,
+            fullUrl: `${SDK_API_URL}stories/${code}`
+          })
+          
+          request(`stories/${code}`, this.shop_id, {
+            params: requestParams,
+          }).then((res) => {
+            // Transform snake_case to camelCase for backgroundColor and elements
+            if (res?.stories) {
+              res.stories.forEach(story => {
+                if (story.slides) {
+                  story.slides.forEach(slide => {
+                    // Convert background_color to backgroundColor
+                    if (slide.background_color && !slide.backgroundColor) {
+                      slide.backgroundColor = slide.background_color
+                    }
+                    
+                    // Parse duration (convert to number if string, match iOS SDK: Int in seconds, default 10)
+                    if (slide.duration !== undefined) {
+                      slide.duration = typeof slide.duration === 'string' ? parseInt(slide.duration, 10) || 10 : slide.duration
+                    } else {
+                      // If duration is missing, set default 10 seconds (like iOS SDK)
+                      slide.duration = 10
+                    }
+                    
+                    // Convert snake_case to camelCase for elements
+                    if (slide.elements && Array.isArray(slide.elements)) {
+                      slide.elements.forEach(element => {
+                        // text_input -> textInput
+                        if (element.text_input !== undefined && element.textInput === undefined) {
+                          element.textInput = element.text_input
+                        }
+                        // text_color -> textColor
+                        if (element.text_color !== undefined && element.textColor === undefined) {
+                          element.textColor = element.text_color
+                        }
+                        // text_background_color -> textBackgroundColor
+                        if (element.text_background_color !== undefined && element.textBackgroundColor === undefined) {
+                          element.textBackgroundColor = element.text_background_color
+                        }
+                        // text_background_color_opacity -> textBackgroundColorOpacity
+                        if (element.text_background_color_opacity !== undefined && element.textBackgroundColorOpacity === undefined) {
+                          element.textBackgroundColorOpacity = element.text_background_color_opacity
+                        }
+                        // text_align -> textAlignment
+                        if (element.text_align !== undefined && element.textAlignment === undefined) {
+                          element.textAlignment = element.text_align
+                        }
+                        // text_line_spacing -> textLineSpacing (convert to number)
+                        if (element.text_line_spacing !== undefined && element.textLineSpacing === undefined) {
+                          const spacing = element.text_line_spacing
+                          element.textLineSpacing = typeof spacing === 'string' ? parseFloat(spacing) || 0 : spacing
+                        }
+                        // text_bold -> textBold
+                        if (element.text_bold !== undefined && element.textBold === undefined) {
+                          element.textBold = element.text_bold
+                        }
+                        // font_size -> fontSize (convert to number)
+                        if (element.font_size !== undefined && element.fontSize === undefined) {
+                          const size = element.font_size
+                          element.fontSize = typeof size === 'string' ? parseFloat(size) || undefined : size
+                        }
+                        // font_type -> fontType
+                        if (element.font_type !== undefined && element.fontType === undefined) {
+                          element.fontType = element.font_type
+                        }
+                        // y_offset -> yOffset (convert to number)
+                        if (element.y_offset !== undefined && element.yOffset === undefined) {
+                          const offset = element.y_offset
+                          element.yOffset = typeof offset === 'string' ? parseFloat(offset) || 0 : offset
+                        }
+                      })
+                    }
+                  })
+                }
+              })
+            }
+            
+            console.log('[getStories] API response received:', {
+              status: res?.status,
+              hasStories: !!res?.stories,
+              storiesCount: res?.stories?.length || 0,
+              stories: res?.stories?.map((story, idx) => ({
+                index: idx,
+                id: story.id,
+                name: story.name,
+                avatar: story.avatar,
+                slidesCount: story.slides?.length || 0,
+                slides: story.slides?.map((slide, slideIdx) => ({
+                  slideIndex: slideIdx,
+                  id: slide.id,
+                  background: slide.background,
+                  backgroundColor: slide.backgroundColor,
+                  background_color: slide.background_color,
+                  type: slide.type,
+                  elementsCount: slide.elements?.length || 0,
+                  elements: slide.elements?.map(el => ({
+                    type: el.type,
+                    title: el.title,
+                    textInput: el.textInput
+                  }))
+                }))
+              }))
+            })
+            
+            // Check for duplicate stories
+            if (res?.stories && res.stories.length > 0) {
+              const storyIds = res.stories.map(s => s.id)
+              const uniqueIds = new Set(storyIds)
+              if (storyIds.length !== uniqueIds.size) {
+                console.warn('[getStories] WARNING: Duplicate story IDs found!', {
+                  totalStories: storyIds.length,
+                  uniqueStories: uniqueIds.size,
+                  duplicates: storyIds.filter((id, idx) => storyIds.indexOf(id) !== idx),
+                  allIds: storyIds
+                })
+              }
+              
+              // Check for identical stories
+              const storyStrings = res.stories.map(s => JSON.stringify(s))
+              const uniqueStories = new Set(storyStrings)
+              if (storyStrings.length !== uniqueStories.size) {
+                console.warn('[getStories] WARNING: Identical story objects found!', {
+                  totalStories: storyStrings.length,
+                  uniqueStories: uniqueStories.size,
+                  duplicatesCount: storyStrings.length - uniqueStories.size
+                })
+              }
+            }
+            
+            console.log('[getStories] Full API response:', JSON.stringify(res, null, 2))
+            resolve(res)
+          }).catch((error) => {
+            console.error('[getStories] Request error:', error)
+            reject(error)
+          })
+        } catch (error) {
+          console.error('[getStories] Error:', error)
+          reject(error)
+        }
+      })
+    })
+  }
+
+  /**
+   * Track story slide view event
+   * @param {string|number} storyId - Story identifier (string id or numeric ids)
+   * @param {string|number} slideId - Slide identifier (string id or numeric ids)
+   * @param {string} code - Stories code
+   * @returns {Promise<Object>} - Promise that resolves with tracking response
+   */
+  trackStoryView(storyId, slideId, code) {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          // Get current deviceId from storage to ensure it's up-to-date
+          const storageData = await getData(this.shop_id)
+          const deviceId = storageData?.did || this.deviceId || ''
+          if (deviceId && deviceId !== this.deviceId) {
+            this.deviceId = deviceId
+          }
+          
+          // Validate that storyId is a positive integer (API requires number)
+          const numericStoryId = Number(storyId)
+          if (isNaN(numericStoryId) || numericStoryId <= 0 || !Number.isInteger(numericStoryId)) {
+            console.warn('Invalid story_id for tracking:', storyId, 'Expected positive integer')
+            reject(new Error(`Invalid story_id: ${storyId}. Expected positive integer.`))
+            return
+          }
+          
+          // Validate that slideId is a positive integer
+          const numericSlideId = Number(slideId)
+          if (isNaN(numericSlideId) || numericSlideId <= 0 || !Number.isInteger(numericSlideId)) {
+            console.warn('Invalid slide_id for tracking:', slideId, 'Expected positive integer')
+            reject(new Error(`Invalid slide_id: ${slideId}. Expected positive integer.`))
+            return
+          }
+          
+          request('track/stories', this.shop_id, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            params: {
+              shop_id: this.shop_id,
+              did: deviceId,
+              seance: this.userSeance,
+              sid: this.userSeance,
+              segment: this.segment,
+              story_id: numericStoryId,
+              slide_id: numericSlideId,
+              code: code,
+              event: 'view',
+            },
+          }).then((res) => {
+            resolve(res)
+          }).catch((error) => {
+            reject(error)
+          })
+        } catch (error) {
+          reject(error)
+        }
+      })
+    })
+  }
+
+  /**
+   * Track story slide click event
+   * @param {string|number} storyId - Story identifier (string id or numeric ids)
+   * @param {string|number} slideId - Slide identifier (string id or numeric ids)
+   * @param {string} code - Stories code
+   * @returns {Promise<Object>} - Promise that resolves with tracking response
+   */
+  trackStoryClick(storyId, slideId, code) {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          // Get current deviceId from storage to ensure it's up-to-date
+          const storageData = await getData(this.shop_id)
+          const deviceId = storageData?.did || this.deviceId || ''
+          if (deviceId && deviceId !== this.deviceId) {
+            this.deviceId = deviceId
+          }
+          
+          // Validate that storyId is a positive integer (API requires number)
+          const numericStoryId = Number(storyId)
+          if (isNaN(numericStoryId) || numericStoryId <= 0 || !Number.isInteger(numericStoryId)) {
+            console.warn('Invalid story_id for tracking:', storyId, 'Expected positive integer')
+            reject(new Error(`Invalid story_id: ${storyId}. Expected positive integer.`))
+            return
+          }
+          
+          // Validate that slideId is a positive integer
+          const numericSlideId = Number(slideId)
+          if (isNaN(numericSlideId) || numericSlideId <= 0 || !Number.isInteger(numericSlideId)) {
+            console.warn('Invalid slide_id for tracking:', slideId, 'Expected positive integer')
+            reject(new Error(`Invalid slide_id: ${slideId}. Expected positive integer.`))
+            return
+          }
+          
+          // Debug logging
+          console.log('trackStoryClick called with:', {
+            storyId: numericStoryId,
+            slideId: numericSlideId,
+            code: code
+          })
+          
+          request('track/stories', this.shop_id, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            params: {
+              shop_id: this.shop_id,
+              did: deviceId,
+              seance: this.userSeance,
+              sid: this.userSeance,
+              segment: this.segment,
+              story_id: numericStoryId,
+              slide_id: numericSlideId,
+              code: code,
+              event: 'click',
+            },
+          }).then((res) => {
+            resolve(res)
+          }).catch((error) => {
+            reject(error)
           })
         } catch (error) {
           reject(error)
@@ -598,14 +1025,20 @@ class MainSDK extends Performer {
 
     let pushToken
 
+    const messaging = this._ensureMessaging()
+    if (!messaging) {
+      console.warn('Firebase messaging not available')
+      return null
+    }
+
     if (this._push_type === null && Platform.OS === 'ios') {
-      getAPNSToken(this.messaging).then((token) => {
+      getAPNSToken(messaging).then((token) => {
         if (DEBUG) console.log('New APN token: ', token)
         this.setPushTokenNotification(token)
         pushToken = token
       })
     } else {
-      getToken(this.messaging).then((token) => {
+      getToken(messaging).then((token) => {
         if (DEBUG) console.log('New FCM token: ', token)
         this.setPushTokenNotification(token)
         pushToken = token
@@ -667,7 +1100,9 @@ class MainSDK extends Performer {
     if (notifyBgReceive) this.pushBgReceivedListener = notifyBgReceive
 
     // Register handler
-    onMessage(this.messaging, async (remoteMessage) => {
+    const messaging = this._ensureMessaging()
+    if (messaging) {
+      onMessage(messaging, async (remoteMessage) => {
       if (this.lastMessageIds.includes(remoteMessage.messageId)) {
         return false
       } else {
@@ -682,10 +1117,13 @@ class MainSDK extends Performer {
 
       await updPushData(remoteMessage, this.shop_id)
       await this.pushReceivedListener(remoteMessage)
-    })
+      })
+    }
 
     // Register background handler
-    setBackgroundMessageHandler(this.messaging, async (remoteMessage) => {
+    const messagingForBg = this._ensureMessaging()
+    if (messagingForBg) {
+      setBackgroundMessageHandler(messagingForBg, async (remoteMessage) => {
       if (this.lastMessageIds.includes(remoteMessage.messageId)) {
         return false
       } else {
@@ -700,10 +1138,13 @@ class MainSDK extends Performer {
 
       await updPushData(remoteMessage, this.shop_id)
       await this.pushBgReceivedListener(remoteMessage)
-    })
+      })
+    }
 
-    // Register background handler
-    onNotificationOpenedApp(this.messaging, async (remoteMessage) => {
+    // Register notification opened handler
+    const messagingForOpened = this._ensureMessaging()
+    if (messagingForOpened) {
+      onNotificationOpenedApp(messagingForOpened, async (remoteMessage) => {
       if (this.lastMessageIds.includes(remoteMessage.messageId)) {
         return false
       } else {
@@ -718,7 +1159,8 @@ class MainSDK extends Performer {
 
       await updPushData(remoteMessage, this.shop_id)
       await this.pushBgReceivedListener(remoteMessage)
-    })
+      })
+    }
 
     /** Subscribe to click notification */
     notifee.onForegroundEvent(async ({ type, detail }) => {
@@ -826,7 +1268,10 @@ class MainSDK extends Performer {
    */
   async deleteToken() {
     return savePushToken(false, this.shop_id).then(async () => {
-      await deleteToken(this.messaging)
+      const messaging = this._ensureMessaging()
+      if (messaging) {
+        await deleteToken(messaging)
+      }
     })
   }
 
@@ -854,6 +1299,7 @@ class MainSDK extends Performer {
               {
                 shop_id: this.shop_id,
                 stream: this.stream,
+                segment: this.segment || null,
               },
               data
             ),
@@ -865,6 +1311,10 @@ class MainSDK extends Performer {
         }
       })
     })
+  }
+
+  getCurrentSegment() {
+    return this.segment
   }
 
   /**
