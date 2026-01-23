@@ -48,7 +48,7 @@ jobs:
         run: yarn install --inline-builds
 
       - name: Publish
-        run: yarn workspaces foreach --no-private -vp --jobs=2 npm publish --access public
+        run: yarn workspaces foreach --all --no-private -vp --jobs=2 npm publish --access public
 
       - name: Release
         env:
