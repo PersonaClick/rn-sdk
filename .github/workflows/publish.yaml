@@ -18,22 +18,37 @@ permissions:
 jobs:
   publish:
     name: Publish to npm and create release
-    if: github.event.pull_request.merged == true || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: |
+      github.event.pull_request.merged == true ||
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v5
-        with:
-          ref: master
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
           registry-url: https://registry.npmjs.org
 
+      - name: Yarn cache directory
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: Install
+        working-directory: ${{ inputs.workingDirectory }}
+        run: yarn install --inline-builds
+
       - name: Publish
-        run: npm publish --access public
+        run: yarn workspaces foreach --no-private -vp --jobs=2 npm publish --access public
 
       - name: Release
         env:
