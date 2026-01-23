@@ -1,8 +1,12 @@
 name: Publish
 
 on:
+  push:
+    branches:
+      - master
   pull_request:
-    types: [closed]
+    types:
+      - closed
     branches:
       - master
   workflow_dispatch:
@@ -14,7 +18,7 @@ permissions:
 jobs:
   publish:
     name: Publish to npm and create release
-    if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -25,8 +29,8 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
 
       - name: Publish
         run: npm publish --access public
