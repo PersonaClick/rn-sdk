@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - master
-  pull_request:
-    types:
-      - closed
-    branches:
-      - master
   workflow_dispatch:
 
 permissions:
@@ -19,10 +14,6 @@ permissions:
 jobs:
   publish:
     name: Publish to npm and create release
-    if: |
-      github.event.pull_request.merged == true ||
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
