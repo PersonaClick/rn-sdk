@@ -19,7 +19,6 @@ import { PermissionsAndroid } from 'react-native'
 import { Platform } from 'react-native'
 import { getMessaging } from '@react-native-firebase/messaging'
 import { onMessage } from '@react-native-firebase/messaging'
-import firebase from '@react-native-firebase/app'
 import { setBackgroundMessageHandler } from '@react-native-firebase/messaging'
 import { getToken } from '@react-native-firebase/messaging'
 import { getAPNSToken } from '@react-native-firebase/messaging'
@@ -31,6 +30,7 @@ import { AndroidStyle } from '@notifee/react-native'
 import { EventType } from '@notifee/react-native'
 import { AuthorizationStatus } from '@notifee/react-native'
 import { SDK_PUSH_CHANNEL } from './index'
+import PushOrchestrator from './lib/push/PushOrchestrator'
 import Performer from './lib/performer'
 import { blankSearchRequest } from './utils'
 import { isOverOneWeekAgo } from './utils'
@@ -114,7 +114,35 @@ class MainSDK extends Performer {
     // Firebase is initialized automatically by native modules
     // Initialize messaging lazily when needed
     this.messaging = null
-    this._initMessaging()
+
+    /**
+     * Internal push orchestration (device registration, token fetch, tracking subscriptions).
+     * @type {PushOrchestrator}
+     */
+    this._pushOrchestrator = new PushOrchestrator({
+      getMessaging: () => this._ensureMessaging(),
+      getToken,
+      getAPNSToken,
+      onMessage,
+      setBackgroundMessageHandler,
+      onNotificationOpenedApp,
+      notifee,
+      EventType,
+      getPushData,
+      updPushData,
+      notificationDelivered: (options) => this.notificationDelivered(options),
+      pushReceivedListener: (remoteMessage) =>
+        this.pushReceivedListener.call(this, remoteMessage),
+      pushBgReceivedListener: (remoteMessage) =>
+        this.pushBgReceivedListener.call(this, remoteMessage),
+      pushClickListener: (event) => this.pushClickListener.call(this, event),
+      getShopId: () => this.shop_id,
+      hasSeenMessageId: (messageId) => this.lastMessageIds.includes(messageId),
+      markMessageIdSeen: (messageId) => {
+        this.lastMessageIds.push(messageId)
+      },
+      isDebug: () => DEBUG,
+    })
   }
 
   /**
@@ -149,17 +177,9 @@ class MainSDK extends Performer {
 
   _initMessaging() {
     // Initialize Firebase messaging lazily
-    // Firebase is initialized automatically by native modules in React Native
-    // getMessaging() can be called directly without checking firebase.apps
     try {
-      // Check if Firebase is available before initializing messaging
-      if (firebase.apps && firebase.apps.length > 0) {
-        this.messaging = getMessaging()
-      } else {
-        // Firebase not initialized - this is OK for SDK features that don't require push
-        this.messaging = null
-        if (DEBUG) console.log('Firebase not initialized - push features will be disabled')
-      }
+      // Firebase initialization is the host app responsibility.
+      this.messaging = getMessaging()
     } catch (error) {
       console.warn('Firebase messaging initialization failed:', error)
       this.messaging = null
@@ -288,9 +308,10 @@ class MainSDK extends Performer {
         // Initialize messaging after SDK is initialized
         this._initMessaging()
         this.performQueue()
-        this.initPushChannelAndToken()
         if (this.isInit() && this.autoSendPushToken) {
-          await this.sendPushToken()
+          // Explicitly request push permission and register token on init.
+          // This will show the system prompt on first launch if needed.
+          await this.initPush()
         }
       } catch (error) {
         this.initialized = false
@@ -328,17 +349,17 @@ class MainSDK extends Performer {
   }
 
   /**
-   * @returns {Promise<string | undefined>}
+   * @returns {Promise<string | null>}
    */
-  getToken = () => {
-    return this.initPushToken()
-      .then((token) => {
-        if (DEBUG) console.log(token)
-        return token
-      })
-      .catch((error) => {
-        console.error(error)
-      })
+  getToken = async () => {
+    try {
+      const token = await this.initPushToken()
+      if (DEBUG) console.log(token)
+      return token ?? null
+    } catch (error) {
+      console.error(error)
+      return null
+    }
   }
 
   /**
@@ -911,9 +932,11 @@ class MainSDK extends Performer {
       if (await this.checkPushToken()) {
         this.push(async () => {
           if (await this.getPushPermission()) {
-            this.initPushChannel()
-            await this.initPushToken(false)
-            await saveLastPushTokenSentDate(new Date(), this.shop_id)
+            await this.initPushChannel()
+            const token = await this.initPushToken(false)
+            if (token) {
+              await saveLastPushTokenSentDate(new Date(), this.shop_id)
+            }
           }
         })
       }
@@ -927,6 +950,11 @@ class MainSDK extends Performer {
    * @returns {void}
    */
   setPushTokenNotification(token) {
+    if (typeof token !== 'string' || token.length === 0) {
+      if (DEBUG) console.log('Push token is empty, skipping send')
+      return
+    }
+
     this.push(async () => {
       try {
         let platform
@@ -1009,7 +1037,7 @@ class MainSDK extends Performer {
 
   /**
    * @param {boolean} removeOld
-   * @returns {Promise<string, Error>}
+   * @returns {Promise<string | null>}
    */
   async initPushToken(removeOld = false) {
     let savedToken = await getSavedPushToken(this.shop_id)
@@ -1020,10 +1048,10 @@ class MainSDK extends Performer {
 
     if (savedToken) {
       if (DEBUG) console.log('Old valid FCM token: ', savedToken)
+      // Even when token is already cached, ensure tracking subscriptions are installed.
+      await this._pushOrchestrator.ensureTrackingSubscriptions()
       return savedToken
     }
-
-    let pushToken
 
     const messaging = this._ensureMessaging()
     if (!messaging) {
@@ -1031,26 +1059,22 @@ class MainSDK extends Performer {
       return null
     }
 
-    if (this._push_type === null && Platform.OS === 'ios') {
-      getAPNSToken(messaging).then((token) => {
-        if (DEBUG) console.log('New APN token: ', token)
-        this.setPushTokenNotification(token)
-        pushToken = token
-      })
-    } else {
-      getToken(messaging).then((token) => {
-        if (DEBUG) console.log('New FCM token: ', token)
-        this.setPushTokenNotification(token)
-        pushToken = token
-      })
-    }
-    return pushToken
+    const token = await this._pushOrchestrator.fetchToken({
+      messaging,
+      pushType: this._push_type,
+      platformOS: Platform.OS,
+    })
+
+    if (!token) return null
+    this.setPushTokenNotification(token)
+    return token
   }
 
   /**
    * @returns {Promise<void>}
    */
   async initPushChannel() {
+    if (Platform.OS !== 'android') return
     await notifee.createChannel({
       id: SDK_PUSH_CHANNEL,
       name: 'RNSDK channel',
@@ -1082,6 +1106,14 @@ class MainSDK extends Performer {
     notifyReceive = false,
     notifyBgReceive = false
   ) {
+    // Always allow updating listeners, even if initPush() is called repeatedly.
+    if (notifyClick) {
+      this.pushClickListener = notifyClick
+      this._pushOrchestrator.setHasCustomClickListener(true)
+    }
+    if (notifyReceive) this.pushReceivedListener = notifyReceive
+    if (notifyBgReceive) this.pushBgReceivedListener = notifyBgReceive
+
     const lock = await initLocker(this.shop_id)
     if (
       lock &&
@@ -1089,112 +1121,20 @@ class MainSDK extends Performer {
       lock.state === true &&
       new Date().getTime() < lock.expires
     ) {
+      // Ensure subscriptions exist even if init is locked.
+      await this._pushOrchestrator.ensureTrackingSubscriptions()
       return false
     }
 
     await setInitLocker(true, this.shop_id)
+    const granted = await this.getPushPermission()
+    if (!granted) return false
 
-    this.initPushChannelAndToken()
-    if (notifyClick) this.pushClickListener = notifyClick
-    if (notifyReceive) this.pushReceivedListener = notifyReceive
-    if (notifyBgReceive) this.pushBgReceivedListener = notifyBgReceive
+    await this.initPushChannel()
+    await this.initPushToken(false)
 
-    // Register handler
-    const messaging = this._ensureMessaging()
-    if (messaging) {
-      onMessage(messaging, async (remoteMessage) => {
-      if (this.lastMessageIds.includes(remoteMessage.messageId)) {
-        return false
-      } else {
-        this.lastMessageIds.push(remoteMessage.messageId)
-      }
-
-      await this.notificationDelivered({
-        code: remoteMessage.data.id,
-        type: remoteMessage.data.type,
-      })
-      if (DEBUG) console.log('Message delivered: ', remoteMessage)
-
-      await updPushData(remoteMessage, this.shop_id)
-      await this.pushReceivedListener(remoteMessage)
-      })
-    }
-
-    // Register background handler
-    const messagingForBg = this._ensureMessaging()
-    if (messagingForBg) {
-      setBackgroundMessageHandler(messagingForBg, async (remoteMessage) => {
-      if (this.lastMessageIds.includes(remoteMessage.messageId)) {
-        return false
-      } else {
-        this.lastMessageIds.push(remoteMessage.messageId)
-      }
-
-      await this.notificationDelivered({
-        code: remoteMessage.data.id,
-        type: remoteMessage.data.type,
-      })
-      if (DEBUG) console.log('Background message delivered: ', remoteMessage)
-
-      await updPushData(remoteMessage, this.shop_id)
-      await this.pushBgReceivedListener(remoteMessage)
-      })
-    }
-
-    // Register notification opened handler
-    const messagingForOpened = this._ensureMessaging()
-    if (messagingForOpened) {
-      onNotificationOpenedApp(messagingForOpened, async (remoteMessage) => {
-      if (this.lastMessageIds.includes(remoteMessage.messageId)) {
-        return false
-      } else {
-        this.lastMessageIds.push(remoteMessage.messageId)
-      }
-
-      await this.notificationDelivered({
-        code: remoteMessage.data.id,
-        type: remoteMessage.data.type,
-      })
-      if (DEBUG) console.log('App opened via notification', remoteMessage)
-
-      await updPushData(remoteMessage, this.shop_id)
-      await this.pushBgReceivedListener(remoteMessage)
-      })
-    }
-
-    /** Subscribe to click notification */
-    notifee.onForegroundEvent(async ({ type, detail }) => {
-      if (type === EventType.PRESS && detail.notification) {
-        const n = detail.notification
-        const data = n.data || {}
-        await updPushData({ data, messageId: data.message_id }, this.shop_id)
-        if (!notifyClick) {
-          await this.pushClickListener({ data })
-        } else {
-          const messageId =
-            data.message_id ||
-            data['google.message_id'] ||
-            data['gcm.message_id']
-          const stored = await getPushData(messageId, this.shop_id)
-          await this.pushClickListener(
-            stored && stored.length > 0 ? stored[0] : { data }
-          )
-        }
-      }
-    })
-
-    notifee.onBackgroundEvent(async ({ type, detail }) => {
-      if (type === EventType.PRESS && detail.notification) {
-        const data = detail.notification.data || {}
-        await this.pushClickListener({ data })
-      }
-    })
-
-    const initial = await notifee.getInitialNotification()
-    if (initial?.notification) {
-      const data = initial.notification.data || {}
-      await this.pushClickListener({ data })
-    }
+    await this._pushOrchestrator.ensureTrackingSubscriptions()
+    return true
   }
 
   /**
