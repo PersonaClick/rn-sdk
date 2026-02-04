@@ -13,3 +13,8 @@ class PersonaClick extends MainSDK{
 }
 
 export default PersonaClick;
+
+// Export popup overlay UI component for React Native apps.
+// NOTE: this component must be rendered in your React tree if you want SDK to auto-present popups.
+export { default as SdkPopupOverlay } from './components/Popup/SdkPopupOverlay'
+export { registerSDK as registerSdkPopupOverlaySDK } from './components/Popup/SdkPopupOverlay'
