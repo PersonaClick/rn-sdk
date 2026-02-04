@@ -36,6 +36,8 @@ import { blankSearchRequest } from './utils'
 import { isOverOneWeekAgo } from './utils'
 import { getStorageKey } from './utils'
 import { SDK_API_URL } from './index'
+import { prepareAndShow, registerSDK } from './components/Popup/SdkPopupOverlay'
+import PopupLogic from './lib/popup'
 
 /**
  * @typedef {Object} Event
@@ -110,6 +112,13 @@ class MainSDK extends Performer {
     this.lastMessageIds = []
     this.autoSendPushToken = autoSendPushToken
     this.deviceInfo = deviceInfo
+
+    /**
+     * Popup presentation delegate.
+     * If set, SDK will NOT show popups automatically and will forward popup payload to host app.
+     * @type {(popup: any, sdk: MainSDK) => void | null}
+     */
+    this.popupPresentationDelegate = null
     
     // Firebase is initialized automatically by native modules
     // Initialize messaging lazily when needed
@@ -225,74 +234,63 @@ class MainSDK extends Performer {
         const storageData = await getData(this.shop_id)
         if (DEBUG) console.log('[SDK Init] Storage data:', storageData)
         
-        let response = null
+        if (DEBUG) console.log('[SDK Init] Making init request to API...')
+        
+        let did = ''
 
+        // First try to get did from cache
         if (storageData?.did) {
-          if (DEBUG) console.log('[SDK Init] Using cached device ID:', storageData.did)
-          this.deviceId = storageData.did
-          response = storageData
-          if (
-            !storageData?.seance ||
-            !storageData?.expires ||
-            new Date().getTime() > storageData?.expires
-          ) {
-            response.sid = response.seance = generateSid()
-            if (DEBUG) console.log('[SDK Init] Generated new session ID:', response.sid)
-          }
+          did = storageData.did
+          if (DEBUG) console.log('[SDK Init] Using cached device ID for request:', did)
+        } else if (this.deviceInfo && this.deviceInfo.id) {
+          did = this.deviceInfo.id
         } else {
-          if (DEBUG) console.log('[SDK Init] Making init request to API...')
-          let did = ''
-
-          if (this.deviceInfo && this.deviceInfo.id) {
-            did = this.deviceInfo.id
-          } else {
-            try {
-              const DeviceInfo = await import('react-native-device-info')
-              did =
-                Platform.OS === 'android'
-                  ? await DeviceInfo.getAndroidId()
-                  : (await DeviceInfo.syncUniqueId()) || ''
-            } catch (e) {
-              console.error(
-                `Device ID is not present in init args, but also 'react-native-device-info' is not present: ${JSON.stringify(
-                  e,
-                  undefined,
-                  2
-                )}`
-              )
-              did = ''
-            }
-          }
-
-          const params = {
-            shop_id: this.shop_id,
-            stream: this.stream,
-          }
-          if (did) {
-            params.did = did
-          }
-
-          response = await request('init', this.shop_id, { params })
-          
-          if (DEBUG) console.log('[SDK Init] API response:', response)
-          
-          // Check if response is an error
-          if (response instanceof Error || (response && response.message)) {
-            const error = response instanceof Error ? response : new Error(response.message || 'Init request failed')
-            if (DEBUG) console.error('[SDK Init] API error:', error)
-            this.initialized = false
-            throw error
+          try {
+            const DeviceInfo = await import('react-native-device-info')
+            did =
+              Platform.OS === 'android'
+                ? await DeviceInfo.getAndroidId()
+                : (await DeviceInfo.syncUniqueId()) || ''
+          } catch (e) {
+            console.error(
+              `Device ID is not present in init args, but also 'react-native-device-info' is not present: ${JSON.stringify(
+                e,
+                undefined,
+                2
+              )}`
+            )
+            did = ''
           }
         }
 
-        if (!response || (!response.did && !storageData?.did)) {
+        const params = {
+          shop_id: this.shop_id,
+          stream: this.stream,
+        }
+        if (did) {
+          params.did = did
+        }
+
+        const response = await request('init', this.shop_id, { params })
+        
+        if (DEBUG) console.log('[SDK Init] API response:', JSON.stringify(response, null, 2))
+        
+        // Check if response is an error
+        if (response instanceof Error || (response && response.message)) {
+          const error = response instanceof Error ? response : new Error(response.message || 'Init request failed')
+          if (DEBUG) console.error('[SDK Init] API error:', error)
+          this.initialized = false
+          throw error
+        }
+
+        if (!response || !response.did) {
           const error = new Error('Invalid response from init: missing device ID')
           if (DEBUG) console.error('[SDK Init] Error:', error, 'Response:', response)
           this.initialized = false
           throw error
         }
 
-        const didToUse = response?.did || storageData?.did || ''
+        const didToUse = response.did
         this.deviceId = didToUse
         this.userSeance = response?.seance || response?.sid || ''
         if (!this.segment && response?.segment) {
@@ -304,6 +302,13 @@ class MainSDK extends Performer {
         
         this.initialized = true
         if (DEBUG) console.log('[SDK Init] SDK initialized successfully!')
+        
+        // Log full response for debugging
+        if (DEBUG) console.log('[SDK Init] Full response before popup check:', JSON.stringify(response, null, 2))
+        
+        // Check for popup in init response
+        if (DEBUG) console.log('[SDK Init] Checking for popup in response...')
+        await this.checkAndShowPopup(response)
         
         // Initialize messaging after SDK is initialized
         this._initMessaging()
@@ -389,7 +394,7 @@ class MainSDK extends Performer {
     this.push(async () => {
       try {
         const queryParams = await convertParams(event, options)
-        return await request('push', this.shop_id, {
+        const response = await request('push', this.shop_id, {
           headers: { 'Content-Type': 'application/json' },
           method: 'POST',
           params: {
@@ -398,6 +403,9 @@ class MainSDK extends Performer {
             ...queryParams,
           },
         })
+        // Check for popup in response
+        await this.checkAndShowPopup(response)
+        return response
       } catch (error) {
         return error
       }
@@ -417,7 +425,7 @@ class MainSDK extends Performer {
           queryParams = Object.assign(queryParams, options)
         }
 
-        return await request('push/custom', this.shop_id, {
+        const response = await request('push/custom', this.shop_id, {
           headers: { 'Content-Type': 'application/json' },
           method: 'POST',
           params: {
@@ -426,6 +434,9 @@ class MainSDK extends Performer {
             ...queryParams,
           },
         })
+        // Check for popup in response
+        await this.checkAndShowPopup(response)
+        return response
       } catch (error) {
         return error
       }
@@ -464,7 +475,7 @@ class MainSDK extends Performer {
   notificationTrack(event, options) {
     this.push(async () => {
       try {
-        return await request(`track/${event}`, this.shop_id, {
+        const res = await request(`track/${event}`, this.shop_id, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           params: {
@@ -473,6 +484,9 @@ class MainSDK extends Performer {
             ...options,
           },
         })
+        // Check for popup in response
+        await this.checkAndShowPopup(res)
+        return res
       } catch (error) {
         return error
       }
@@ -486,18 +500,19 @@ class MainSDK extends Performer {
    */
   recommend(recommender_code, options) {
     return new Promise((resolve, reject) => {
-      this.push(() => {
+      this.push(async () => {
         try {
-          request(`recommend/${recommender_code}`, this.shop_id, {
+          const res = await request(`recommend/${recommender_code}`, this.shop_id, {
             params: {
               shop_id: this.shop_id,
               stream: this.stream,
               recommender_code,
               ...options,
             },
-          }).then((res) => {
-            resolve(res)
           })
+          // Check for popup in response
+          await this.checkAndShowPopup(res)
+          resolve(res)
         } catch (error) {
           reject(error)
         }
@@ -525,14 +540,6 @@ class MainSDK extends Performer {
             shop_id: this.shop_id,
             did: deviceId,
           }
-          
-          console.log('[getStories] Making request with params:', {
-            url: `stories/${code}`,
-            shop_id: this.shop_id,
-            did: deviceId,
-            code: code,
-            fullUrl: `${SDK_API_URL}stories/${code}`
-          })
           
           request(`stories/${code}`, this.shop_id, {
             params: requestParams,
@@ -608,33 +615,6 @@ class MainSDK extends Performer {
               })
             }
             
-            console.log('[getStories] API response received:', {
-              status: res?.status,
-              hasStories: !!res?.stories,
-              storiesCount: res?.stories?.length || 0,
-              stories: res?.stories?.map((story, idx) => ({
-                index: idx,
-                id: story.id,
-                name: story.name,
-                avatar: story.avatar,
-                slidesCount: story.slides?.length || 0,
-                slides: story.slides?.map((slide, slideIdx) => ({
-                  slideIndex: slideIdx,
-                  id: slide.id,
-                  background: slide.background,
-                  backgroundColor: slide.backgroundColor,
-                  background_color: slide.background_color,
-                  type: slide.type,
-                  elementsCount: slide.elements?.length || 0,
-                  elements: slide.elements?.map(el => ({
-                    type: el.type,
-                    title: el.title,
-                    textInput: el.textInput
-                  }))
-                }))
-              }))
-            })
-            
             // Check for duplicate stories
             if (res?.stories && res.stories.length > 0) {
               const storyIds = res.stories.map(s => s.id)
@@ -660,7 +640,6 @@ class MainSDK extends Performer {
               }
             }
             
-            console.log('[getStories] Full API response:', JSON.stringify(res, null, 2))
             resolve(res)
           }).catch((error) => {
             console.error('[getStories] Request error:', error)
@@ -722,7 +701,9 @@ class MainSDK extends Performer {
               code: code,
               event: 'view',
             },
-          }).then((res) => {
+          }).then(async (res) => {
+            // Check for popup in response
+            await this.checkAndShowPopup(res)
             resolve(res)
           }).catch((error) => {
             reject(error)
@@ -768,13 +749,6 @@ class MainSDK extends Performer {
             return
           }
           
-          // Debug logging
-          console.log('trackStoryClick called with:', {
-            storyId: numericStoryId,
-            slideId: numericSlideId,
-            code: code
-          })
-          
           request('track/stories', this.shop_id, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -789,7 +763,9 @@ class MainSDK extends Performer {
               code: code,
               event: 'click',
             },
-          }).then((res) => {
+          }).then(async (res) => {
+            // Check for popup in response
+            await this.checkAndShowPopup(res)
             resolve(res)
           }).catch((error) => {
             reject(error)
@@ -831,17 +807,18 @@ class MainSDK extends Performer {
    */
   search(options) {
     return new Promise((resolve, reject) => {
-      this.push(() => {
+      this.push(async () => {
         try {
-          request('search', this.shop_id, {
+          const res = await request('search', this.shop_id, {
             params: {
               shop_id: this.shop_id,
               stream: this.stream,
               ...options,
             },
-          }).then((res) => {
-            resolve(res)
           })
+          // Check for popup in response
+          await this.checkAndShowPopup(res)
+          resolve(res)
         } catch (error) {
           reject(error)
         }
@@ -876,7 +853,7 @@ class MainSDK extends Performer {
         }
       }
       try {
-        return await request('profile/set', this.shop_id, {
+        const res = await request('profile/set', this.shop_id, {
           headers: { 'Content-Type': 'application/json' },
           method: 'POST',
           params: {
@@ -885,6 +862,9 @@ class MainSDK extends Performer {
             ...params,
           },
         })
+        // Check for popup in response
+        await this.checkAndShowPopup(res)
+        return res
       } catch (error) {
         return error
       }
@@ -1011,7 +991,7 @@ class MainSDK extends Performer {
         )
         result = granted === PermissionsAndroid.RESULTS.GRANTED
       } catch (err) {
-        console.log(err)
+        if (DEBUG) console.error('Android permissions error:', err)
       }
     } else {
       const settings = await notifee.requestPermission()
@@ -1342,6 +1322,93 @@ class MainSDK extends Performer {
    */
   async showInAppNotification(params) {
     NotificationManager.showNotification(params)
+  }
+
+  /**
+   * Track popup shown event and mark popup as shown in storage.
+   * Intended for host app usage in delegate mode (when popup is presented by the host app).
+   *
+   * @param {number} popupId
+   * @returns {Promise<void>}
+   */
+  async trackPopupShown(popupId) {
+    if (!popupId || typeof popupId !== 'number') {
+      console.warn('[MainSDK] trackPopupShown: invalid popupId')
+      return
+    }
+
+    try {
+      const shopId = this.shop_id
+      const storageData = await getData(shopId)
+      const deviceId = storageData?.did || this.deviceId || ''
+      const seance = storageData?.seance || storageData?.sid || this.userSeance || ''
+
+      await PopupLogic.trackPopupShown(popupId, shopId, deviceId, seance)
+      await PopupLogic.markPopupAsShown(popupId, shopId)
+    } catch (error) {
+      console.error('[MainSDK] trackPopupShown error:', error)
+    }
+  }
+
+  /**
+   * Check response for popup data and show popup if present
+   * @param {Object} response - API response
+   * @param {boolean} manual - Whether popup is shown manually
+   * @returns {Promise<void>}
+   */
+  async checkAndShowPopup(response, manual = false) {
+    if (DEBUG) console.log('[MainSDK] checkAndShowPopup called, response:', response ? 'exists' : 'null', 'initialized:', this.initialized)
+    
+    if (!response || !this.initialized) {
+      if (DEBUG) console.log('[MainSDK] checkAndShowPopup skipped: response=', !!response, 'initialized=', this.initialized)
+      return
+    }
+
+    // Check if response contains popup data
+    // Popup should have id and either html or components
+    if (DEBUG) console.log('[MainSDK] Checking for popup in response, response.popup:', response.popup ? 'exists' : 'missing')
+    
+    if (response.popup && typeof response.popup === 'object' && response.popup.id) {
+      if (DEBUG) console.log('[MainSDK] Popup found with id:', response.popup.id)
+      
+      const hasHtml = response.popup.html && typeof response.popup.html === 'string'
+      const hasComponents = response.popup.components && (typeof response.popup.components === 'string' || typeof response.popup.components === 'object')
+      
+      if (DEBUG) console.log('[MainSDK] Popup data check - hasHtml:', hasHtml, 'hasComponents:', hasComponents)
+      
+      if (hasHtml || hasComponents) {
+        // Delegate mode: if delegate is set, do not auto-present popups.
+        // Host app is responsible for UI and tracking `popup/showed`.
+        if (this.popupPresentationDelegate && typeof this.popupPresentationDelegate === 'function') {
+          try {
+            const popupId = response.popup.id
+            const wasShown = await PopupLogic.wasPopupShown(popupId, this.shop_id)
+            if (wasShown) {
+              if (DEBUG) console.log(`[MainSDK] Popup ${popupId} was already shown, skipping delegate call`)
+              return
+            }
+
+            if (DEBUG) console.log('[MainSDK] Popup detected in response, forwarding to delegate...', JSON.stringify(response.popup, null, 2))
+            this.popupPresentationDelegate(response.popup, this)
+          } catch (error) {
+            if (DEBUG) console.error('[MainSDK] Error forwarding popup to delegate:', error)
+          }
+          return
+        }
+
+        if (DEBUG) console.log('[MainSDK] Popup detected in response, preparing to show...', JSON.stringify(response.popup, null, 2))
+        try {
+          await prepareAndShow(this, response.popup, manual)
+          if (DEBUG) console.log('[MainSDK] prepareAndShow completed')
+        } catch (error) {
+          if (DEBUG) console.error('[MainSDK] Error showing popup:', error)
+        }
+      } else {
+        if (DEBUG) console.warn('[MainSDK] Popup data found but missing both html and components')
+      }
+    } else {
+      if (DEBUG) console.log('[MainSDK] No popup found in response')
+    }
   }
 }
 
