@@ -36,8 +36,50 @@ import { blankSearchRequest } from './utils'
 import { isOverOneWeekAgo } from './utils'
 import { getStorageKey } from './utils'
 import { SDK_API_URL } from './index'
+import { parseCartItem, parseProductInfo, parseProductsListResponse } from './types/productTypes'
 import { prepareAndShow, registerSDK } from './components/Popup/SdkPopupOverlay'
 import PopupLogic from './lib/popup'
+
+/** Minimum allowed NPS/review rate (1–10). */
+const REVIEW_RATE_MIN = 1
+/** Maximum allowed NPS/review rate (1–10). */
+const REVIEW_RATE_MAX = 10
+
+/** Source tracking TTL in seconds (48 hours, matches iOS). */
+const SOURCE_TTL_SECONDS = 48 * 60 * 60
+const SOURCE_STORAGE_KEYS = {
+  timeStartSave: 'timeStartSave',
+  recomendedCode: 'recomendedCode',
+  recomendedType: 'recomendedType',
+}
+
+const PUSH_PERMISSION_WAIT_TIMEOUT_MS = 12000
+const PUSH_PERMISSION_STATE_WAIT_POLL_MS = 200
+
+/**
+ * Reads saved source params from AsyncStorage. If valid (within 48h), returns { source: { from, code } }; otherwise clears storage and returns {}.
+ * @param {string} shop_id
+ * @returns {Promise<{ source?: { from: string, code: string } }>}
+ */
+async function getSourceParams(shop_id) {
+  const keyTime = getStorageKey(SOURCE_STORAGE_KEYS.timeStartSave, shop_id)
+  const keyCode = getStorageKey(SOURCE_STORAGE_KEYS.recomendedCode, shop_id)
+  const keyType = getStorageKey(SOURCE_STORAGE_KEYS.recomendedType, shop_id)
+  try {
+    const [[, timeVal], [, codeVal], [, typeVal]] = await AsyncStorage.multiGet([keyTime, keyCode, keyType])
+    const timeStart = timeVal != null ? Number(timeVal) : NaN
+    const savedCode = codeVal ?? ''
+    const savedType = typeVal ?? ''
+    const nowSec = Date.now() / 1000
+    if (Number.isNaN(timeStart) || savedCode === '' || savedType === '' || nowSec - timeStart > SOURCE_TTL_SECONDS) {
+      await AsyncStorage.multiRemove([keyTime, keyCode, keyType])
+      return {}
+    }
+    return { source: { from: savedType, code: savedCode } }
+  } catch (_) {
+    return {}
+  }
+}
 
 /**
  * @typedef {Object} Event
@@ -119,10 +161,18 @@ class MainSDK extends Performer {
      * @type {(popup: any, sdk: MainSDK) => void | null}
      */
     this.popupPresentationDelegate = null
-    
+
     // Firebase is initialized automatically by native modules
     // Initialize messaging lazily when needed
     this.messaging = null
+    this._pushPermissionState = 'idle'
+    this._pushPermissionPromise = null
+    // In-memory token cache: avoids AsyncStorage race when getToken() is called
+    // immediately after initPushToken() (savePushToken runs after backend response).
+    this._tokenCache = null
+    // Tracks the in-flight initPush() promise so getToken() can await it
+    // when called concurrently (e.g. autoSendPushToken race in init()).
+    this._initPushPromise = null
 
     /**
      * Internal push orchestration (device registration, token fetch, tracking subscriptions).
@@ -162,6 +212,139 @@ class MainSDK extends Performer {
     command()
   }
 
+  /**
+   * @param {string} context
+   * @param {any} error
+   * @returns {void}
+   */
+  _logFirebaseError(context, error) {
+    const code = error?.code || 'unknown'
+    const message = error?.message || String(error)
+    console.warn(`[Firebase][${context}] code=${code} message=${message}`, error)
+  }
+
+  /**
+   * @param {'idle' | 'requesting' | 'granted' | 'denied'} nextState
+   * @param {string} source
+   * @returns {void}
+   */
+  _setPushPermissionState(nextState, source) {
+    const prevState = this._pushPermissionState
+    this._pushPermissionState = nextState
+    if (DEBUG && prevState !== nextState) {
+      console.log(
+        `[PushPermission] state: ${prevState} -> ${nextState} (source=${source})`
+      )
+    }
+  }
+
+  /**
+   * @param {'permission_denied' | 'permission_timeout' | 'messaging_unavailable' | 'token_empty' | 'push_token_error'} reason
+   * @param {Record<string, any>} [extra]
+   * @returns {void}
+   */
+  _logPushNullReason(reason, extra = {}) {
+    console.warn('[PushToken] Returning null', {
+      reason,
+      permissionState: this._pushPermissionState,
+      ...extra,
+    })
+  }
+
+  /**
+   * @returns {Promise<boolean>}
+   */
+  async _requestPushPermissionInternal() {
+    if (Platform.OS === 'android') {
+      // Android < 13 (API < 33): POST_NOTIFICATIONS permission does not exist.
+      // FCM token is always available; no permission dialog is needed.
+      if (Platform.Version < 33) {
+        if (DEBUG) console.log('[PushPermission] Android < 13: permission not required, auto-grant')
+        return true
+      }
+
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+        )
+        return granted === PermissionsAndroid.RESULTS.GRANTED
+      } catch (err) {
+        this._logFirebaseError('PermissionsAndroid.request', err)
+        return false
+      }
+    }
+
+    // iOS / other platforms: use notifee
+    try {
+      const settings = await notifee.requestPermission()
+
+      if (settings.authorizationStatus === AuthorizationStatus.DENIED) {
+        if (DEBUG) console.log('User denied permissions request')
+        return false
+      }
+
+      if (
+        settings.authorizationStatus === AuthorizationStatus.AUTHORIZED ||
+        settings.authorizationStatus === AuthorizationStatus.PROVISIONAL
+      ) {
+        if (DEBUG) console.log('User granted permissions request')
+        return true
+      }
+
+      return false
+    } catch (error) {
+      this._logFirebaseError('notifee.requestPermission', error)
+      return false
+    }
+  }
+
+  /**
+   * @returns {Promise<boolean>}
+   */
+  async _requestPushPermissionOnce() {
+    if (this._pushPermissionPromise) {
+      return this._pushPermissionPromise
+    }
+
+    this._setPushPermissionState('requesting', 'request_start')
+    this._pushPermissionPromise = (async () => {
+      const granted = await this._requestPushPermissionInternal()
+      this._setPushPermissionState(granted ? 'granted' : 'denied', 'request_end')
+      return granted
+    })().finally(() => {
+      this._pushPermissionPromise = null
+    })
+
+    return this._pushPermissionPromise
+  }
+
+  /**
+   * @param {number} timeoutMs
+   * @returns {Promise<'granted' | 'denied' | 'timeout'>}
+   */
+  async _waitForPushPermissionResolution(timeoutMs = PUSH_PERMISSION_WAIT_TIMEOUT_MS) {
+    if (this._pushPermissionState === 'granted') return 'granted'
+    if (this._pushPermissionState === 'denied') return 'denied'
+    if (this._pushPermissionState !== 'requesting') return 'denied'
+
+    if (DEBUG) {
+      console.log(
+        `[PushPermission] waiting for decision (timeoutMs=${timeoutMs})`
+      )
+    }
+
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      if (this._pushPermissionState === 'granted') return 'granted'
+      if (this._pushPermissionState === 'denied') return 'denied'
+      await new Promise((resolve) =>
+        setTimeout(resolve, PUSH_PERMISSION_STATE_WAIT_POLL_MS)
+      )
+    }
+
+    return 'timeout'
+  }
+
   async initializeSegment() {
     const key = getStorageKey('segment', this.shop_id)
     const segments = ['A', 'B']
@@ -190,7 +373,7 @@ class MainSDK extends Performer {
       // Firebase initialization is the host app responsibility.
       this.messaging = getMessaging()
     } catch (error) {
-      console.warn('Firebase messaging initialization failed:', error)
+      this._logFirebaseError('getMessaging', error)
       this.messaging = null
     }
   }
@@ -354,10 +537,20 @@ class MainSDK extends Performer {
   }
 
   /**
+   * Returns the current push token.
+   * If initPush() is actively running (e.g. triggered by autoSendPushToken during init()),
+   * waits for it to complete instead of racing against it.
    * @returns {Promise<string | null>}
    */
   getToken = async () => {
     try {
+      if (this._initPushPromise) {
+        // Join the in-flight initPush() — no deadlock because initPushToken()
+        // inside initPush() does not read _initPushPromise.
+        const token = await this._initPushPromise
+        if (DEBUG) console.log(token)
+        return typeof token === 'string' ? token : null
+      }
       const token = await this.initPushToken()
       if (DEBUG) console.log(token)
       return token ?? null
@@ -394,6 +587,8 @@ class MainSDK extends Performer {
     this.push(async () => {
       try {
         const queryParams = await convertParams(event, options)
+        const sourceParams = await getSourceParams(this.shop_id)
+        Object.assign(queryParams, sourceParams)
         const response = await request('push', this.shop_id, {
           headers: { 'Content-Type': 'application/json' },
           method: 'POST',
@@ -424,6 +619,8 @@ class MainSDK extends Performer {
         if (options) {
           queryParams = Object.assign(queryParams, options)
         }
+        const sourceParams = await getSourceParams(this.shop_id)
+        Object.assign(queryParams, sourceParams)
 
         const response = await request('push/custom', this.shop_id, {
           headers: { 'Content-Type': 'application/json' },
@@ -441,6 +638,24 @@ class MainSDK extends Performer {
         return error
       }
     })
+  }
+
+  /**
+   * Saves recommendation source (type and code). For the next 48 hours, track() and trackEvent() will automatically include source in params.
+   * @param {string} source - Source type (e.g. 'dynamic', 'full_search', 'instant_search', 'stories', 'chain', 'transactional', 'bulk', 'web_push_digest').
+   * @param {string} code - Source code (e.g. recommender block code, search query, stories code).
+   */
+  trackSource(source, code) {
+    const shop_id = this.shop_id
+    const keyTime = getStorageKey(SOURCE_STORAGE_KEYS.timeStartSave, shop_id)
+    const keyCode = getStorageKey(SOURCE_STORAGE_KEYS.recomendedCode, shop_id)
+    const keyType = getStorageKey(SOURCE_STORAGE_KEYS.recomendedType, shop_id)
+    const timeSec = Math.floor(Date.now() / 1000)
+    AsyncStorage.multiSet([
+      [keyTime, String(timeSec)],
+      [keyCode, String(code ?? '')],
+      [keyType, String(source ?? '')],
+    ]).catch(() => {})
   }
 
   /**
@@ -799,6 +1014,121 @@ class MainSDK extends Performer {
   }
 
   /**
+   * Returns cart items from the API as typed CartItem array (productId, quantity).
+   * For raw API response use cart().
+   * @returns {Promise<import('./types/productTypes').CartItem[]>}
+   */
+  getProductsFromCart() {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          const res = await request('products/cart', this.shop_id, {
+            params: { shop_id: this.shop_id },
+          })
+          if (res instanceof Error) {
+            reject(res)
+            return
+          }
+          const items = res?.data?.items ?? res?.items ?? []
+          const parsed = Array.isArray(items) ? items.map(parseCartItem) : []
+          resolve(parsed)
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  }
+
+  /**
+   * Fetches full product info by id.
+   * @param {string} id - Product id (item_id).
+   * @returns {Promise<import('./types/productTypes').ProductInfo>}
+   */
+  getProductInfo(id) {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          const res = await request('products/get', this.shop_id, {
+            params: {
+              shop_id: this.shop_id,
+              item_id: id,
+            },
+          })
+          if (res instanceof Error) {
+            reject(res)
+            return
+          }
+          resolve(parseProductInfo(res))
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  }
+
+  /**
+   * Fetches products list with optional filters (brands, merchants, categories, etc.).
+   * @param {Object} [options]
+   * @param {string} [options.brands]
+   * @param {string} [options.merchants]
+   * @param {string} [options.categories]
+   * @param {string} [options.locations]
+   * @param {number} [options.limit]
+   * @param {number} [options.page]
+   * @param {Record<string, any>} [options.filters] - Sent as JSON string to API.
+   * @returns {Promise<import('./types/productTypes').ProductsListResponse>}
+   */
+  getProductsList(options = {}) {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          const params = { shop_id: this.shop_id }
+          if (options.brands != null) params.brands = options.brands
+          if (options.merchants != null) params.merchants = options.merchants
+          if (options.categories != null) params.categories = options.categories
+          if (options.locations != null) params.locations = options.locations
+          if (options.limit != null) params.limit = String(options.limit)
+          if (options.page != null) params.page = String(options.page)
+          if (options.filters != null && typeof options.filters === 'object') {
+            params.filters = JSON.stringify(options.filters)
+          }
+          const res = await request('products', this.shop_id, { params })
+          if (res instanceof Error) {
+            reject(res)
+            return
+          }
+          resolve(parseProductsListResponse(res))
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  }
+
+  /**
+   * Clears local cart product state keys (prefix cart.product.) from AsyncStorage.
+   * Use when resetting "in cart" UI state, e.g. after order or logout.
+   * @returns {Promise<void>}
+   */
+  resetCartProductStates() {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          const prefix = getStorageKey('cart.product.', this.shop_id)
+          const allKeys = await AsyncStorage.getAllKeys()
+          const keysToRemove = allKeys.filter((k) => typeof k === 'string' && k.startsWith(prefix))
+          if (keysToRemove.length > 0) {
+            await AsyncStorage.multiRemove(keysToRemove)
+          }
+          resolve()
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  }
+
+  /**
    * Executes a search with the given parameters.
    *
    * @param {SearchOptions|undefined} [options] - An object of parameters for the search or undefined.
@@ -833,6 +1163,102 @@ class MainSDK extends Performer {
    */
   searchBlank() {
     return blankSearchRequest(this.shop_id, this.stream)
+  }
+
+  /**
+   * Sends a review (NPS) to the API.
+   *
+   * @param {number} rate - Rating value, must be between 1 and 10 (inclusive).
+   * @param {string} [channel] - Channel code (e.g. 'android_app', 'ios_app', 'web_popup', 'email'). If omitted or empty, uses 'android_app' or 'ios_app' from platform.
+   * @param {string} category - Category identifier (e.g. 'order').
+   * @param {string} [orderId] - Optional order identifier.
+   * @param {string} [comment] - Optional comment text.
+   * @returns {Promise<void>} - Resolves on success, rejects on validation or request error.
+   */
+  review(rate, channel, category, orderId, comment) {
+    return new Promise((resolve, reject) => {
+      const numRate = Number(rate)
+      if (typeof rate !== 'number' && typeof rate !== 'string') {
+        reject(new Error('Error: rating can be between 1 and 10 only'))
+        return
+      }
+      if (Number.isNaN(numRate) || numRate < REVIEW_RATE_MIN || numRate > REVIEW_RATE_MAX) {
+        reject(new Error('Error: rating can be between 1 and 10 only'))
+        return
+      }
+      this.push(async () => {
+        try {
+          const channelValue = (channel != null && channel !== '')
+            ? channel
+            : (this.stream === 'android' ? 'android_app' : 'ios_app')
+          await request('nps/create', this.shop_id, {
+            method: 'POST',
+            params: {
+              shop_id: this.shop_id,
+              stream: this.stream,
+              rate: numRate,
+              channel: channelValue,
+              category: category ?? '',
+              order_id: orderId ?? '',
+              comment: comment ?? '',
+            },
+          })
+          resolve()
+        } catch (error) {
+          reject(error)
+        }
+      })
+    })
+  }
+
+  /**
+   * Fetches the list of NPS channels available for the shop (for use with review).
+   *
+   * @returns {Promise<Array<Record<string, any>>>} - A promise that resolves with the list of channels.
+   */
+  getNpsChannels() {
+    return new Promise((resolve, reject) => {
+      this.push(() => {
+        try {
+          request('nps/channels', this.shop_id, {
+            method: 'GET',
+            params: {
+              shop_id: this.shop_id,
+              stream: this.stream,
+            },
+          }).then((res) => {
+            resolve(Array.isArray(res) ? res : (res?.channels ?? res ?? []))
+          }).catch(reject)
+        } catch (error) {
+          reject(error)
+        }
+      })
+    })
+  }
+
+  /**
+   * Fetches the list of NPS categories available for the shop (for use with review).
+   *
+   * @returns {Promise<Array<Record<string, any>>>} - A promise that resolves with the list of categories.
+   */
+  getNpsCategories() {
+    return new Promise((resolve, reject) => {
+      this.push(() => {
+        try {
+          request('nps/categories', this.shop_id, {
+            method: 'GET',
+            params: {
+              shop_id: this.shop_id,
+              stream: this.stream,
+            },
+          }).then((res) => {
+            resolve(Array.isArray(res) ? res : (res?.categories ?? res ?? []))
+          }).catch(reject)
+        } catch (error) {
+          reject(error)
+        }
+      })
+    })
   }
 
   /**
@@ -981,38 +1407,7 @@ class MainSDK extends Performer {
    * @returns {Promise<boolean>}
    */
   async getPushPermission() {
-    let result = false
-    if (Platform.OS === 'android' && Platform.Version >= 33) {
-      try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
-            ? PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
-            : PermissionsAndroid.PERMISSIONS.POST_NOTIFICATION
-        )
-        result = granted === PermissionsAndroid.RESULTS.GRANTED
-      } catch (err) {
-        if (DEBUG) console.error('Android permissions error:', err)
-      }
-    } else {
-      const settings = await notifee.requestPermission()
-
-      if (settings.authorizationStatus === AuthorizationStatus.DENIED) {
-        if (DEBUG) console.log('User denied permissions request')
-        return false
-      } else if (
-        settings.authorizationStatus === AuthorizationStatus.AUTHORIZED
-      ) {
-        if (DEBUG) console.log('User granted permissions request')
-        return true
-      } else if (
-        settings.authorizationStatus === AuthorizationStatus.PROVISIONAL
-      ) {
-        if (DEBUG) console.log('User provisionally granted permissions request')
-        return true
-      }
-
-      return false
-    }
+    return this._requestPushPermissionOnce()
   }
 
   /**
@@ -1020,32 +1415,66 @@ class MainSDK extends Performer {
    * @returns {Promise<string | null>}
    */
   async initPushToken(removeOld = false) {
-    let savedToken = await getSavedPushToken(this.shop_id)
     if (removeOld) {
       await this.deleteToken()
-      savedToken = false
+      this._tokenCache = null
     }
 
+    // Fast path: in-memory cache populated on the same JS run (avoids AsyncStorage race).
+    if (!removeOld && this._tokenCache) {
+      if (DEBUG) console.log('FCM token from memory cache: ', this._tokenCache)
+      await this._pushOrchestrator.ensureTrackingSubscriptions()
+      return this._tokenCache
+    }
+
+    const savedToken = await getSavedPushToken(this.shop_id)
     if (savedToken) {
       if (DEBUG) console.log('Old valid FCM token: ', savedToken)
+      this._tokenCache = savedToken
       // Even when token is already cached, ensure tracking subscriptions are installed.
       await this._pushOrchestrator.ensureTrackingSubscriptions()
       return savedToken
     }
 
+    if (Platform.OS === 'android' && this._pushPermissionState === 'requesting') {
+      const permissionDecision = await this._waitForPushPermissionResolution()
+      if (permissionDecision === 'denied') {
+        this._logPushNullReason('permission_denied')
+        return null
+      }
+      if (permissionDecision === 'timeout') {
+        this._logPushNullReason('permission_timeout', {
+          timeoutMs: PUSH_PERMISSION_WAIT_TIMEOUT_MS,
+        })
+        return null
+      }
+    }
+
     const messaging = this._ensureMessaging()
     if (!messaging) {
-      console.warn('Firebase messaging not available')
+      this._logPushNullReason('messaging_unavailable')
       return null
     }
 
-    const token = await this._pushOrchestrator.fetchToken({
-      messaging,
-      pushType: this._push_type,
-      platformOS: Platform.OS,
-    })
+    let token = null
+    try {
+      token = await this._pushOrchestrator.fetchToken({
+        messaging,
+        pushType: this._push_type,
+        platformOS: Platform.OS,
+      })
+    } catch (error) {
+      this._logFirebaseError('initPushToken.fetchToken', error)
+      this._logPushNullReason('push_token_error')
+      return null
+    }
 
-    if (!token) return null
+    if (!token) {
+      this._logPushNullReason('token_empty')
+      return null
+    }
+    // Cache immediately so getToken() called right after won't race with AsyncStorage write.
+    this._tokenCache = token
     this.setPushTokenNotification(token)
     return token
   }
@@ -1079,7 +1508,7 @@ class MainSDK extends Performer {
    * @param {boolean | Function} notifyClick
    * @param {boolean | Function} notifyReceive
    * @param {boolean | Function} notifyBgReceive
-   * @returns {Promise<boolean>}
+   * @returns {Promise<string | null | false>} The token on success, null if permission denied/token unavailable, false if already locked.
    */
   async initPush(
     notifyClick = false,
@@ -1094,6 +1523,12 @@ class MainSDK extends Performer {
     if (notifyReceive) this.pushReceivedListener = notifyReceive
     if (notifyBgReceive) this.pushBgReceivedListener = notifyBgReceive
 
+    // If this exact initPush() call is already in-flight (e.g. concurrent button taps),
+    // join the existing promise instead of starting a duplicate run.
+    if (this._initPushPromise) {
+      return this._initPushPromise
+    }
+
     const lock = await initLocker(this.shop_id)
     if (
       lock &&
@@ -1106,15 +1541,31 @@ class MainSDK extends Performer {
       return false
     }
 
-    await setInitLocker(true, this.shop_id)
-    const granted = await this.getPushPermission()
-    if (!granted) return false
+    this._initPushPromise = (async () => {
+      try {
+        await setInitLocker(true, this.shop_id)
 
-    await this.initPushChannel()
-    await this.initPushToken(false)
+        const granted = await this.getPushPermission()
+        if (!granted) {
+          await setInitLocker(false, this.shop_id)
+          return null
+        }
 
-    await this._pushOrchestrator.ensureTrackingSubscriptions()
-    return true
+        await this.initPushChannel()
+        const token = await this.initPushToken(false)
+
+        if (!token) {
+          await setInitLocker(false, this.shop_id)
+        }
+
+        await this._pushOrchestrator.ensureTrackingSubscriptions()
+        return token ?? null
+      } finally {
+        this._initPushPromise = null
+      }
+    })()
+
+    return this._initPushPromise
   }
 
   /**
@@ -1187,6 +1638,7 @@ class MainSDK extends Performer {
    * @returns {Promise<void>}
    */
   async deleteToken() {
+    this._tokenCache = null
     return savePushToken(false, this.shop_id).then(async () => {
       const messaging = this._ensureMessaging()
       if (messaging) {
