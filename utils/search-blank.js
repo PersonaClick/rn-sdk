@@ -10,7 +10,7 @@ import { request } from '../lib/client';
 export const blankSearchRequest = (shop_id, stream) => {
   return new Promise((resolve, reject) => {
     try {
-      request('search/blank', {
+      request('search/blank', shop_id, {
         params: {
           shop_id,
           stream,

@@ -51,4 +51,15 @@ describe('Search', () => {
       expect(error.message).toContain('Request failed with status code 400')
     }
   })
+
+  test('should call searchBlank and resolve with suggests, last_queries, products', async () => {
+    const response = await sdk.searchBlank()
+
+    expect(response).toHaveProperty('suggests')
+    expect(response).toHaveProperty('last_queries')
+    expect(response).toHaveProperty('products')
+    expect(Array.isArray(response.suggests)).toBe(true)
+    expect(Array.isArray(response.last_queries)).toBe(true)
+    expect(Array.isArray(response.products)).toBe(true)
+  })
 })
