@@ -39,6 +39,7 @@ import { SDK_API_URL } from './index'
 import { parseCartItem, parseProductInfo, parseProductsListResponse } from './types/productTypes'
 import { prepareAndShow, registerSDK } from './components/Popup/SdkPopupOverlay'
 import PopupLogic from './lib/popup'
+import { buildTrackCustomEventParams } from './lib/buildTrackCustomEventParams'
 
 /** Minimum allowed NPS/review rate (1–10). */
 const REVIEW_RATE_MIN = 1
@@ -609,16 +610,21 @@ class MainSDK extends Performer {
 
   /**
    * @param {string} event
-   * @param {Record<string, any>} options
+   * @param {import('./types/customEventParams').CustomEventParams | undefined} [params]
    * @returns {void}
    */
-  trackEvent(event, options) {
+  trackEvent(event, params) {
+    /** @type {Record<string, unknown>} */
+    let queryParams
+    try {
+      queryParams = buildTrackCustomEventParams(event, params)
+    } catch (err) {
+      console.error(err?.message ?? err)
+      return
+    }
+
     this.push(async () => {
       try {
-        let queryParams = { event: event }
-        if (options) {
-          queryParams = Object.assign(queryParams, options)
-        }
         const sourceParams = await getSourceParams(this.shop_id)
         Object.assign(queryParams, sourceParams)
 
