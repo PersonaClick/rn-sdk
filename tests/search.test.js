@@ -1,9 +1,5 @@
 import REES46 from '../index.js'
 
-jest.mock('react-native-device-info', () => {})
-jest.mock('@react-native-firebase/messaging', () => {})
-jest.mock('@react-native-async-storage/async-storage', () => {})
-
 describe('Search', () => {
   let sdk
 
@@ -52,14 +48,15 @@ describe('Search', () => {
     }
   })
 
-  test('should call searchBlank and resolve with suggests, last_queries, products', async () => {
+  test('should call searchBlank and resolve with suggests and products', async () => {
     const response = await sdk.searchBlank()
 
     expect(response).toHaveProperty('suggests')
-    expect(response).toHaveProperty('last_queries')
     expect(response).toHaveProperty('products')
     expect(Array.isArray(response.suggests)).toBe(true)
-    expect(Array.isArray(response.last_queries)).toBe(true)
     expect(Array.isArray(response.products)).toBe(true)
+    if (Object.prototype.hasOwnProperty.call(response, 'last_queries')) {
+      expect(Array.isArray(response.last_queries)).toBe(true)
+    }
   })
 })

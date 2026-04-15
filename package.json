@@ -1,10 +1,14 @@
 {
   "name": "@personaclick/rn-sdk",
-  "version": "4.0.6",
+  "version": "4.0.8",
   "description": "PersonaClick React Native SDK",
   "type": "module",
+  "types": "./index.d.ts",
   "exports": {
-    ".": "./index.js"
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
   },
   "main": "index.js",
   "author": "PersonaClick",
@@ -51,7 +55,7 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "yarn dlx jest@29.7.0 --config jest.config.cjs",
+    "test": "yarn exec jest --config jest.config.cjs",
     "changelog": "conventional-changelog -i CHANGELOG.md -s --commit-path . -p angular -t @personaclick/rn-sdk-"
   },
   "publishConfig": {

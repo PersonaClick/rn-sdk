@@ -244,9 +244,10 @@ export default function Popup({ visible, popupData, onClose, sdk }) {
             onStartShouldSetResponder={() => true}
           >
             {/* Close button (X) */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.closeButton}
               onPress={handleClose}
+              testID="sdk-popup-close"
             >
               <Text style={styles.closeButtonText}>×</Text>
             </TouchableOpacity>
