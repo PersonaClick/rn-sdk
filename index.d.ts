@@ -2,6 +2,11 @@ import type { ComponentType } from 'react'
 
 export type { CustomEventParams } from './types/customEventParams.js'
 export type { PurchasePredictParams, PurchasePredictResponse } from './types/purchasePredict.js'
+export type {
+  PurchaseItemRequest,
+  PurchaseRecommendedBy,
+  PurchaseTrackingRequest,
+} from './types/purchaseTracking.js'
 
 export const SESSION_CODE_EXPIRE: number
 export const SDK_API_URL: string
@@ -14,7 +19,28 @@ export function parseProductInfo(json: Record<string, unknown>): unknown
 export function parseProductsListResponse(json: Record<string, unknown>): unknown
 
 /** @see ./MainSDK.js — default export is the SDK class (implementation in JS). */
-declare const Rees46: any
+declare class Rees46 {
+  constructor(...args: unknown[])
+
+  /**
+   * Legacy event tracking API.
+   *
+   * Note: the SDK also supports other events via this method; only the `purchase`
+   * variant is deprecated in favor of the strict `trackPurchase` contract.
+   */
+  track(event: string, data?: unknown): void
+
+  /**
+   * @deprecated Use `trackPurchase(request)` with `PurchaseTrackingRequest` instead.
+   */
+  track(event: 'purchase', data: unknown): void
+
+  /**
+   * Strict purchase tracking (`push`, `event` = `purchase`).
+   */
+  trackPurchase(request: import('./types/purchaseTracking.js').PurchaseTrackingRequest): void
+}
+
 export default Rees46
 
 /** @see ./components/Popup/SdkPopupOverlay */
