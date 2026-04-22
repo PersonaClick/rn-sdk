@@ -43,6 +43,7 @@ import { prepareAndShow, registerSDK } from './components/Popup/SdkPopupOverlay'
 import PopupLogic from './lib/popup'
 import { buildTrackCustomEventParams } from './lib/buildTrackCustomEventParams'
 import { buildPurchasePredictQueryParams } from './lib/buildPurchasePredictQueryParams'
+import { buildPurchaseTrackingParams } from './lib/buildPurchaseTrackingParams.js'
 
 /** Minimum allowed NPS/review rate (1–10). */
 const REVIEW_RATE_MIN = 1
@@ -615,6 +616,44 @@ class MainSDK extends Performer {
         await this.checkAndShowPopup(response)
         return response
       } catch (error) {
+        return error
+      }
+    })
+  }
+
+  /**
+   * Strict purchase tracking (`push`, `event` = `purchase`). Prefer this over `track('purchase', …)`.
+   * @param {import('./types/purchaseTracking').PurchaseTrackingRequest} purchaseRequest
+   * @returns {void}
+   */
+  trackPurchase(purchaseRequest) {
+    /** @type {Record<string, unknown>} */
+    let queryParams
+    try {
+      queryParams = buildPurchaseTrackingParams(purchaseRequest)
+    } catch (err) {
+      console.error(err?.message ?? err)
+      return
+    }
+
+    this.push(async () => {
+      try {
+        const sourceParams = await getSourceParams(this.shop_id)
+        Object.assign(queryParams, sourceParams)
+        const response = await request('push', this.shop_id, {
+          headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+          params: {
+            shop_id: this.shop_id,
+            stream: this.stream,
+            ...queryParams,
+          },
+        })
+        await this.checkAndShowPopup(response)
+        return response
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('[SDK] trackPurchase failed:', error)
         return error
       }
     })
