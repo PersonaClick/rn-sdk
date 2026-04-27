@@ -19,7 +19,7 @@ export function parseProductInfo(json: Record<string, unknown>): unknown
 export function parseProductsListResponse(json: Record<string, unknown>): unknown
 
 /** @see ./MainSDK.js — default export is the SDK class (implementation in JS). */
-declare class Rees46 {
+declare class PersonaClick {
   constructor(...args: unknown[])
 
   /**
@@ -41,7 +41,7 @@ declare class Rees46 {
   trackPurchase(request: import('./types/purchaseTracking.js').PurchaseTrackingRequest): void
 }
 
-export default Rees46
+export default PersonaClick
 
 /** @see ./components/Popup/SdkPopupOverlay */
 export const SdkPopupOverlay: ComponentType<Record<string, unknown>>

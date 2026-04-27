@@ -1,15 +1,52 @@
-import REES46 from '../index.js'
+import PersonaClick from '../index.js'
+
+const mockRequest = jest.fn()
+jest.mock('../lib/client.js', () => {
+  const actual = jest.requireActual('../lib/client.js')
+  return {
+    ...actual,
+    request: (...args) => mockRequest(...args),
+  }
+})
 
 describe('Search', () => {
   let sdk
 
   beforeEach(() => {
-    sdk = new REES46('357382bf66ac0ce2f1722677c59511', 'android', true)
+    mockRequest.mockImplementation((endpoint, _shopId, options) => {
+      if (endpoint === 'init') {
+        return Promise.resolve({ did: 'jest-did', seance: 'jest-seance', segment: '' })
+      }
+
+      if (endpoint === 'search') {
+        const hasType = Boolean(options?.params?.type)
+        if (!hasType) {
+          return Promise.reject(new Error('Request failed with status code 400'))
+        }
+        return Promise.resolve({
+          categories: [],
+          html: '',
+          products: [],
+          products_total: 0,
+        })
+      }
+
+      if (endpoint === 'search/blank') {
+        return Promise.resolve({
+          suggests: [],
+          products: [],
+        })
+      }
+
+      return Promise.resolve({})
+    })
+
+    sdk = new PersonaClick('357382bf66ac0ce2f1722677c59511', 'android', true)
     jest.spyOn(sdk, 'push').mockImplementation((callback) => {
       callback()
     })
 
-    jest.clearAllMocks()
+    mockRequest.mockClear()
   })
 
   afterEach(() => {
