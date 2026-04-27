@@ -1,4 +1,4 @@
-import REES46 from '../index.js'
+import PersonaClick from '../index.js'
 
 const mockRequest = jest.fn()
 jest.mock('../lib/client.js', () => {
@@ -19,7 +19,7 @@ describe('Review', () => {
       }
       return Promise.resolve({})
     })
-    sdk = new REES46('357382bf66ac0ce2f1722677c59511', 'android', true)
+    sdk = new PersonaClick('357382bf66ac0ce2f1722677c59511', 'android', true)
     jest.spyOn(sdk, 'push').mockImplementation((callback) => {
       callback()
     })
