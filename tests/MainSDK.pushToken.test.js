@@ -112,9 +112,17 @@ function createSdk() {
   sdk.initialized = true
   sdk.push = jest.fn((command) => command())
   sdk._pushOrchestrator = {
-    ensureTrackingSubscriptions: jest.fn().mockResolvedValue(true),
+    installSubscriptions: jest.fn().mockResolvedValue(true),
     fetchToken: jest.fn().mockResolvedValue('fcm-token-1'),
-    setHasCustomClickListener: jest.fn(),
+    setListeners: jest.fn(),
+    _clickListener: null,
+    _receiveListener: null,
+    _bgReceiveListener: null,
+    _deps: {
+      defaultClickListener: () => {},
+      defaultReceiveListener: () => {},
+      defaultBgReceiveListener: () => {},
+    },
   }
   return sdk
 }
@@ -166,7 +174,7 @@ describe('MainSDK push token flow', () => {
 
     expect(token).toBe('cached-memory-token')
     expect(mockGetSavedPushToken).not.toHaveBeenCalled()
-    expect(sdk._pushOrchestrator.ensureTrackingSubscriptions).toHaveBeenCalledTimes(
+    expect(sdk._pushOrchestrator.installSubscriptions).toHaveBeenCalledTimes(
       1
     )
   })
@@ -180,7 +188,7 @@ describe('MainSDK push token flow', () => {
     expect(token).toBe('saved-token')
     expect(sdk._tokenCache).toBe('saved-token')
     expect(mockGetSavedPushToken).toHaveBeenCalledWith('shop-id')
-    expect(sdk._pushOrchestrator.ensureTrackingSubscriptions).toHaveBeenCalledTimes(
+    expect(sdk._pushOrchestrator.installSubscriptions).toHaveBeenCalledTimes(
       1
     )
   })
@@ -273,21 +281,20 @@ describe('MainSDK push token flow', () => {
 
     expect(token).toBe(false)
     expect(mockInitLocker).toHaveBeenCalledWith('shop-id')
-    expect(sdk._pushOrchestrator.ensureTrackingSubscriptions).toHaveBeenCalledTimes(
+    expect(sdk._pushOrchestrator.installSubscriptions).toHaveBeenCalledTimes(
       1
     )
   })
 
-  test('initPush updates custom click listener and marks orchestrator flag', async () => {
+  test('initPush forwards custom click listener to orchestrator via setListeners', async () => {
     const sdk = createSdk()
     const customClick = jest.fn().mockResolvedValue(undefined)
     jest.spyOn(sdk, 'getPushPermission').mockResolvedValue(false)
 
     await sdk.initPush(customClick)
 
-    expect(sdk.pushClickListener).toBe(customClick)
-    expect(sdk._pushOrchestrator.setHasCustomClickListener).toHaveBeenCalledWith(
-      true
+    expect(sdk._pushOrchestrator.setListeners).toHaveBeenCalledWith(
+      expect.objectContaining({ click: customClick })
     )
   })
 
@@ -323,7 +330,7 @@ describe('MainSDK push token flow', () => {
 
     expect(token).toBe('init-token')
     expect(mockSetInitLocker).toHaveBeenCalledWith(true, 'shop-id')
-    expect(sdk._pushOrchestrator.ensureTrackingSubscriptions).toHaveBeenCalledTimes(
+    expect(sdk._pushOrchestrator.installSubscriptions).toHaveBeenCalledTimes(
       1
     )
   })
