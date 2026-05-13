@@ -1,3 +1,167 @@
+## 4.0.12 (2026-05-13)
+
+
+* [DEV-359] feat!(main): support expo apps, rm native module. Kudos https://github.com/ahmetkuslular (dc9762c)
+
+
+### Bug Fixes
+
+* add .js extensions to ESM imports in tests and mock native modules (41317ad)
+* **gcm:** message variability (544eb08)
+
+
+### Features
+
+* **common:** bump version (ce7e70d)
+* **sdk:** bump device-info (1d1f10e)
+* **sdk:** getToken to use correct token (d07df14)
+* **sdk:** in-app push notifications (#51) (6fa0296)
+* **sdk:** include types for exclude_brands (#50) (cd1d301)
+* **sdk:** rm jest (d0cce5d)
+* **sdk:** sid token generation (4a34846)
+
+
+### BREAKING CHANGES
+
+* rm react-native-device-info, dynamically import if
+needed
+
+
+
+## 4.0.11 (2026-04-27)
+
+
+* [DEV-359] feat!(main): support expo apps, rm native module. Kudos https://github.com/ahmetkuslular (dc9762c)
+
+
+### Bug Fixes
+
+* add .js extensions to ESM imports in tests and mock native modules (41317ad)
+* **gcm:** message variability (544eb08)
+
+
+### Features
+
+* **common:** bump version (ce7e70d)
+* **sdk:** bump device-info (1d1f10e)
+* **sdk:** getToken to use correct token (d07df14)
+* **sdk:** in-app push notifications (#51) (6fa0296)
+* **sdk:** include types for exclude_brands (#50) (cd1d301)
+* **sdk:** rm jest (d0cce5d)
+* **sdk:** sid token generation (4a34846)
+
+
+### BREAKING CHANGES
+
+* rm react-native-device-info, dynamically import if
+needed
+
+
+
+## 4.0.10 (2026-04-22)
+
+
+* [DEV-359] feat!(main): support expo apps, rm native module. Kudos https://github.com/ahmetkuslular (dc9762c)
+
+
+### Bug Fixes
+
+* add .js extensions to ESM imports in tests and mock native modules (41317ad)
+* **gcm:** message variability (544eb08)
+
+
+### Features
+
+* **common:** bump version (ce7e70d)
+* **sdk:** bump device-info (1d1f10e)
+* **sdk:** getToken to use correct token (d07df14)
+* **sdk:** in-app push notifications (#51) (6fa0296)
+* **sdk:** include types for exclude_brands (#50) (cd1d301)
+* **sdk:** rm jest (d0cce5d)
+* **sdk:** sid token generation (4a34846)
+
+
+### BREAKING CHANGES
+
+* rm react-native-device-info, dynamically import if
+needed
+
+
+
+## 4.0.9 (2026-04-22)
+
+
+* [DEV-359] feat!(main): support expo apps, rm native module. Kudos https://github.com/ahmetkuslular (dc9762c)
+
+
+### Bug Fixes
+
+* add .js extensions to ESM imports in tests and mock native modules (41317ad)
+* **gcm:** message variability (544eb08)
+
+
+### Features
+
+* **common:** bump version (ce7e70d)
+* **sdk:** bump device-info (1d1f10e)
+* **sdk:** getToken to use correct token (d07df14)
+* **sdk:** in-app push notifications (#51) (6fa0296)
+* **sdk:** include types for exclude_brands (#50) (cd1d301)
+* **sdk:** rm jest (d0cce5d)
+* **sdk:** sid token generation (4a34846)
+
+
+### BREAKING CHANGES
+
+* rm react-native-device-info, dynamically import if
+needed
+
+
+
+## Unreleased
+
+### Features
+
+* **sdk:** strict purchase tracking — `trackPurchase(request)` with typed `PurchaseTrackingRequest` / `PurchaseItemRequest` (camelCase API, snake_case only on the wire). Client-side validation; `tax_free` is sent only when `isTaxFree` is `true`; optional keys are omitted when unset. Demo app and Detox harness: `trackPurchase_minimal` / `trackPurchase_full`.
+
+### Deprecations
+
+* **sdk:** `track('purchase', …)` — use `trackPurchase` instead; the legacy path logs a one-time migration warning.
+
+### Migration
+
+Replace legacy `track('purchase', data)` with `trackPurchase({ orderId, orderPrice, items })` where each item has required `id`, `amount` (integer > 0), and `price` (finite number). Map `data.order` → `orderId`, `data.order_price` → `orderPrice`, and `data.products` → `items` (ensure each product supplies `amount` and `price`; the old `products`/`quantity`-only shape is not equivalent to the strict contract).
+
+## 4.0.8 (2026-04-15)
+
+
+* [DEV-359] feat!(main): support expo apps, rm native module. Kudos https://github.com/ahmetkuslular (dc9762c)
+
+
+### Bug Fixes
+
+* add .js extensions to ESM imports in tests and mock native modules (41317ad)
+* **gcm:** message variability (544eb08)
+
+
+### Features
+
+* **common:** bump version (ce7e70d)
+* **sdk:** bump device-info (1d1f10e)
+* **sdk:** getToken to use correct token (d07df14)
+* **sdk:** in-app push notifications (#51) (6fa0296)
+* **sdk:** include types for exclude_brands (#50) (cd1d301)
+* **sdk:** rm jest (d0cce5d)
+* **sdk:** sid token generation (4a34846)
+
+
+### BREAKING CHANGES
+
+* rm react-native-device-info, dynamically import if
+needed
+
+
+
 ## 4.0.7 (2026-04-09)
 
 

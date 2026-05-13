@@ -204,11 +204,11 @@ class MainSDK extends Performer {
       getPushData,
       updPushData,
       notificationDelivered: (options) => this.notificationDelivered(options),
-      pushReceivedListener: (remoteMessage) =>
-        this.pushReceivedListener.call(this, remoteMessage),
-      pushBgReceivedListener: (remoteMessage) =>
-        this.pushBgReceivedListener.call(this, remoteMessage),
-      pushClickListener: (event) => this.pushClickListener.call(this, event),
+      defaultClickListener: (event) => this.onClickPush(event),
+      defaultReceiveListener: (remoteMessage) =>
+        this.showNotification(remoteMessage),
+      defaultBgReceiveListener: (remoteMessage) =>
+        this.showNotification(remoteMessage),
       getShopId: () => this.shop_id,
       hasSeenMessageId: (messageId) => this.lastMessageIds.includes(messageId),
       markMessageIdSeen: (messageId) => {
@@ -575,26 +575,35 @@ class MainSDK extends Performer {
   }
 
   /**
-   * @param {import('@react-native-firebase/messaging').RemoteMessage} remoteMessage
-   * @returns {Promise<void>}
+   * @deprecated Use `initPush(click, ...)` to register a click handler. Kept as
+   * a proxy to PushOrchestrator's listener so existing direct accessors keep
+   * working.
    */
-  pushReceivedListener = async function (remoteMessage) {
-    await this.showNotification(remoteMessage)
+  get pushClickListener() {
+    return this._pushOrchestrator._clickListener ?? this._pushOrchestrator._deps.defaultClickListener
+  }
+  set pushClickListener(fn) {
+    this._pushOrchestrator.setListeners({ click: fn })
   }
 
   /**
-   * @param {import('@react-native-firebase/messaging').RemoteMessage} remoteMessage
-   * @returns {Promise<void>}
+   * @deprecated Use `initPush(_, receive, _)` instead.
    */
-  pushBgReceivedListener = async function (remoteMessage) {
-    await this.showNotification(remoteMessage)
+  get pushReceivedListener() {
+    return this._pushOrchestrator._receiveListener ?? this._pushOrchestrator._deps.defaultReceiveListener
+  }
+  set pushReceivedListener(fn) {
+    this._pushOrchestrator.setListeners({ receive: fn })
   }
 
   /**
-   * @returns {Promise<void>}
+   * @deprecated Use `initPush(_, _, bgReceive)` instead.
    */
-  pushClickListener = async function (event) {
-    await this.onClickPush(event)
+  get pushBgReceivedListener() {
+    return this._pushOrchestrator._bgReceiveListener ?? this._pushOrchestrator._deps.defaultBgReceiveListener
+  }
+  set pushBgReceivedListener(fn) {
+    this._pushOrchestrator.setListeners({ bgReceive: fn })
   }
 
   track(event, options) {
@@ -1522,7 +1531,7 @@ class MainSDK extends Performer {
     // Fast path: in-memory cache populated on the same JS run (avoids AsyncStorage race).
     if (!removeOld && this._tokenCache) {
       if (DEBUG) console.log('FCM token from memory cache: ', this._tokenCache)
-      await this._pushOrchestrator.ensureTrackingSubscriptions()
+      await this._pushOrchestrator.installSubscriptions()
       return this._tokenCache
     }
 
@@ -1531,7 +1540,7 @@ class MainSDK extends Performer {
       if (DEBUG) console.log('Old valid FCM token: ', savedToken)
       this._tokenCache = savedToken
       // Even when token is already cached, ensure tracking subscriptions are installed.
-      await this._pushOrchestrator.ensureTrackingSubscriptions()
+      await this._pushOrchestrator.installSubscriptions()
       return savedToken
     }
 
@@ -1615,15 +1624,14 @@ class MainSDK extends Performer {
     notifyBgReceive = false
   ) {
     // Always allow updating listeners, even if initPush() is called repeatedly.
-    if (notifyClick) {
-      this.pushClickListener = notifyClick
-      this._pushOrchestrator.setHasCustomClickListener(true)
-    }
-    if (notifyReceive) this.pushReceivedListener = notifyReceive
-    if (notifyBgReceive) this.pushBgReceivedListener = notifyBgReceive
+    // Replays a buffered cold-start through `notifyClick` if the default already
+    // consumed it (e.g. autoSendPushToken auto-init ran first).
+    this._pushOrchestrator.setListeners({
+      click: notifyClick || undefined,
+      receive: notifyReceive || undefined,
+      bgReceive: notifyBgReceive || undefined,
+    })
 
-    // If this exact initPush() call is already in-flight (e.g. concurrent button taps),
-    // join the existing promise instead of starting a duplicate run.
     if (this._initPushPromise) {
       return this._initPushPromise
     }
@@ -1635,8 +1643,7 @@ class MainSDK extends Performer {
       lock.state === true &&
       new Date().getTime() < lock.expires
     ) {
-      // Ensure subscriptions exist even if init is locked.
-      await this._pushOrchestrator.ensureTrackingSubscriptions()
+      await this._pushOrchestrator.installSubscriptions()
       return false
     }
 
@@ -1657,7 +1664,7 @@ class MainSDK extends Performer {
           await setInitLocker(false, this.shop_id)
         }
 
-        await this._pushOrchestrator.ensureTrackingSubscriptions()
+        await this._pushOrchestrator.installSubscriptions()
         return token ?? null
       } finally {
         this._initPushPromise = null
