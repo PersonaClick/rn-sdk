@@ -1,6 +1,6 @@
 {
   "name": "@personaclick/rn-sdk",
-  "version": "4.0.12",
+  "version": "4.0.13",
   "description": "PersonaClick React Native SDK",
   "type": "module",
   "types": "./index.d.ts",
