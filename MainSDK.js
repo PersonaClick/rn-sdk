@@ -38,7 +38,9 @@ import { blankSearchRequest } from './utils'
 import { isOverOneWeekAgo } from './utils'
 import { getStorageKey } from './utils'
 import { SDK_API_URL } from './index'
-import { parseCartItem, parseProductInfo, parseProductsListResponse } from './types/productTypes'
+import { parseCartItem, parseProduct, parseProductInfo, parseProductsListResponse } from './types/productTypes'
+import { parseUserOrdersResponse } from './types/orderTypes'
+import { parseLoyaltyJoinResponse, parseLoyaltyStatus } from './types/loyaltyTypes'
 import { prepareAndShow, registerSDK } from './components/Popup/SdkPopupOverlay'
 import PopupLogic from './lib/popup'
 import { buildTrackCustomEventParams } from './lib/buildTrackCustomEventParams'
@@ -1206,6 +1208,135 @@ class MainSDK extends Performer {
             return
           }
           resolve(parseProductsListResponse(res))
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  }
+
+  /**
+   * Fetches the products of the user's last order.
+   * The `orders/last_for_user` endpoint returns a top-level array of products.
+   * @param {Object} [options] - Optional extra params (e.g. email, phone).
+   * @returns {Promise<import('./types/productTypes').Product[]>}
+   */
+  getLastOrderProducts(options = {}) {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          const res = await request('orders/last_for_user', this.shop_id, {
+            params: {
+              shop_id: this.shop_id,
+              segment: this.segment || null,
+              ...options,
+            },
+          })
+          if (res instanceof Error) {
+            reject(res)
+            return
+          }
+          resolve(Array.isArray(res) ? res.map(parseProduct) : [])
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  }
+
+  /**
+   * Fetches the list of the user's orders (`orders/by_user`), ascending by date and internal id.
+   *
+   * Requires `shop_secret` in `options`. The user is identified by `did` (added automatically)
+   * or by `email` / `phone` / `loyalty_id` / `external_id`. Optional `date_from` (YYYY-MM-DD).
+   *
+   * NOTE: `shop_secret` is a server-side secret key; shipping it inside a mobile app exposes it.
+   * Use only in trusted contexts.
+   *
+   * Response envelope `{ status, data: { orders: [...] } }` is parsed to a list of orders.
+   *
+   * @param {Object} options - Must include `shop_secret`; may include identifiers and `date_from`.
+   * @returns {Promise<import('./types/orderTypes').Order[]>}
+   */
+  getUserOrders(options = {}) {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          const res = await request('orders/by_user', this.shop_id, {
+            params: {
+              shop_id: this.shop_id,
+              ...options,
+            },
+          })
+          if (res instanceof Error) {
+            reject(res)
+            return
+          }
+          resolve(parseUserOrdersResponse(res))
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  }
+
+  /**
+   * Joins the loyalty program (`loyalty/members/join`).
+   *
+   * `shop_id` is added automatically. `phone` is required by the endpoint;
+   * `email`, `first_name`, `last_name` are optional.
+   *
+   * @param {Object} params - Member fields; must include `phone`.
+   * @returns {Promise<import('./types/loyaltyTypes').LoyaltyJoinResponse>}
+   */
+  loyaltyJoin(params = {}) {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          const res = await request('loyalty/members/join', this.shop_id, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            params: {
+              shop_id: this.shop_id,
+              stream: this.stream,
+              ...params,
+            },
+          })
+          if (res instanceof Error) {
+            reject(res)
+            return
+          }
+          resolve(parseLoyaltyJoinResponse(res))
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  }
+
+  /**
+   * Fetches the loyalty membership status (`loyalty/members/status`).
+   *
+   * `shop_id` is added automatically.
+   *
+   * @param {string} identifier - Member identifier (phone).
+   * @returns {Promise<import('./types/loyaltyTypes').LoyaltyStatus>}
+   */
+  getLoyaltyStatus(identifier) {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          const res = await request('loyalty/members/status', this.shop_id, {
+            params: {
+              shop_id: this.shop_id,
+              identifier,
+            },
+          })
+          if (res instanceof Error) {
+            reject(res)
+            return
+          }
+          resolve(parseLoyaltyStatus(res))
         } catch (e) {
           reject(e)
         }
