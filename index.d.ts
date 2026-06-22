@@ -39,6 +39,26 @@ declare class PersonaClick {
    * Strict purchase tracking (`push`, `event` = `purchase`).
    */
   trackPurchase(request: import('./types/purchaseTracking.js').PurchaseTrackingRequest): void
+
+  /**
+   * Fetches the products of the user's last order (`orders/last_for_user`).
+   */
+  getLastOrderProducts(options?: Record<string, unknown>): Promise<unknown[]>
+
+  /**
+   * Fetches the list of the user's orders (`orders/by_user`). Requires `shop_secret` in options.
+   */
+  getUserOrders(options: Record<string, unknown>): Promise<unknown[]>
+
+  /**
+   * Joins the loyalty program (`loyalty/members/join`). Requires `phone` in params.
+   */
+  loyaltyJoin(params: Record<string, unknown>): Promise<unknown>
+
+  /**
+   * Fetches the loyalty membership status (`loyalty/members/status`) for the given identifier (phone).
+   */
+  getLoyaltyStatus(identifier: string): Promise<unknown>
 }
 
 export default PersonaClick
