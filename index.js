@@ -25,3 +25,8 @@ export default PersonaClick;
 // NOTE: this component must be rendered in your React tree if you want SDK to auto-present popups.
 export { default as SdkPopupOverlay } from './components/Popup/SdkPopupOverlay'
 export { registerSDK as registerSdkPopupOverlaySDK } from './components/Popup/SdkPopupOverlay'
+
+// NOTE: Stories UI components are intentionally NOT exported from the package root.
+// They pull heavy native deps (react-native-fs/video/vector-icons/volume-manager), so importing
+// the SDK would force those on every consumer. Import them from the '@personaClick/react-native-sdk/stories'
+// subpath instead (see ./stories.js).

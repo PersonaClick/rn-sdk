@@ -1,6 +1,6 @@
 {
   "name": "@personaclick/rn-sdk",
-  "version": "4.0.14",
+  "version": "4.0.16",
   "description": "PersonaClick React Native SDK",
   "type": "module",
   "types": "./index.d.ts",
@@ -8,6 +8,10 @@
     ".": {
       "types": "./index.d.ts",
       "default": "./index.js"
+    },
+    "./stories": {
+      "types": "./stories.d.ts",
+      "default": "./stories.js"
     }
   },
   "main": "index.js",
@@ -49,7 +53,25 @@
     "@notifee/react-native": "^9.1.8",
     "@react-native-async-storage/async-storage": "^1.23.1",
     "@react-native-firebase/app": "^23",
-    "@react-native-firebase/messaging": "^23"
+    "@react-native-firebase/messaging": "^23",
+    "react-native-fs": "^2.20.0",
+    "react-native-vector-icons": "^10.3.0",
+    "react-native-video": "^6.4.5",
+    "react-native-volume-manager": "^2.0.8"
+  },
+  "peerDependenciesMeta": {
+    "react-native-fs": {
+      "optional": true
+    },
+    "react-native-vector-icons": {
+      "optional": true
+    },
+    "react-native-video": {
+      "optional": true
+    },
+    "react-native-volume-manager": {
+      "optional": true
+    }
   },
   "directories": {
     "lib": "lib"
