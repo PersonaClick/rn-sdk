@@ -59,6 +59,29 @@ declare class PersonaClick {
    * Fetches the loyalty membership status (`loyalty/members/status`) for the given identifier (phone).
    */
   getLoyaltyStatus(identifier: string): Promise<unknown>
+
+  /**
+   * Fetches the stored user profile (`GET /profile`). No parameters required.
+   */
+  getProfile(): Promise<unknown>
+
+  /**
+   * Fetches view/cart/purchase counters and trigger counts for a product (`GET /products/counters`).
+   */
+  getProductCounters(item: string): Promise<unknown>
+
+  /**
+   * Fetches a category listing (`GET /category/{category}`). `category` is the slug;
+   * optional `params` may include `limit`, `page`, `brands`, `locations`, `filters`.
+   */
+  getCategory(category: string, params?: Record<string, unknown>): Promise<unknown>
+
+  /**
+   * Fetches a configured product collection (`GET /collection/{id}`). `collectionId`
+   * is configured in the dashboard; optional `params` may include `location`,
+   * `email`, `phone`, `external_id`, `loyalty_id`.
+   */
+  getCollection(collectionId: string | number, params?: Record<string, unknown>): Promise<unknown>
 }
 
 export default PersonaClick

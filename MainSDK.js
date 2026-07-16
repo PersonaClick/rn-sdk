@@ -41,6 +41,7 @@ import { SDK_API_URL } from './index'
 import { parseCartItem, parseProduct, parseProductInfo, parseProductsListResponse } from './types/productTypes'
 import { parseUserOrdersResponse } from './types/orderTypes'
 import { parseLoyaltyJoinResponse, parseLoyaltyStatus } from './types/loyaltyTypes'
+import { parseProfile, parseProductCounters, parseCategory, parseCollection } from './types/catalogTypes'
 import { prepareAndShow, registerSDK } from './components/Popup/SdkPopupOverlay'
 import PopupLogic from './lib/popup'
 import { buildTrackCustomEventParams } from './lib/buildTrackCustomEventParams'
@@ -1345,6 +1346,102 @@ class MainSDK extends Performer {
   }
 
   /**
+   * Fetches view/cart/purchase counters and trigger counts for a product
+   * (`GET /products/counters`).
+   *
+   * @param {string} item - Product item id.
+   * @returns {Promise<import('./types/catalogTypes').ProductCountersResponse>}
+   */
+  getProductCounters(item) {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          const res = await request('products/counters', this.shop_id, {
+            params: {
+              shop_id: this.shop_id,
+              item,
+            },
+          })
+          if (res instanceof Error) {
+            reject(res)
+            return
+          }
+          resolve(parseProductCounters(res))
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  }
+
+  /**
+   * Fetches a category listing (`GET /category/{category}`).
+   *
+   * `shop_id`, `did`, `sid` are added automatically. [category] is the category
+   * slug (not a numeric id). Optional `params` may include `limit`, `page`,
+   * `brands`, `locations`, `filters`.
+   *
+   * @param {string} category - Category slug (path segment).
+   * @param {Object} [params={}] - Optional filter/paging params.
+   * @returns {Promise<import('./types/catalogTypes').CategoryResponse>}
+   */
+  getCategory(category, params = {}) {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          const res = await request(`category/${category}`, this.shop_id, {
+            params: {
+              shop_id: this.shop_id,
+              stream: this.stream,
+              ...params,
+            },
+          })
+          if (res instanceof Error) {
+            reject(res)
+            return
+          }
+          resolve(parseCategory(res))
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  }
+
+  /**
+   * Fetches a configured product collection (`GET /collection/{id}`).
+   *
+   * `shop_id`, `did` are added automatically. [collectionId] is configured in the
+   * dashboard. Optional `params` may include `location`, `email`, `phone`,
+   * `external_id`, `loyalty_id`.
+   *
+   * @param {string|number} collectionId - Collection id (path segment).
+   * @param {Object} [params={}] - Optional identity/location params.
+   * @returns {Promise<import('./types/catalogTypes').CollectionResponse>}
+   */
+  getCollection(collectionId, params = {}) {
+    return new Promise((resolve, reject) => {
+      this.push(async () => {
+        try {
+          const res = await request(`collection/${collectionId}`, this.shop_id, {
+            params: {
+              shop_id: this.shop_id,
+              ...params,
+            },
+          })
+          if (res instanceof Error) {
+            reject(res)
+            return
+          }
+          resolve(parseCollection(res))
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  }
+
+  /**
    * Clears local cart product state keys (prefix cart.product.) from AsyncStorage.
    * Use when resetting "in cart" UI state, e.g. after order or logout.
    * @returns {Promise<void>}
@@ -1537,21 +1634,29 @@ class MainSDK extends Performer {
   }
 
   /**
-   * @returns {Promise<any>}
+   * Fetches the stored user profile (`GET /profile`).
+   *
+   * `shop_id` and `did` are added automatically. The response is parsed into a
+   * normalized object; the full untouched payload is available under `raw`.
+   *
+   * @returns {Promise<import('./types/catalogTypes').ProfileResponse>}
    */
   getProfile() {
     return new Promise((resolve, reject) => {
-      this.push(() => {
+      this.push(async () => {
         try {
-          request('profile', this.shop_id, {
+          const res = await request('profile', this.shop_id, {
             method: 'GET',
             params: {
               shop_id: this.shop_id,
               stream: this.stream,
             },
-          }).then((res) => {
-            resolve(res)
           })
+          if (res instanceof Error) {
+            reject(res)
+            return
+          }
+          resolve(parseProfile(res))
         } catch (error) {
           reject(error)
         }
