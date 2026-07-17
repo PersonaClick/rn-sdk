@@ -2082,6 +2082,19 @@ __metadata:
     "@react-native-async-storage/async-storage": ^1.23.1
     "@react-native-firebase/app": ^23
     "@react-native-firebase/messaging": ^23
+    react-native-fs: ^2.20.0
+    react-native-vector-icons: ^10.3.0
+    react-native-video: ^6.4.5
+    react-native-volume-manager: ^2.0.8
+  peerDependenciesMeta:
+    react-native-fs:
+      optional: true
+    react-native-vector-icons:
+      optional: true
+    react-native-video:
+      optional: true
+    react-native-volume-manager:
+      optional: true
   languageName: unknown
   linkType: soft
 

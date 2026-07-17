@@ -17,7 +17,14 @@ jobs:
     name: Check PR
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
+
       - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Yarn cache directory
         id: yarn-cache-dir-path

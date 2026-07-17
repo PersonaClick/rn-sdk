@@ -1,3 +1,36 @@
+## 4.0.17 (2026-07-17)
+
+
+* [DEV-359] feat!(main): support expo apps, rm native module. Kudos https://github.com/ahmetkuslular (dc9762c)
+
+
+### Bug Fixes
+
+* add .js extensions to ESM imports in tests and mock native modules (41317ad)
+* **gcm:** message variability (544eb08)
+
+
+### Features
+
+* add product counters, category and collection methods; parse profile response (dc7e886)
+* **common:** bump version (ce7e70d)
+* **sdk:** bump device-info (1d1f10e)
+* **sdk:** getToken to use correct token (d07df14)
+* **sdk:** in-app push notifications (#51) (6fa0296)
+* **sdk:** include types for exclude_brands (#50) (cd1d301)
+* **sdk:** rm jest (d0cce5d)
+* **sdk:** sid token generation (4a34846)
+* **stories:** expose StoriesList/StoryViewer via /stories subpath (3b7bf5d)
+* **stories:** StoriesList opens the built-in StoryViewer itself (696e78e)
+
+
+### BREAKING CHANGES
+
+* rm react-native-device-info, dynamically import if
+needed
+
+
+
 ## 4.0.16 (2026-07-16)
 
 
