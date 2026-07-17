@@ -13,15 +13,22 @@ import {
 import { styles, DEFAULT_CONFIG, DEFAULT_COLORS, hexToRgba, getColorFromSettings } from './styles'
 import { isStoryFullyViewed } from '../../lib/stories/storage'
 import { preloadSlides, cancelAllPreloads, pausePreloading, resumePreloading } from '../../lib/stories/slidePreloader'
+import StoryViewer from './StoryViewer'
 
 /**
  * StoriesList Component
  * Horizontal scrollable list of story circles
  * 
+ * By default the list opens the full-screen story viewer itself when a circle is tapped, so a
+ * host only needs to render <StoriesList sdk code />. Set `showViewer={false}` to manage a
+ * StoryViewer yourself (use `onStoryPress` for that).
+ *
  * @param {Object} props
  * @param {Object} props.sdk - SDK instance
  * @param {string} props.code - Stories code identifier
- * @param {Function} props.onStoryPress - Callback when story is pressed
+ * @param {boolean} [props.showViewer=true] - Open the built-in StoryViewer on tap
+ * @param {Function} [props.onElementPress] - Forwarded to the built-in StoryViewer (tap on a slide element)
+ * @param {Function} [props.onStoryPress] - Called when a story circle is pressed (story, index, settings)
  * @param {Object} [props.style] - Additional styles for FlatList
  * @param {Object} [props.contentContainerStyle] - Additional styles for FlatList content container
  * @param {number} [props.iconSize] - Size of story circles
@@ -29,22 +36,26 @@ import { preloadSlides, cancelAllPreloads, pausePreloading, resumePreloading } f
  * @param {number} [props.height] - Height of the stories container
  * @param {Function} [props.onLoadComplete] - Callback when stories load
  */
-const StoriesList = forwardRef(function StoriesList({ 
-  sdk, 
-  code, 
-  onStoryPress, 
-  style, 
+const StoriesList = forwardRef(function StoriesList({
+  sdk,
+  code,
+  showViewer = true,
+  onElementPress,
+  onStoryPress,
+  style,
   contentContainerStyle,
   iconSize = DEFAULT_CONFIG.iconSize,
   iconMargin = DEFAULT_CONFIG.iconMargin,
   height = DEFAULT_CONFIG.storyHeight,
-  onLoadComplete 
+  onLoadComplete
 }, ref) {
   const [stories, setStories] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [viewedStates, setViewedStates] = useState({})
   const [settings, setSettings] = useState(null)
+  const [viewerVisible, setViewerVisible] = useState(false)
+  const [selectedStoryIndex, setSelectedStoryIndex] = useState(0)
   const preloadTimeoutRef = useRef(null)
   const appStateSubscriptionRef = useRef(null)
 
@@ -75,6 +86,22 @@ const StoriesList = forwardRef(function StoriesList({
   useImperativeHandle(ref, () => ({
     refreshViewedStates,
   }))
+
+  const handleStoryPress = useCallback((story, index) => {
+    onStoryPress?.(story, index, settings)
+    if (showViewer) {
+      setSelectedStoryIndex(index)
+      setViewerVisible(true)
+    }
+  }, [onStoryPress, settings, showViewer])
+
+  const handleViewerClose = useCallback(() => {
+    setViewerVisible(false)
+    // Viewed-slide writes settle shortly after the viewer closes; refresh the ring states then.
+    setTimeout(() => {
+      refreshViewedStates()
+    }, 300)
+  }, [refreshViewedStates])
 
   useEffect(() => {
     loadStories()
@@ -234,7 +261,7 @@ const StoriesList = forwardRef(function StoriesList({
     return (
       <Pressable
         style={[styles.storyItem, { marginHorizontal: iconMargin }]}
-        onPress={() => onStoryPress?.(story, index, settings)}
+        onPress={() => handleStoryPress(story, index)}
       >
         {/* Circle container - всегда сверху, фиксированная высота */}
         <View
@@ -349,15 +376,29 @@ const StoriesList = forwardRef(function StoriesList({
   }
 
   return (
-    <FlatList
-      data={stories}
-      renderItem={renderStoryItem}
-      keyExtractor={(story) => story.id}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={mergedContentContainerStyle}
-      style={[{ height }, style]}
-    />
+    <>
+      <FlatList
+        data={stories}
+        renderItem={renderStoryItem}
+        keyExtractor={(story) => story.id}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={mergedContentContainerStyle}
+        style={[{ height }, style]}
+      />
+      {showViewer && (
+        <StoryViewer
+          visible={viewerVisible}
+          stories={stories}
+          initialStoryIndex={selectedStoryIndex}
+          settings={settings}
+          sdk={sdk}
+          code={code}
+          onClose={handleViewerClose}
+          onElementPress={onElementPress}
+        />
+      )}
+    </>
   )
 })
 
