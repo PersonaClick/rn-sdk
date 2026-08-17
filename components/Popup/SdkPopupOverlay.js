@@ -13,7 +13,12 @@ class SdkPopupOverlaySingleton {
     this.currentPopup = null
     this.isVisible = false
     this.popupQueue = []
+    // Last SDK registered via <SdkPopupOverlay sdk={...} /> — the fallback target when a popup is
+    // shown without an explicit owner (e.g. manual/legacy paths).
     this.sdkInstance = null
+    // SDK that owns the popup currently being displayed. Set per-popup so multi-shop apps render and
+    // track against the shop that triggered the popup, not whichever instance registered last.
+    this.currentSdk = null
     this.updateCallback = null
   }
 
@@ -48,8 +53,9 @@ class SdkPopupOverlaySingleton {
   /**
    * Show popup
    * @param {Object} popupData - Popup data from server
+   * @param {Object} [sdk] - SDK instance that owns this popup (defaults to the registered SDK)
    */
-  showPopup(popupData) {
+  showPopup(popupData, sdk = null) {
     if (!popupData || !popupData.id) {
       console.warn('[SdkPopupOverlay] showPopup: invalid popup data')
       return
@@ -66,13 +72,14 @@ class SdkPopupOverlaySingleton {
       return
     }
 
-    // If there's already a popup showing, queue this one
+    // If there's already a popup showing, queue this one together with its owning SDK.
     if (this.isVisible && this.currentPopup) {
-      this.popupQueue.push(popupData)
+      this.popupQueue.push({ popupData, sdk })
       return
     }
 
     this.currentPopup = popupData
+    this.currentSdk = sdk
     this.isVisible = true
 
     // Trigger component update
@@ -97,8 +104,9 @@ class SdkPopupOverlaySingleton {
     // Show next popup from queue if any
     setTimeout(() => {
       if (this.popupQueue.length > 0) {
-        const nextPopup = this.popupQueue.shift()
-        this.currentPopup = nextPopup
+        const next = this.popupQueue.shift()
+        this.currentPopup = next.popupData
+        this.currentSdk = next.sdk
         this.isVisible = true
 
         if (this.updateCallback) {
@@ -106,6 +114,7 @@ class SdkPopupOverlaySingleton {
         }
       } else {
         this.currentPopup = null
+        this.currentSdk = null
         if (this.updateCallback) {
           this.updateCallback()
         }
@@ -114,13 +123,14 @@ class SdkPopupOverlaySingleton {
   }
 
   /**
-   * Get current popup state
+   * Get current popup state. `sdk` is the owner of the currently shown popup, falling back to the
+   * last registered SDK when no popup-scoped owner is set (manual/legacy paths).
    */
   getState() {
     return {
       currentPopup: this.currentPopup,
       isVisible: this.isVisible,
-      sdk: this.sdkInstance,
+      sdk: this.currentSdk ?? this.sdkInstance,
     }
   }
 }
@@ -197,9 +207,10 @@ export default function SdkPopupOverlay({ sdk }) {
 /**
  * Show popup programmatically (used internally by SDK).
  * @param {Object} popupData
+ * @param {Object} [sdk] - SDK instance that owns this popup (routes rendering/tracking per shop)
  */
-export function showPopup(popupData) {
-  sdkPopupOverlayInstance.showPopup(popupData)
+export function showPopup(popupData, sdk = null) {
+  sdkPopupOverlayInstance.showPopup(popupData, sdk)
 }
 
 /**
@@ -219,4 +230,8 @@ export function registerSDK(sdkInstance) {
 export async function prepareAndShow(sdkInstance, popupData, manual = false) {
   await PopupLogic.prepare(sdkInstance, popupData, manual, showPopup)
 }
+
+// Exposed for tests only — lets the per-shop popup routing (Release 2, RN-6) be exercised on a fresh
+// instance without touching the module singleton. Not part of the public API.
+export { SdkPopupOverlaySingleton }
 

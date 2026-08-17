@@ -25,6 +25,7 @@ const AsyncStorage = {
     }
     return Promise.resolve()
   },
+  getAllKeys: () => Promise.resolve(Array.from(mem.keys())),
   clearAll: () => {
     mem.clear()
     return Promise.resolve()
