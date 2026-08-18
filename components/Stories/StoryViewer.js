@@ -16,6 +16,7 @@ import StoryTimeline from './StoryTimeline.js'
 import ProductsCarousel from './ProductsCarousel'
 import { styles, getDuration, getStartSlideIndex, extractNumericId, extractSlideIdForTracking, getColorFromSettings, DEFAULT_COLORS } from './styles'
 import { markSlideAsViewed, getStartSlideIndex as getStorageStartIndex, setLastSeenSlide } from '../../lib/stories/storage'
+import { awaitInstance } from '../../lib/facade/facade'
 import { isSlidePreloaded, preloadSlide, onSlideReady, PRIORITY } from '../../lib/stories/slidePreloader'
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window')
@@ -31,7 +32,9 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window')
  * @param {number} [props.initialSlideIndex] - Initial slide index within story
  * @param {Object} [props.settings] - Stories settings from API (colors, etc.)
  * @param {Function} props.onClose - Callback when viewer is closed
- * @param {Object} props.sdk - SDK instance
+ * @param {Object} [props.sdk] - SDK instance. Optional if `shopId` is given.
+ * @param {string} [props.shopId] - Resolve the SDK by shop id through the registry (Release 3).
+ *   Ignored when an explicit `sdk` prop is passed.
  * @param {string} props.code - Stories code identifier
  * @param {Function} [props.onElementPress] - Callback when element is pressed
  */
@@ -42,10 +45,24 @@ export default function StoryViewer({
   initialSlideIndex,
   settings,
   onClose,
-  sdk,
+  sdk: sdkProp,
+  shopId,
   code,
   onElementPress,
 }) {
+  // Resolve the SDK: an explicit `sdk` prop wins; otherwise resolve by `shopId` through the registry
+  // (Release 3). Keeps the `sdk` prop working when the viewer is used standalone.
+  const [resolvedSdk, setResolvedSdk] = useState(sdkProp ?? null)
+  useEffect(() => {
+    if (sdkProp) {
+      setResolvedSdk(sdkProp)
+      return
+    }
+    if (!shopId) return
+    const cancel = awaitInstance(shopId, (instance) => setResolvedSdk(instance))
+    return cancel
+  }, [sdkProp, shopId])
+  const sdk = sdkProp ?? resolvedSdk
   const [currentStoryIndex, setCurrentStoryIndex] = useState(initialStoryIndex || 0)
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
@@ -161,7 +178,7 @@ export default function StoryViewer({
       let isActive = true
 
       // Get starting slide index from storage
-      getStorageStartIndex(storyId, slideIds, initialSlideIndex || currentStory.startPosition || 0)
+      getStorageStartIndex(storyId, slideIds, initialSlideIndex || currentStory.startPosition || 0, sdk?.shop_id)
         .then(startIndex => {
           if (!isActive || currentStoryRef.current?.id !== storyId) {
             return
@@ -331,7 +348,7 @@ export default function StoryViewer({
       if (story && story.slides && slideIndex >= 0 && slideIndex < story.slides.length) {
         const currentSlideToSave = story.slides[slideIndex]
         if (currentSlideToSave) {
-          setLastSeenSlide(story.id, currentSlideToSave.id)
+          setLastSeenSlide(story.id, currentSlideToSave.id, sdk?.shop_id)
         }
       }
 
@@ -339,7 +356,7 @@ export default function StoryViewer({
     if (story && story.slides && slideIndex >= 0 && slideIndex < story.slides.length) {
       const currentSlideToMark = story.slides[slideIndex]
       if (currentSlideToMark) {
-        markSlideAsViewed(story.id, currentSlideToMark.id)
+        markSlideAsViewed(story.id, currentSlideToMark.id, sdk?.shop_id)
       }
     }
 
@@ -605,7 +622,7 @@ export default function StoryViewer({
       if (newProgress >= 1) {
         // Mark slide as viewed when it completes (like iOS didEndDisplaying)
         if (currentStoryRef.current && currentSlide) {
-          markSlideAsViewed(currentStoryRef.current.id, currentSlide.id)
+          markSlideAsViewed(currentStoryRef.current.id, currentSlide.id, sdk?.shop_id)
         }
         
         // Reset paused step when slide completes
@@ -624,7 +641,7 @@ export default function StoryViewer({
     if (story && story.slides && slideIndex >= 0 && slideIndex < story.slides.length) {
       const currentSlideToSave = story.slides[slideIndex]
       if (currentSlideToSave) {
-        setLastSeenSlide(story.id, currentSlideToSave.id)
+        setLastSeenSlide(story.id, currentSlideToSave.id, sdk?.shop_id)
       }
     }
 
@@ -632,7 +649,7 @@ export default function StoryViewer({
     if (story && story.slides && slideIndex >= 0 && slideIndex < story.slides.length) {
       const currentSlideToMark = story.slides[slideIndex]
       if (currentSlideToMark) {
-        markSlideAsViewed(story.id, currentSlideToMark.id)
+        markSlideAsViewed(story.id, currentSlideToMark.id, sdk?.shop_id)
       }
     }
 
@@ -666,7 +683,7 @@ export default function StoryViewer({
     if (story && story.slides && slideIndex >= 0 && slideIndex < story.slides.length) {
       const currentSlideToSave = story.slides[slideIndex]
       if (currentSlideToSave) {
-        setLastSeenSlide(story.id, currentSlideToSave.id)
+        setLastSeenSlide(story.id, currentSlideToSave.id, sdk?.shop_id)
       }
     }
 
@@ -693,7 +710,7 @@ export default function StoryViewer({
     if (story && story.slides && slideIndex >= 0 && slideIndex < story.slides.length) {
       const currentSlideToSave = story.slides[slideIndex]
       if (currentSlideToSave) {
-        setLastSeenSlide(story.id, currentSlideToSave.id)
+        setLastSeenSlide(story.id, currentSlideToSave.id, sdk?.shop_id)
       }
     }
 
@@ -701,7 +718,7 @@ export default function StoryViewer({
     if (story && story.slides && slideIndex >= 0 && slideIndex < story.slides.length) {
       const currentSlideToMark = story.slides[slideIndex]
       if (currentSlideToMark) {
-        markSlideAsViewed(story.id, currentSlideToMark.id)
+        markSlideAsViewed(story.id, currentSlideToMark.id, sdk?.shop_id)
       }
     }
 
@@ -738,7 +755,7 @@ export default function StoryViewer({
     if (story && story.slides && slideIndex >= 0 && slideIndex < story.slides.length) {
       const currentSlideToSave = story.slides[slideIndex]
       if (currentSlideToSave) {
-        setLastSeenSlide(story.id, currentSlideToSave.id)
+        setLastSeenSlide(story.id, currentSlideToSave.id, sdk?.shop_id)
       }
     }
 

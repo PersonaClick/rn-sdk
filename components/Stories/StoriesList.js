@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { styles, DEFAULT_CONFIG, DEFAULT_COLORS, hexToRgba, getColorFromSettings } from './styles'
 import { isStoryFullyViewed } from '../../lib/stories/storage'
+import { awaitInstance } from '../../lib/facade/facade'
 import { preloadSlides, cancelAllPreloads, pausePreloading, resumePreloading } from '../../lib/stories/slidePreloader'
 import StoryViewer from './StoryViewer'
 
@@ -24,7 +25,9 @@ import StoryViewer from './StoryViewer'
  * StoryViewer yourself (use `onStoryPress` for that).
  *
  * @param {Object} props
- * @param {Object} props.sdk - SDK instance
+ * @param {Object} [props.sdk] - SDK instance. Optional if `shopId` is given.
+ * @param {string} [props.shopId] - Resolve the SDK by shop id through the registry (Release 3).
+ *   Ignored when an explicit `sdk` prop is passed. Use one or the other.
  * @param {string} props.code - Stories code identifier
  * @param {boolean} [props.showViewer=true] - Open the built-in StoryViewer on tap
  * @param {Function} [props.onElementPress] - Forwarded to the built-in StoryViewer (tap on a slide element)
@@ -37,7 +40,8 @@ import StoryViewer from './StoryViewer'
  * @param {Function} [props.onLoadComplete] - Callback when stories load
  */
 const StoriesList = forwardRef(function StoriesList({
-  sdk,
+  sdk: sdkProp,
+  shopId,
   code,
   showViewer = true,
   onElementPress,
@@ -49,6 +53,20 @@ const StoriesList = forwardRef(function StoriesList({
   height = DEFAULT_CONFIG.storyHeight,
   onLoadComplete
 }, ref) {
+  // Resolve the SDK: an explicit `sdk` prop wins; otherwise resolve by `shopId` through the registry
+  // (Release 3), reacting to a later registration. Keeps the `sdk` prop working.
+  const [resolvedSdk, setResolvedSdk] = useState(sdkProp ?? null)
+  useEffect(() => {
+    if (sdkProp) {
+      setResolvedSdk(sdkProp)
+      return
+    }
+    if (!shopId) return
+    const cancel = awaitInstance(shopId, (instance) => setResolvedSdk(instance))
+    return cancel
+  }, [sdkProp, shopId])
+  const sdk = sdkProp ?? resolvedSdk
+
   const [stories, setStories] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -69,7 +87,7 @@ const StoriesList = forwardRef(function StoriesList({
       const viewedStatesMap = {}
       for (const story of stories) {
         const slideIds = story.slides.map(slide => slide.id)
-        const isViewed = await isStoryFullyViewed(story.id, slideIds)
+        const isViewed = await isStoryFullyViewed(story.id, slideIds, sdk?.shop_id)
         viewedStatesMap[story.id] = isViewed
         if (__DEV__) {
         }
@@ -80,7 +98,7 @@ const StoriesList = forwardRef(function StoriesList({
     } catch (err) {
       console.warn('[StoriesList] Error refreshing viewed states:', err)
     }
-  }, [stories])
+  }, [stories, sdk])
 
   // Expose refreshViewedStates via ref
   useImperativeHandle(ref, () => ({
@@ -143,6 +161,11 @@ const StoriesList = forwardRef(function StoriesList({
 
   const loadStories = async () => {
     if (!sdk || !code) {
+      // Still resolving the SDK by shopId (Release 3): stay in loading instead of flashing an error.
+      if (!sdk && shopId && !sdkProp) {
+        setLoading(true)
+        return
+      }
       setError('SDK or code not provided')
       setLoading(false)
       return
@@ -166,7 +189,7 @@ const StoriesList = forwardRef(function StoriesList({
         const viewedStatesMap = {}
         for (const story of response.stories) {
           const slideIds = story.slides.map(slide => slide.id)
-          const isViewed = await isStoryFullyViewed(story.id, slideIds)
+          const isViewed = await isStoryFullyViewed(story.id, slideIds, sdk?.shop_id)
           viewedStatesMap[story.id] = isViewed
         }
         setViewedStates(viewedStatesMap)

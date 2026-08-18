@@ -116,6 +116,7 @@ jest.mock('../lib/client.js', () => ({
   updPushData: jest.fn().mockResolvedValue(undefined),
   removePushMessage: jest.fn().mockResolvedValue(undefined),
   getData: jest.fn().mockResolvedValue(null),
+  migrateLegacyIdentity: jest.fn().mockResolvedValue(undefined),
   generateSid: jest.fn(() => 'sid-1'),
   getSavedPushToken: jest.fn().mockResolvedValue(null),
   savePushToken: jest.fn().mockResolvedValue(undefined),
@@ -124,6 +125,11 @@ jest.mock('../lib/client.js', () => ({
 }))
 
 const MainSDK = require('../MainSDK.js').default
+// Push install/routing is process-global (PushRouter singleton) and MainSDK registers itself in the
+// SdkRegistry singleton — reset both before each test so every test freshly installs and routes to
+// its own instance (no shop_id in these payloads → single-instance fallback).
+const SdkRegistry = require('../lib/registry/SdkRegistry').default
+const PushRouter = require('../lib/push/PushRouter').default
 
 // ---------------------------------------------------------------------------
 // Factory — keeps the real PushOrchestrator to exercise the callback closure
@@ -145,6 +151,12 @@ function createSdkWithRealOrchestrator() {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+// Reset process-global push state before every test (runs before each describe's own beforeEach).
+beforeEach(() => {
+  SdkRegistry.reset()
+  PushRouter.reset()
+})
 
 describe('initPush callback wiring — click', () => {
   let capturedOnNotifOpenedHandler

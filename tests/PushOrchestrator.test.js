@@ -1,4 +1,15 @@
 import PushOrchestrator from '../lib/push/PushOrchestrator.js'
+import SdkRegistry from '../lib/registry/SdkRegistry.js'
+import PushRouter from '../lib/push/PushRouter.js'
+
+// Install + cold-start now live in the process-global PushRouter, which routes each event to the
+// instance its shop_id names via the SdkRegistry. `installSubscriptions()` delegates to it. These
+// tests register the orchestrator's owning SDK so the router routes back to it (payloads carry no
+// shop_id → single-instance fallback), and reset both singletons before each test.
+beforeEach(() => {
+  SdkRegistry.reset()
+  PushRouter.reset()
+})
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -46,6 +57,8 @@ function makeOrchestrator(overrides = {}) {
   }
 
   const orchestrator = new PushOrchestrator(deps)
+  // Register the orchestrator's owning SDK so the router can route events back to it.
+  SdkRegistry.register(deps.getShopId(), { _pushOrchestrator: orchestrator })
   return { orchestrator, deps, messaging }
 }
 
@@ -214,7 +227,7 @@ describe('PushOrchestrator.installSubscriptions — subscription setup', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
     const result = await orchestrator.installSubscriptions()
     expect(result).toBe(false)
-    expect(orchestrator._subscriptionsInstalled).toBe(false)
+    expect(PushRouter._installed).toBe(false)
     expect(deps.onMessage).not.toHaveBeenCalled()
     warnSpy.mockRestore()
   })
@@ -230,11 +243,11 @@ describe('PushOrchestrator.installSubscriptions — subscription setup', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
 
     expect(await orchestrator.installSubscriptions()).toBe(false)
-    expect(orchestrator._subscriptionsInstalled).toBe(false)
+    expect(PushRouter._installed).toBe(false)
     expect(deps.onMessage).not.toHaveBeenCalled()
 
     expect(await orchestrator.installSubscriptions()).toBe(true)
-    expect(orchestrator._subscriptionsInstalled).toBe(true)
+    expect(PushRouter._installed).toBe(true)
     expect(deps.onMessage).toHaveBeenCalledTimes(1)
 
     warnSpy.mockRestore()
@@ -259,7 +272,7 @@ describe('PushOrchestrator.installSubscriptions — subscription setup', () => {
     })
     const result = await orchestrator.installSubscriptions()
     expect(result).toBe(false)
-    expect(orchestrator._subscriptionsInstalled).toBe(false)
+    expect(PushRouter._installed).toBe(false)
   })
 })
 
@@ -664,7 +677,7 @@ describe('PushOrchestrator — FCM cold-start (getInitialNotification)', () => {
     })
     await orchestrator.installSubscriptions()
     expect(deps.defaultClickListener).not.toHaveBeenCalled()
-    orchestrator._cancelColdStartRetry()
+    PushRouter.reset() // cancel the pending cold-start retry the router scheduled
   })
 
   test('processes FCM cold-start only once across multiple installSubscriptions calls', async () => {
@@ -857,7 +870,7 @@ describe('PushOrchestrator — notifee cold-start', () => {
     const { orchestrator, deps } = makeOrchestrator()
     await orchestrator.installSubscriptions()
     expect(deps.defaultClickListener).not.toHaveBeenCalled()
-    orchestrator._cancelColdStartRetry()
+    PushRouter.reset() // cancel the pending cold-start retry the router scheduled
   })
 })
 

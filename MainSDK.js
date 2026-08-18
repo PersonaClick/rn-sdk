@@ -7,6 +7,7 @@ import { getPushData } from './lib/client'
 import { updPushData } from './lib/client'
 import { removePushMessage } from './lib/client'
 import { getData } from './lib/client'
+import { migrateLegacyIdentity } from './lib/client'
 import { generateSid } from './lib/client'
 import { getSavedPushToken } from './lib/client'
 import { savePushToken } from './lib/client'
@@ -33,6 +34,7 @@ import { EventType } from '@notifee/react-native'
 import { AuthorizationStatus } from '@notifee/react-native'
 import { SDK_PUSH_CHANNEL } from './index'
 import PushOrchestrator from './lib/push/PushOrchestrator'
+import displayPush from './lib/push/displayPush'
 import Performer from './lib/performer'
 import { blankSearchRequest } from './utils'
 import { isOverOneWeekAgo } from './utils'
@@ -47,6 +49,7 @@ import PopupLogic from './lib/popup'
 import { buildTrackCustomEventParams } from './lib/buildTrackCustomEventParams'
 import { buildPurchasePredictQueryParams } from './lib/buildPurchasePredictQueryParams'
 import { buildPurchaseTrackingParams } from './lib/buildPurchaseTrackingParams.js'
+import SdkRegistry from './lib/registry/SdkRegistry'
 
 /** Minimum allowed NPS/review rate (1–10). */
 const REVIEW_RATE_MIN = 1
@@ -156,7 +159,10 @@ class MainSDK extends Performer {
     this.userSeance = ''
     this.segment = ''
     this.initialized = false
-    DEBUG = debug
+    // DEBUG is a process-global logging flag shared by every instance (and read by lib/client).
+    // With multiple shops it is sticky-on: enabling debug on any instance turns it on for all, and a
+    // later instance constructed without debug does not turn it back off (was last-writer-wins).
+    if (debug) DEBUG = true
     this._push_type = null
     this.push_payload = []
     this.lastMessageIds = []
@@ -219,6 +225,13 @@ class MainSDK extends Performer {
       },
       isDebug: () => DEBUG,
     })
+
+    // Multi-instance groundwork (Release 1): make this instance reachable by `shop_id` through the
+    // process-wide registry. No public surface yet and single-instance behaviour is unchanged — the
+    // host still holds its own reference. A re-init for the same shop replaces the mapping.
+    if (this.shop_id && typeof this.shop_id === 'string') {
+      SdkRegistry.register(this.shop_id, this)
+    }
   }
 
   /**
@@ -430,7 +443,12 @@ class MainSDK extends Performer {
 
         // JS SDK behavior: initialize segment before init request
         await this.initializeSegment()
-        
+
+        // One-time adoption of a pre-partition (v1) install's identity into this shop's partition, so
+        // an existing single-shop user keeps their did on upgrade instead of being re-registered by the
+        // server. Runs before the identity read below, so the first /init goes out with the old did.
+        await migrateLegacyIdentity(this.shop_id)
+
         const storageData = await getData(this.shop_id)
         if (DEBUG) console.log('[SDK Init] Storage data:', storageData)
         
@@ -438,29 +456,18 @@ class MainSDK extends Performer {
         
         let did = ''
 
-        // First try to get did from cache
+        // Device-id policy (parity with the Android/iOS/web SDKs): never seed the did with a
+        // hardware id. The did comes from the per-shop cache, or an explicit host-provided
+        // `deviceInfo.id`; otherwise it stays empty and the first `/init` goes out with no did, so the
+        // server assigns one — distinct per shop_id. Seeding a device-global id (getAndroidId /
+        // syncUniqueId) made every shop on a device share one did/seance, breaking multi-instance
+        // isolation. The server-assigned did is persisted per shop (updSeance below), so existing
+        // installs keep their did and are never silently re-identified.
         if (storageData?.did) {
           did = storageData.did
           if (DEBUG) console.log('[SDK Init] Using cached device ID for request:', did)
         } else if (this.deviceInfo && this.deviceInfo.id) {
           did = this.deviceInfo.id
-        } else {
-          try {
-            const DeviceInfo = await import('react-native-device-info')
-            did =
-              Platform.OS === 'android'
-                ? await DeviceInfo.getAndroidId()
-                : (await DeviceInfo.syncUniqueId()) || ''
-          } catch (e) {
-            console.error(
-              `Device ID is not present in init args, but also 'react-native-device-info' is not present: ${JSON.stringify(
-                e,
-                undefined,
-                2
-              )}`
-            )
-            did = ''
-          }
         }
 
         const params = {
@@ -1832,6 +1839,10 @@ class MainSDK extends Performer {
       id: SDK_PUSH_CHANNEL,
       name: 'RNSDK channel',
       importance: AndroidImportance.HIGH,
+      // Keep in sync with displayPush's channel — without an explicit sound the channel is silent
+      // (Notifee default) and pushes only vibrate. Frozen after first creation → reinstall to apply.
+      sound: 'default',
+      vibration: true,
     })
   }
 
@@ -1922,33 +1933,9 @@ class MainSDK extends Performer {
       code: message.data.id,
       type: message.data.type,
     })
-    await this.initPushChannel()
-    const data = {
-      ...(message.messageId && { message_id: message.messageId }),
-      ...(message.data.id && { id: message.data.id }),
-      ...(message.data.type && { type: message.data.type }),
-      ...(message.data.icon && { icon: message.data.icon }),
-      ...(message.data.image_url && { image: message.data.image_url }),
-      ...(message.data.image && { image: message.data.image }),
-      ...(message.from && { from: message.from }),
-      ...(message.sentTime && { sentTime: `${message.sentTime}` }),
-      ...(message.ttl && { ttl: `${message.ttl}` }),
-    }
-    const android = {
-      channelId: SDK_PUSH_CHANNEL,
-      pressAction: { id: 'default' },
-      ...(message.data.icon && { largeIcon: message.data.icon }),
-      ...(message.data.image && {
-        type: AndroidStyle.BIGPICTURE,
-        picture: message.data.image,
-      }),
-    }
-    await notifee.displayNotification({
-      title: message.data.title,
-      body: message.data.body,
-      data,
-      android,
-    })
+    // Rendering lives in displayPush (shared with the PushRouter's pending-shop path) so a live shop
+    // and a not-yet-initialized shop show identical notifications.
+    await displayPush(message)
   }
 
   /**

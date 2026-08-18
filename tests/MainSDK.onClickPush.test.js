@@ -54,6 +54,7 @@ jest.mock('../lib/client.js', () => ({
   updPushData: jest.fn().mockResolvedValue(undefined),
   removePushMessage: (...args) => mockRemovePushMessage(...args),
   getData: jest.fn().mockResolvedValue(null),
+  migrateLegacyIdentity: jest.fn().mockResolvedValue(undefined),
   generateSid: jest.fn(() => 'sid-1'),
   getSavedPushToken: jest.fn().mockResolvedValue(null),
   savePushToken: jest.fn().mockResolvedValue(undefined),

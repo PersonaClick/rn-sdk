@@ -1,3 +1,43 @@
+## 4.0.18 (2026-08-17)
+
+
+* [DEV-359] feat!(main): support expo apps, rm native module. Kudos https://github.com/ahmetkuslular (dc9762c)
+
+
+### Bug Fixes
+
+* add .js extensions to ESM imports in tests and mock native modules (41317ad)
+* **deps:** bump axios to 0.33.0 (de5d23b)
+* **deps:** widen firebase peer range to support host v24 (7aababe)
+* **gcm:** message variability (544eb08)
+
+
+### Features
+
+* add product counters, category and collection methods; parse profile response (dc7e886)
+* **common:** bump version (ce7e70d)
+* **push:** single process-wide router that routes pushes by shop_id (5c0d88d)
+* **rn:** multi-instance push routing, per-shop identity, demo + E2E (10e1641)
+* **sdk:** bump device-info (1d1f10e)
+* **sdk:** getToken to use correct token (d07df14)
+* **sdk:** in-app push notifications (#51) (6fa0296)
+* **sdk:** include types for exclude_brands (#50) (cd1d301)
+* **sdk:** partition per-shop UI state — stories-viewed and popup overlay (4b73088)
+* **sdk:** public multi-instance facade and push handoff (0f0d3bb)
+* **sdk:** registry and pure resolvers, register each instance by shop_id (0bd3c18)
+* **sdk:** rm jest (d0cce5d)
+* **sdk:** sid token generation (4a34846)
+* **stories:** expose StoriesList/StoryViewer via /stories subpath (3b7bf5d)
+* **stories:** StoriesList opens the built-in StoryViewer itself (696e78e)
+
+
+### BREAKING CHANGES
+
+* rm react-native-device-info, dynamically import if
+needed
+
+
+
 ## 4.0.17 (2026-07-17)
 
 
