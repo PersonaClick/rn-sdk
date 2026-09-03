@@ -1,7 +1,7 @@
 module.exports = {
   preset: 'react-native',
   rootDir: __dirname,
-  testMatch: ['<rootDir>/tests/**/*.test.js'],
+  testMatch: ['<rootDir>/tests/**/*.test.js', '<rootDir>/lib/tests/**/*.test.js'],
   transformIgnorePatterns: [
     'node_modules/(?!(react-native|@react-native|@react-native-firebase|@notifee|react-native-device-info|axios)/)',
   ],

@@ -42,4 +42,5 @@ export interface PurchaseTrackingRequest {
   recommendedSource?: Record<string, unknown>
   stream?: string
   segment?: string
+  isGiftPackage?: boolean
 }
