@@ -1,3 +1,66 @@
+## 4.0.20 (2026-09-30)
+
+
+* [DEV-359] feat!(main): support expo apps, rm native module. Kudos https://github.com/ahmetkuslular (dc9762c)
+
+
+### Bug Fixes
+
+* add .js extensions to ESM imports in tests and mock native modules (41317ad)
+* **deps:** bump axios to 0.33.0 (de5d23b)
+* **deps:** widen firebase peer range to support host v24 (7aababe)
+* **gcm:** message variability (544eb08)
+* **request:** keep reserved characters in query values (85bdcbc)
+* **ui:** cards in a row share a baseline, loader replaces count and load more (1769a51)
+* **ui:** follow the design file — button radii, LG height, input fill, loader slot (286df2b), closes #F2F2F2
+* **ui:** in-app popup cross, buttons and shadow as in the finished design (168b864)
+* **ui:** instant search clear cross clears the query (431ce56)
+* **ui:** search results show "no results" only when there are none (da034d0)
+* **ui:** tokens follow the design file's variables again (96a5879), closes #F2F2F2 #0D0D0 #1A1A1 #0D0D0
+
+
+### Features
+
+* add product counters, category and collection methods; parse profile response (dc7e886)
+* **common:** bump version (ce7e70d)
+* **push:** single process-wide router that routes pushes by shop_id (5c0d88d)
+* **rn:** multi-instance push routing, per-shop identity, demo + E2E (10e1641)
+* **sdk:** a popup with no known position comes out fullscreen (4099996)
+* **sdk:** bump device-info (1d1f10e)
+* **sdk:** getToken to use correct token (d07df14)
+* **sdk:** in-app push notifications (#51) (6fa0296)
+* **sdk:** include types for exclude_brands (#50) (cd1d301)
+* **sdk:** partition per-shop UI state — stories-viewed and popup overlay (4b73088)
+* **sdk:** public multi-instance facade and push handoff (0f0d3bb)
+* **sdk:** registry and pure resolvers, register each instance by shop_id (0bd3c18)
+* **sdk:** rm jest (d0cce5d)
+* **sdk:** send gift_package on purchase (dfeaa23)
+* **sdk:** sid token generation (4a34846)
+* **stories:** expose StoriesList/StoryViewer via /stories subpath (3b7bf5d)
+* **stories:** StoriesList opens the built-in StoryViewer itself (696e78e)
+* **ui:** card press, product press passthrough, title button toggles (9a5154c)
+* **ui:** design system tokens and base components (525e59d)
+* **ui:** empty state in the catalogue (e107a01)
+* **ui:** in-app popup component (3ceac52)
+* **ui:** instant search and filters screens, text link (1ccc794)
+* **ui:** instant search field and search results screen bound to the SDK (a069588)
+* **ui:** move the design system off the package root to internal/ui (477cc3f)
+* **ui:** price bounds as placeholders in the search filters (93418e9)
+* **ui:** product card follows the image aspect, carousel old price 16/24 (47c9140)
+* **ui:** product card, product image and favorites badge (d62caf0), closes #E51919
+* **ui:** product lists and recommender block (1b45599)
+* **ui:** search suggestions and catalogue screen, plus the arrow-rotate-cw icon (673f568)
+* **ui:** theme provider so a host can rebrand the design system (6ee13d2)
+* **ui:** toast and loyalty card (629900c)
+
+
+### BREAKING CHANGES
+
+* rm react-native-device-info, dynamically import if
+needed
+
+
+
 ## 4.0.19 (2026-09-03)
 
 
