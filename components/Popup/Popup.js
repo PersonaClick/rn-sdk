@@ -12,7 +12,10 @@ import {
   Linking,
   ScrollView,
 } from 'react-native'
-import PopupLogic from '../../lib/popup'
+// Core SafeAreaView, imported by path: the `react-native` index getter logs a deprecation warning
+// for it, and the SDK has no safe-area dependency of its own. On Android it is a plain View.
+import SafeAreaView from 'react-native/Libraries/Components/SafeAreaView/SafeAreaView'
+import PopupLogic, { POPUP_POSITION_FULLSCREEN } from '../../lib/popup'
 import { DEBUG } from '../../MainSDK'
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window')
@@ -21,6 +24,10 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window')
  * Popup Component
  * Displays popup using native React Native components (like Android/iOS SDK)
  * Uses structured data from components and popupActions instead of HTML
+ *
+ * Positions "centered", "fixed_bottom" and "top" (and slide_*) are cards over a dimmed backdrop;
+ * a popup with no position or one this SDK does not know takes the whole screen, as on Android:
+ * the image on top, the text under it, the buttons at the bottom and the cross in the corner.
  * 
  * @param {Object} props
  * @param {boolean} props.visible - Whether popup is visible
@@ -33,7 +40,8 @@ export default function Popup({ visible, popupData, onClose, sdk }) {
   const fadeAnim = useRef(new Animated.Value(0)).current
 
   const popupId = popupData?.id
-  const position = popupData?.position || 'fixed_bottom'
+  const position = PopupLogic.resolvePosition(popupData?.position)
+  const fullScreen = position === POPUP_POSITION_FULLSCREEN
   const components = PopupLogic.parseComponents(popupData?.components)
   const popupActions = PopupLogic.parsePopupActions(popupData?.popup_actions)
 
@@ -226,6 +234,89 @@ export default function Popup({ visible, popupData, onClose, sdk }) {
     return null
   }
 
+  // Close button (X)
+  const closeButton = (
+    <TouchableOpacity
+      style={styles.closeButton}
+      onPress={handleClose}
+      testID="sdk-popup-close"
+    >
+      <Text style={styles.closeButtonText}>×</Text>
+    </TouchableOpacity>
+  )
+
+  const buttons = (
+    <View style={styles.buttonsContainer}>
+      {confirmButtonText && (
+        <TouchableOpacity
+          style={[styles.button, styles.confirmButton]}
+          onPress={handleConfirmClick}
+        >
+          <Text style={styles.confirmButtonText}>{confirmButtonText}</Text>
+        </TouchableOpacity>
+      )}
+
+      {declineButtonText && (
+        <TouchableOpacity
+          style={[styles.button, styles.declineButton]}
+          onPress={handleClose}
+        >
+          <Text style={styles.declineButtonText}>{declineButtonText}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  )
+
+  if (fullScreen) {
+    // Same layout as Android's FullScreenDialog. The white ground fills the whole screen; the
+    // content sits inside the safe area, so the cross stays clear of the status bar and notch.
+    return (
+      <Modal
+        visible={visible}
+        transparent
+        animationType="none"
+        onRequestClose={handleClose}
+      >
+        <Animated.View style={[styles.fullScreen, { opacity: fadeAnim }]}>
+          <SafeAreaView style={styles.fullScreenSafeArea}>
+            <View style={styles.fullScreenContent}>
+              {imageUrl && (
+                <Image
+                  source={{ uri: imageUrl }}
+                  style={styles.fullScreenImage}
+                  resizeMode="cover"
+                />
+              )}
+
+              {/* Text takes the space between the image and the buttons; long text scrolls. */}
+              <ScrollView
+                style={styles.fullScreenText}
+                contentContainerStyle={[
+                  styles.fullScreenTextContent,
+                  // Without an image the cross lies over the text: start below it.
+                  !imageUrl && styles.fullScreenTextUnderClose,
+                ]}
+                showsVerticalScrollIndicator={false}
+              >
+                {title ? (
+                  <Text style={styles.title}>{title}</Text>
+                ) : null}
+
+                {message ? (
+                  <Text style={styles.message}>{message}</Text>
+                ) : null}
+              </ScrollView>
+
+              <View style={styles.fullScreenButtons}>{buttons}</View>
+
+              {closeButton}
+            </View>
+          </SafeAreaView>
+        </Animated.View>
+      </Modal>
+    )
+  }
+
   return (
     <Modal
       visible={visible}
@@ -243,14 +334,7 @@ export default function Popup({ visible, popupData, onClose, sdk }) {
             style={styles.modalContent}
             onStartShouldSetResponder={() => true}
           >
-            {/* Close button (X) */}
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={handleClose}
-              testID="sdk-popup-close"
-            >
-              <Text style={styles.closeButtonText}>×</Text>
-            </TouchableOpacity>
+            {closeButton}
 
             <ScrollView 
               style={styles.scrollView}
@@ -278,25 +362,7 @@ export default function Popup({ visible, popupData, onClose, sdk }) {
                 ) : null}
 
                 {/* Buttons */}
-                <View style={styles.buttonsContainer}>
-                  {confirmButtonText && (
-                    <TouchableOpacity
-                      style={[styles.button, styles.confirmButton]}
-                      onPress={handleConfirmClick}
-                    >
-                      <Text style={styles.confirmButtonText}>{confirmButtonText}</Text>
-                    </TouchableOpacity>
-                  )}
-                  
-                  {declineButtonText && (
-                    <TouchableOpacity
-                      style={[styles.button, styles.declineButton]}
-                      onPress={handleClose}
-                    >
-                      <Text style={styles.declineButtonText}>{declineButtonText}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+                {buttons}
               </View>
             </ScrollView>
           </View>
@@ -417,5 +483,32 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 16,
     fontWeight: '500',
+  },
+  fullScreen: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  fullScreenSafeArea: {
+    flex: 1,
+  },
+  fullScreenContent: {
+    flex: 1,
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: 200,
+  },
+  fullScreenText: {
+    flex: 1,
+  },
+  fullScreenTextContent: {
+    padding: 20,
+  },
+  fullScreenTextUnderClose: {
+    paddingTop: 40,
+  },
+  fullScreenButtons: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
 })

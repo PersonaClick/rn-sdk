@@ -1,4 +1,5 @@
 import { SdkPopupOverlaySingleton } from '../components/Popup/SdkPopupOverlay.js'
+import PopupLogic, { POPUP_POSITION_FULLSCREEN } from '../lib/popup.js'
 
 // Release 2 (RN-6): the popup overlay renders and tracks against the SDK that triggered the popup,
 // not whichever instance registered last. Exercised on a fresh singleton so the module-global one
@@ -57,5 +58,36 @@ describe('SdkPopupOverlay — per-shop routing', () => {
   test('no owner and nothing registered yields a null sdk (overlay renders nothing)', () => {
     const overlay = new SdkPopupOverlaySingleton()
     expect(overlay.getState().sdk).toBeNull()
+  })
+})
+
+// The popup UI lays out the positions it knows; anything else comes out fullscreen, as on Android
+// (it used to fall back to fixed_bottom).
+describe('Popup — position routing', () => {
+  test.each(['centered', 'fixed_bottom', 'top', 'slide_right', 'slide_left'])(
+    'known position %s keeps its layout',
+    (position) => {
+      expect(PopupLogic.resolvePosition(position)).toBe(position)
+    },
+  )
+
+  test.each([
+    ['a missing', undefined],
+    ['a null', null],
+    ['an empty', ''],
+    ['an unknown', 'full_screen'],
+    ['a differently cased', 'Centered'],
+  ])('%s position comes out fullscreen', (_, position) => {
+    expect(PopupLogic.resolvePosition(position)).toBe(POPUP_POSITION_FULLSCREEN)
+  })
+
+  test('the overlay hands a popup without a position to the UI as it came', () => {
+    const overlay = new SdkPopupOverlaySingleton()
+    const noPosition = popup(1)
+
+    overlay.showPopup(noPosition, sdk('shop-a'))
+
+    expect(overlay.getState().currentPopup).toBe(noPosition)
+    expect(PopupLogic.resolvePosition(overlay.getState().currentPopup.position)).toBe(POPUP_POSITION_FULLSCREEN)
   })
 })
