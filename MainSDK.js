@@ -9,6 +9,8 @@ import { removePushMessage } from './lib/client'
 import { getData } from './lib/client'
 import { migrateLegacyIdentity } from './lib/client'
 import { generateSid } from './lib/client'
+import { setShopRefused } from './lib/client'
+import { knownOffline, waitForReconnect } from './lib/network'
 import { getSavedPushToken } from './lib/client'
 import { savePushToken } from './lib/client'
 import { getLastPushTokenSentDate } from './lib/client'
@@ -66,6 +68,51 @@ const SOURCE_STORAGE_KEYS = {
 
 const PUSH_PERMISSION_WAIT_TIMEOUT_MS = 12000
 const PUSH_PERMISSION_STATE_WAIT_POLL_MS = 200
+
+// A failed /init is retried this many times, waiting INIT_RETRY_DELAY_MS longer before each retry
+// (1 s, 2 s, ... 5 s) — the same policy as the Android SDK.
+const INIT_MAX_RETRIES = 5
+const INIT_RETRY_DELAY_MS = 1000
+// An /init hanging without an error must not hold the SDK: past this it counts as a network error.
+const INIT_TIMEOUT_MS = 10000
+// 4xx statuses that mean "later", not "no".
+const RETRYABLE_CLIENT_STATUSES = [408, 429]
+
+/**
+ * What an /init answer means. 'ok' — a did came. 'refused' — the server said no: a 4xx (other than
+ * 408/429) or an error body; asking again will not help. 'failed' — anything else, worth retrying:
+ * no answer, a timeout, a 5xx, a 408/429, a page without a did (a captive portal answers 200 HTML).
+ * @param {any} response what lib/client `request` returned
+ * @returns {'ok'|'refused'|'failed'}
+ */
+function initOutcome(response) {
+  if (response instanceof Error) {
+    const status = response.response?.status
+    const clientError = status >= 400 && status < 500
+    return clientError && !RETRYABLE_CLIENT_STATUSES.includes(status) ? 'refused' : 'failed'
+  }
+  if (response?.did) return 'ok'
+  if (response && typeof response === 'object' && response.message) return 'refused'
+  return 'failed'
+}
+
+/**
+ * The error every call of a shop gets once its /init was refused: names the shop and the server's
+ * reason instead of a bare "Request failed with status code 404".
+ * @param {string} shop_id
+ * @param {Error|object} failure the axios error or the error body
+ * @returns {Error}
+ */
+function initRefusal(shop_id, failure) {
+  const status = failure?.response?.status
+  const reason = failure?.response?.data?.message || failure?.message || 'unknown reason'
+  const refusal = new Error(
+    `Requests of shop ${shop_id} are not sent: init was refused${status ? ` (HTTP ${status})` : ''}: ${reason}`
+  )
+  refusal.name = 'Init error'
+  refusal.cause = failure
+  return refusal
+}
 
 /**
  * Reads saved source params from AsyncStorage. If valid (within 48h), returns { source: { from, code } }; otherwise clears storage and returns {}.
@@ -239,7 +286,12 @@ class MainSDK extends Performer {
    * @returns {void}
    */
   perform(command) {
-    command()
+    // One broken command must not stop the queue: the ones after it would wait forever.
+    try {
+      command()
+    } catch (error) {
+      console.error('[SDK] Command failed:', error)
+    }
   }
 
   /**
@@ -420,113 +472,24 @@ class MainSDK extends Performer {
    */
   init() {
     ;(async () => {
+      // A new init gives a refused shop another chance.
+      setShopRefused(this.shop_id, null)
+      if (DEBUG) console.log('[SDK Init] Starting initialization...')
+
+      const configError = this._initConfigError()
+      if (configError) {
+        // No request of this shop can work: settle every call at once, send nothing.
+        this._refuse(configError)
+        return configError
+      }
+      if (DEBUG) console.log('[SDK Init] Shop ID:', this.shop_id, 'Stream:', this.stream)
+
       try {
-        if (DEBUG) console.log('[SDK Init] Starting initialization...')
-        
-        if (!this.shop_id || typeof this.shop_id !== 'string') {
-          const initError = new Error(
-            'Parameter "shop_id" is required as a string.'
-          )
-          initError.name = 'Init error'
-          if (DEBUG) console.error('[SDK Init] Error:', initError)
-          throw initError
-        }
-
-        if (this.stream && typeof this.stream !== 'string') {
-          const streamError = new Error('Parameter "stream" must be a string.')
-          streamError.name = 'Init error'
-          if (DEBUG) console.error('[SDK Init] Error:', streamError)
-          throw streamError
-        }
-        
-        if (DEBUG) console.log('[SDK Init] Shop ID:', this.shop_id, 'Stream:', this.stream)
-
-        // JS SDK behavior: initialize segment before init request
-        await this.initializeSegment()
-
-        // One-time adoption of a pre-partition (v1) install's identity into this shop's partition, so
-        // an existing single-shop user keeps their did on upgrade instead of being re-registered by the
-        // server. Runs before the identity read below, so the first /init goes out with the old did.
-        await migrateLegacyIdentity(this.shop_id)
-
-        const storageData = await getData(this.shop_id)
-        if (DEBUG) console.log('[SDK Init] Storage data:', storageData)
-        
-        if (DEBUG) console.log('[SDK Init] Making init request to API...')
-        
-        let did = ''
-
-        // Device-id policy (parity with the Android/iOS/web SDKs): never seed the did with a
-        // hardware id. The did comes from the per-shop cache, or an explicit host-provided
-        // `deviceInfo.id`; otherwise it stays empty and the first `/init` goes out with no did, so the
-        // server assigns one — distinct per shop_id. Seeding a device-global id (getAndroidId /
-        // syncUniqueId) made every shop on a device share one did/seance, breaking multi-instance
-        // isolation. The server-assigned did is persisted per shop (updSeance below), so existing
-        // installs keep their did and are never silently re-identified.
-        if (storageData?.did) {
-          did = storageData.did
-          if (DEBUG) console.log('[SDK Init] Using cached device ID for request:', did)
-        } else if (this.deviceInfo && this.deviceInfo.id) {
-          did = this.deviceInfo.id
-        }
-
-        const params = {
-          shop_id: this.shop_id,
-          stream: this.stream,
-        }
-        if (did) {
-          params.did = did
-        }
-
-        const response = await request('init', this.shop_id, { params })
-        
-        if (DEBUG) console.log('[SDK Init] API response:', JSON.stringify(response, null, 2))
-        
-        // Check if response is an error
-        if (response instanceof Error || (response && response.message)) {
-          const error = response instanceof Error ? response : new Error(response.message || 'Init request failed')
-          if (DEBUG) console.error('[SDK Init] API error:', error)
-          this.initialized = false
-          throw error
-        }
-
-        if (!response || !response.did) {
-          const error = new Error('Invalid response from init: missing device ID')
-          if (DEBUG) console.error('[SDK Init] Error:', error, 'Response:', response)
-          this.initialized = false
-          throw error
-        }
-
-        const didToUse = response.did
-        this.deviceId = didToUse
-        this.userSeance = response?.seance || response?.sid || ''
-        if (!this.segment && response?.segment) {
-          this.segment = response.segment
-        }
-
-        if (DEBUG) console.log('[SDK Init] Updating session...')
-        await updSeance(this.shop_id, didToUse, response?.seance)
-        
-        this.initialized = true
-        if (DEBUG) console.log('[SDK Init] SDK initialized successfully!')
-        
-        // Log full response for debugging
-        if (DEBUG) console.log('[SDK Init] Full response before popup check:', JSON.stringify(response, null, 2))
-        
-        // Check for popup in init response
-        if (DEBUG) console.log('[SDK Init] Checking for popup in response...')
-        await this.checkAndShowPopup(response)
-        
-        // Initialize messaging after SDK is initialized
-        this._initMessaging()
-        this.performQueue()
-        if (this.isInit() && this.autoSendPushToken) {
-          // Explicitly request push permission and register token on init.
-          // This will show the system prompt on first launch if needed.
-          await this.initPush()
-        }
+        const response = await this._requestInit()
+        if (response) await this._initSucceeded(response)
       } catch (error) {
-        this.initialized = false
+        // Not initialized unless /init succeeded; either way calls must not wait.
+        this._releaseQueue()
         console.error('[SDK Init] Initialization failed:', error)
         if (DEBUG) {
           console.error('[SDK Init] Error details:', {
@@ -541,9 +504,180 @@ class MainSDK extends Performer {
   }
 
   /**
+   * @returns {Error|null} what is wrong with the shop_id / stream the SDK was built with
+   */
+  _initConfigError() {
+    let message = null
+    if (!this.shop_id || typeof this.shop_id !== 'string') {
+      message = 'Parameter "shop_id" is required as a string.'
+    } else if (this.stream && typeof this.stream !== 'string') {
+      message = 'Parameter "stream" must be a string.'
+    }
+    if (!message) return null
+    const error = new Error(message)
+    error.name = 'Init error'
+    return error
+  }
+
+  /**
+   * Sends /init until it brings a did or a final answer. Offline (as NetInfo knows) it is not sent at
+   * all — it goes out when the network is back. No answer, a timeout, a 5xx, a 408/429 or a page
+   * without a did are retried INIT_MAX_RETRIES times; once they run out, the next reconnect starts
+   * over (with NetInfo; without it the SDK stays uninitialized until the next launch). Calls never
+   * wait for any of this: the queue is released on the first miss.
+   * @returns {Promise<object|null>} the init response with a did, or null — refused, given up, or a
+   *   later SDK for the same shop took over
+   */
+  async _requestInit() {
+    // JS SDK behavior: initialize segment before init request
+    await this.initializeSegment()
+
+    // One-time adoption of a pre-partition (v1) install's identity into this shop's partition, so
+    // an existing single-shop user keeps their did on upgrade instead of being re-registered by the
+    // server. Runs before the identity read below, so the first /init goes out with the old did.
+    await migrateLegacyIdentity(this.shop_id)
+
+    const storageData = await getData(this.shop_id)
+    if (DEBUG) console.log('[SDK Init] Storage data:', storageData)
+
+    let did = ''
+
+    // Device-id policy (parity with the Android/iOS/web SDKs): never seed the did with a
+    // hardware id. The did comes from the per-shop cache, or an explicit host-provided
+    // `deviceInfo.id`; otherwise it stays empty and the first `/init` goes out with no did, so the
+    // server assigns one — distinct per shop_id. Seeding a device-global id (getAndroidId /
+    // syncUniqueId) made every shop on a device share one did/seance, breaking multi-instance
+    // isolation. The server-assigned did is persisted per shop (updSeance below), so existing
+    // installs keep their did and are never silently re-identified.
+    if (storageData?.did) {
+      did = storageData.did
+      if (DEBUG) console.log('[SDK Init] Using cached device ID for request:', did)
+    } else if (this.deviceInfo && this.deviceInfo.id) {
+      did = this.deviceInfo.id
+    }
+
+    const params = {
+      shop_id: this.shop_id,
+      stream: this.stream,
+    }
+    if (did) {
+      params.did = did
+    }
+
+    let retries = 0
+    for (;;) {
+      if (this._superseded()) return null
+      if (await knownOffline()) {
+        this._releaseQueue()
+        if (DEBUG) console.log('[SDK Init] Offline: init waits for the network')
+        await waitForReconnect()
+        retries = 0
+        continue
+      }
+
+      if (DEBUG) console.log('[SDK Init] Making init request to API...')
+      // A fresh copy each time: request() writes did/seance into the params it is given.
+      const response = await request('init', this.shop_id, { params: { ...params }, timeout: INIT_TIMEOUT_MS })
+      if (DEBUG) console.log('[SDK Init] API response:', JSON.stringify(response, null, 2))
+      if (this._superseded()) return null
+
+      const outcome = initOutcome(response)
+      if (outcome === 'ok') return response
+      if (outcome === 'refused') {
+        this._refuse(initRefusal(this.shop_id, response))
+        return null
+      }
+
+      this._releaseQueue()
+      if (retries >= INIT_MAX_RETRIES) {
+        console.error('[SDK Init] Initialization failed, retries are over:', response)
+        if (!(await waitForReconnect())) return null
+        retries = 0
+        continue
+      }
+      retries++
+      if (DEBUG) console.warn(`[SDK Init] Init failed, retry ${retries} of ${INIT_MAX_RETRIES}:`, response)
+      await new Promise((resolve) => setTimeout(resolve, INIT_RETRY_DELAY_MS * retries))
+    }
+  }
+
+  /**
+   * /init gave a did: the SDK is initialized. What follows — the popup, messaging, push
+   * registration — can fail on its own without undoing that.
+   * @param {object} response
+   * @returns {Promise<void>}
+   */
+  async _initSucceeded(response) {
+    const didToUse = response.did
+    this.deviceId = didToUse
+    this.userSeance = response?.seance || response?.sid || ''
+    if (!this.segment && response?.segment) {
+      this.segment = response.segment
+    }
+
+    if (DEBUG) console.log('[SDK Init] Updating session...')
+    await updSeance(this.shop_id, didToUse, response?.seance)
+
+    this.initialized = true
+    if (DEBUG) console.log('[SDK Init] SDK initialized successfully!')
+
+    try {
+      // Check for popup in init response
+      await this.checkAndShowPopup(response)
+      // Initialize messaging after SDK is initialized
+      this._initMessaging()
+    } catch (error) {
+      console.error('[SDK Init] Popup or messaging setup failed:', error)
+    }
+    this.performQueue()
+    if (this.autoSendPushToken) {
+      try {
+        // Explicitly request push permission and register token on init.
+        // This will show the system prompt on first launch if needed.
+        await this.initPush()
+      } catch (error) {
+        console.error('[SDK Init] Push registration failed:', error)
+      }
+    }
+  }
+
+  /**
+   * The shop's init is refused for good: every call settles at once with `refusal`, nothing is sent.
+   * @param {Error} refusal
+   * @returns {void}
+   */
+  _refuse(refusal) {
+    this.initialized = false
+    setShopRefused(this.shop_id, refusal)
+    this._releaseQueue()
+    console.error('[SDK Init] Initialization failed:', refusal)
+  }
+
+  /**
+   * A later SDK for the same shop (a re-init) took over: this one's init must not touch the shop.
+   * @returns {boolean}
+   */
+  _superseded() {
+    return SdkRegistry.byShopId(this.shop_id) !== this
+  }
+
+  /**
    * @returns {boolean}
    */
   isInit = () => this.initialized
+
+  /**
+   * Init failed: the commands queued for it, and every later one, run without waiting. After a
+   * network error they go out with the cached did, or none on a fresh install, as the Android SDK
+   * does; after a refusal their requests return it without being sent. Otherwise each of them (a
+   * recommend() too) would wait for the rest of the session, neither resolving nor rejecting.
+   * @returns {void}
+   */
+  _releaseQueue() {
+    if (this.queueReleased) return
+    this.queueReleased = true
+    this.performQueue()
+  }
 
   /**
    * Gets the current device ID, ensuring it's synchronized with storage
