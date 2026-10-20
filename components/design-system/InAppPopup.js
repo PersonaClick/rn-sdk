@@ -21,7 +21,10 @@ import Button from './Button'
  * Крестик стоит **всегда** и принадлежит самому попапу, а не контейнеру картинки:
  * в макете виды «только текст» и «иконка» картинки не имеют, но крестик у них нарисован.
  * Он круглый (компонент Close: кнопка MD с радиусом Rounded) и во всех видах лежит поверх
- * содержимого в правом верхнем углу, на отступе попапа; над фотографией — в тёмном варианте.
+ * содержимого в правом верхнем углу, на отступе попапа. Над фотографией макет рисует его в
+ * тёмном варианте (белая иконка на белой подложке 5%), но на светлом фото — а фото товара
+ * почти всегда на белом — такой крестик пропадает. Поэтому крестик везде обычный вторичный
+ * и лежит на круге цвета карточки: на любом фото виден либо круг, либо иконка.
  * Текстовая кнопка закрытия (`closeText`) в макете не нарисована — её даёт админка
  * отдельным тумблером рядом с кнопкой действия, поэтому она здесь вторичной кнопкой
  * под основной. Пустой текст — кнопки нет, остаётся один крестик.
@@ -118,18 +121,20 @@ export default function InAppPopup({
       </View>
     ) : null
 
-  // Крестик над фотографией и у вида с картинкой сверху: в макете у него там тёмный режим.
+  // Круг цвета карточки под полупрозрачным крестиком: тот виден на любом фото, в отличие от
+  // тёмного варианта из макета (см. описание компонента).
   const closeIcon = (
-    <Button
-      size="md"
-      view="secondary"
-      rounded
-      onDark={overImage || view === 'image'}
-      iconStart={PERSONALIZATION_ICONS.crossLarge}
-      renderIcon={renderIcon}
-      onPress={onClose}
-      style={styles.closeButton}
-    />
+    <View style={[styles.closeBacking, { backgroundColor: colors.backgroundCard }]}>
+      <Button
+        size="md"
+        view="secondary"
+        rounded
+        iconStart={PERSONALIZATION_ICONS.crossLarge}
+        renderIcon={renderIcon}
+        onPress={onClose}
+        style={styles.closeButton}
+      />
+    </View>
   )
 
   const radius = modal ? theme.radius.modal : 0
@@ -150,7 +155,8 @@ export default function InAppPopup({
       <>
         {/* Картинка забирает всё, что остаётся над карточкой с текстом. */}
         <View style={styles.imageSlot}>
-          {source ? <Image source={source} style={styles.image} resizeMode="cover" /> : null}
+          {/* Целиком, с полями цвета карточки: обрезка срезала бы сам товар на фото. */}
+          {source ? <Image source={source} style={styles.image} resizeMode="contain" /> : null}
         </View>
         <View style={{ padding: pad, gap: modal ? PERSONALIZATION_SPACING.xl : PERSONALIZATION_SPACING.xl3 }}>
           {textBlock}
@@ -205,6 +211,7 @@ const styles = StyleSheet.create({
   textBlock: { gap: PERSONALIZATION_SPACING.md },
   centred: { textAlign: 'center' },
   closeOverlay: { position: 'absolute' },
+  closeBacking: { borderRadius: 999 },
   // Кнопка кита по умолчанию `alignSelf: 'flex-start'` — она рассчитана стоять в ряду.
   // В попапе кнопки во всю ширину, а крестик прижат к правому краю, поэтому выравнивание
   // переопределяется здесь, а не в самой кнопке.
