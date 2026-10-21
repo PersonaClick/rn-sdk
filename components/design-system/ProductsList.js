@@ -19,7 +19,7 @@ import ProductCard from './ProductCard'
  *           onProductPress?: (product: object) => void,
  *           onFirstVisibleChanged?: (index: number) => void,
  *           renderIcon?: (svg: string, color: string, size: number) => React.ReactNode,
- *           style?: object }} props
+ *           contentContainerStyle?: object, style?: object }} props
  */
 export default function ProductsList({
   layout = 'carousel',
@@ -29,6 +29,7 @@ export default function ProductsList({
   onProductPress,
   onFirstVisibleChanged,
   renderIcon,
+  contentContainerStyle,
   style,
 }) {
   const lastFirst = useRef(-1)
@@ -80,6 +81,8 @@ export default function ProductsList({
       columnWrapperStyle={layout === 'grid' ? styles.gridRow : undefined}
       onViewableItemsChanged={carousel ? onViewableItemsChanged : undefined}
       viewabilityConfig={carousel ? VIEWABILITY : undefined}
+      // Поля вокруг ленты (например у карусели в листе сторис): прокручиваются вместе с ней.
+      contentContainerStyle={contentContainerStyle}
       style={style}
     />
   )

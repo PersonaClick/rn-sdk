@@ -282,6 +282,16 @@ export const PersonalizationThemeProvider: ComponentType<{
   children?: ReactNode
 }>
 
+/**
+ * Forces a colour scheme on a subtree: the kit inside takes the `scheme` set instead of the
+ * system one. `null` (or no provider) follows the system, as before. Theme overrides still apply
+ * for the forced scheme.
+ */
+export const PersonalizationColorSchemeProvider: ComponentType<{
+  scheme?: 'light' | 'dark' | null
+  children?: ReactNode
+}>
+
 export function usePersonalizationTheme(): PersonalizationResolvedTheme
 
 export interface PersonalizationProductImageProps {
@@ -339,6 +349,8 @@ export interface PersonalizationProductsListProps {
   onProductPress?: (product: PersonalizationProduct) => void
   onFirstVisibleChanged?: (index: number) => void
   renderIcon?: (svg: string, color: string, size: number) => ReactNode
+  /** Поля вокруг ленты; прокручиваются вместе с ней. */
+  contentContainerStyle?: object
   style?: object
 }
 export const PersonalizationProductsList: ComponentType<PersonalizationProductsListProps>
@@ -585,6 +597,247 @@ export interface PersonalizationLoyaltyCardProps {
 }
 export const PersonalizationLoyaltyCard: ComponentType<PersonalizationLoyaltyCardProps>
 
+// --- Сторис V2: визуальные компоненты -------------------------------------------------------------
+
+/** Состояние обложки сторис: кольцо Button/Primary, Semantic/Warning + звезда, Neutral Subtle, скелетон. */
+export type PersonalizationStoryCoverState = 'default' | 'pinned' | 'viewed' | 'skeleton'
+
+/**
+ * Обложка сторис 88x88: кольцо состояния и картинка в круге 76. `segments` делит кольцо на дуги
+ * по слайдам; показанные — цветом Brand/Primary 65 %.
+ */
+export interface PersonalizationStoryCoverProps {
+  source?: object
+  state?: PersonalizationStoryCoverState
+  segments?: number
+  /** Индексы показанных слайдов (сегмент i отмечен, если показан слайд i) или их число — первые столько. */
+  seenSegments?: number | number[]
+  /** Звезда бейджа закреплённой сторис; без него — встроенная иконка. */
+  renderIcon?: (svg: string, color: string, size: number) => ReactNode
+  style?: object
+}
+export const PersonalizationStoryCover: ComponentType<PersonalizationStoryCoverProps>
+
+/** Сторис в ленте: обложка и подпись до двух строк с многоточием, колонка шириной 88. */
+export interface PersonalizationStoryPreviewProps extends PersonalizationStoryCoverProps {
+  title?: string
+  onPress?: () => void
+}
+export const PersonalizationStoryPreview: ComponentType<PersonalizationStoryPreviewProps>
+
+/** Сторис для ленты: как у StoryPreview, плюс id. */
+export interface PersonalizationStoriesBarItem {
+  id: string | number
+  title?: string
+  source?: object
+  state?: Exclude<PersonalizationStoryCoverState, 'skeleton'>
+  segments?: number
+  seenSegments?: number | number[]
+}
+
+/** Лента сторис: шаг 16, поля 16 (меняются через `contentContainerStyle`); `loading` — скелетоны. */
+export interface PersonalizationStoriesBarProps {
+  stories?: PersonalizationStoriesBarItem[]
+  loading?: boolean
+  /** Сколько скелетонов при загрузке, по умолчанию 4. */
+  skeletonCount?: number
+  onStoryPress?: (story: PersonalizationStoriesBarItem, index: number) => void
+  renderIcon?: (svg: string, color: string, size: number) => ReactNode
+  contentContainerStyle?: object
+  style?: object
+}
+export const PersonalizationStoriesBar: ComponentType<PersonalizationStoriesBarProps>
+
+/** Полоски слайдов: до `current` залиты, текущий — на `progress` (0…1 или Animated.Value). */
+export interface PersonalizationStoryProgressProps {
+  count: number
+  current?: number
+  progress?: number | object
+  style?: object
+}
+export const PersonalizationStoryProgress: ComponentType<PersonalizationStoryProgressProps>
+
+/** Шапка просмотра: полоски слайдов и крестик 32 (Text/Secondary, 65 %). */
+export interface PersonalizationStoryNavigationProps extends PersonalizationStoryProgressProps {
+  onClose?: () => void
+  /** Подпись крестика для скринридера, по умолчанию «Close». */
+  closeLabel?: string
+  /** Крестик; без него — встроенная иконка. */
+  renderIcon?: (svg: string, color: string, size: number) => ReactNode
+}
+export const PersonalizationStoryNavigation: ComponentType<PersonalizationStoryNavigationProps>
+
+export type PersonalizationStoryPriceType = 'price' | 'discount' | 'promoCode'
+
+/**
+ * Плашка цены товарного слайда (коробка #F2F2F2 95 %, текст всегда тёмный). Валюта отделяется
+ * от суммы по хвосту строки. Нажатие на промокод копирует его в буфер, показывает тост через
+ * `toastRef` и зовёт `onPromoCopied`.
+ */
+export interface PersonalizationStoryPriceProps {
+  type?: PersonalizationStoryPriceType
+  /** Отформатированная цена, например «1 190 900 ₽». */
+  price: string
+  oldPrice?: string
+  /** Для `discount`, например «10%». */
+  discount?: string
+  /** Для `promoCode`. */
+  promoCode?: string
+  /** Подпись над промокодом, по умолчанию «Promo code». */
+  promoCaption?: string
+  /** Текст тоста после копирования, по умолчанию «Copied». Пусто — без тоста. */
+  copiedText?: string
+  toastRef?: { current: PersonalizationToastHandle | null }
+  /** Где тост, по умолчанию сверху. */
+  toastPosition?: PersonalizationToastPosition
+  onPromoCopied?: (code: string) => void
+  renderIcon?: (svg: string, color: string, size: number) => ReactNode
+  style?: object
+}
+export const PersonalizationStoryPrice: ComponentType<PersonalizationStoryPriceProps>
+
+/** Обратный отсчёт: одна пилюля (`merged`) или четыре коробки (`separate`); тик раз в секунду. */
+export interface PersonalizationStoryTimerProps {
+  endTime: Date | number | string
+  view?: 'merged' | 'separate'
+  /** Подписи единиц, по умолчанию d / h / m / s. */
+  labels?: { days?: string; hours?: string; minutes?: string; seconds?: string }
+  /** Отсчёт дошёл до нуля (один раз). */
+  onEnd?: () => void
+  style?: object
+}
+export const PersonalizationStoryTimer: ComponentType<PersonalizationStoryTimerProps>
+
+/**
+ * Текст на слайде. Видимый `backgroundColor` — сплошной блок (скругление 12, поля 12/16 у кегля
+ * больше 30, иначе 8/16, текст Text/Light Primary); иначе прозрачный, без полей (Text/Primary).
+ * Пресеты: large 48/48, medium 30/36, small 20/24.
+ */
+export interface PersonalizationStoryTextBlockProps {
+  text: string
+  preset?: 'large' | 'medium' | 'small'
+  fontSize?: number
+  lineHeight?: number
+  color?: string
+  backgroundColor?: string
+  /** Прозрачность фона 0…1 (подложка под текстом, текст остаётся непрозрачным), по умолчанию 1. */
+  backgroundOpacity?: number
+  /** Сплошной блок без своего цвета — фон Semantic/Info. */
+  solid?: boolean
+  align?: 'left' | 'center' | 'right'
+  bold?: boolean
+  italic?: boolean
+  fontFamily?: string
+  style?: object
+}
+export const PersonalizationStoryTextBlock: ComponentType<PersonalizationStoryTextBlockProps>
+
+/**
+ * Низ слайда с товарами: пилюля «Used products» (строка 64) и лист Background/Card с каруселью.
+ * `expanded` + `onToggle` — управляемый режим, без них компонент помнит сам.
+ */
+export interface PersonalizationStoryUsedProductsProps {
+  products?: PersonalizationProduct[]
+  expanded?: boolean
+  onToggle?: (expanded: boolean) => void
+  /** По умолчанию «Used products». */
+  showText?: string
+  /** По умолчанию «Hide products». */
+  hideText?: string
+  /** Слот в начале строки — кнопка звука видео-слайда. */
+  leading?: ReactNode
+  onProductPress?: (product: PersonalizationProduct) => void
+  renderIcon?: (svg: string, color: string, size: number) => ReactNode
+  style?: object
+}
+export const PersonalizationStoryUsedProducts: ComponentType<PersonalizationStoryUsedProductsProps>
+
+/** Элемент слайда как его отдаёт API (`button`, `product`, `products`, `text_block`, `header`). */
+export type PersonalizationStoryElement = Record<string, unknown> & { type: string }
+
+/** Слайд сторис как его отдаёт `getStories`: `type` — `image`, `video` или `""` (товарный). */
+export type PersonalizationStorySlide = Record<string, unknown> & {
+  id: string | number
+  type?: string
+  background?: string
+  background_color?: string
+  preview?: string
+  /** Секунды. */
+  duration?: number
+  elements?: PersonalizationStoryElement[]
+}
+
+/** Сторис как её отдаёт `getStories(code)` (`stories` блока). */
+export type PersonalizationStory = Record<string, unknown> & {
+  id: string | number
+  name?: string
+  avatar?: string
+  viewed?: boolean
+  pinned?: boolean
+  start_position?: number
+  slides: PersonalizationStorySlide[]
+}
+
+/** Тексты сторис V2 — одни имена на всех платформах (D). По умолчанию английские. */
+export interface PersonalizationStoriesTexts {
+  /** Подпись над промокодом, если у элемента `product` нет своего `title`. По умолчанию «Promo code». */
+  promoCaption?: string
+  /** Тост после копирования промокода, по умолчанию «Copied». */
+  promoCopiedText?: string
+  /** Кнопка товарного слайда без элементов `button`, по умолчанию «More info». */
+  productButtonText?: string
+  /** Пилюля карусели, если у элемента `products` нет своих `labels`, по умолчанию «Used products». */
+  showProductsText?: string
+  /** По умолчанию «Hide products». */
+  hideProductsText?: string
+  /** Кнопка, когда медиа не загрузилось, по умолчанию «Retry». */
+  retryText?: string
+  /** Для скринридера: крестик («Close»), звук включён («Sound on») и выключен («Sound off»). */
+  closeLabel?: string
+  soundOnLabel?: string
+  soundOffLabel?: string
+}
+
+/**
+ * Полноэкранный просмотр сторис (нативная Modal). В сеть не ходит и ничего не трекает — о показе
+ * слайда и нажатиях сообщает колбэками. Медиа вписывается целиком; касание по третям (центр —
+ * ничего), удержание и перетаскивание — пауза, свайп вниз — закрыть, вбок — соседняя сторис;
+ * сторис открывается с первого невиденного слайда (`seen`). Пауза в фоне, видео по своей длине,
+ * «Повторить» при ошибке медиа, звук помнится до конца процесса.
+ */
+export interface PersonalizationStoryViewerProps extends PersonalizationStoriesTexts {
+  visible: boolean
+  stories: PersonalizationStory[]
+  /** С какой сторис открыть. Смена при открытом просмотре листает к ней внутри него. */
+  initialStoryIndex?: number
+  /** Новое значение при открытом просмотре — снова листать к `initialStoryIndex`, даже если индекс тот же. */
+  openRequest?: number
+  /** Виденные слайды `{ [storyId]: slideId[] }` — с какого слайда открывать сторис. */
+  seen?: Record<string, string[]>
+  /** Пауза хоста. */
+  paused?: boolean
+  onClose?: () => void
+  onSlideView?: (story: PersonalizationStory, slide: PersonalizationStorySlide) => void
+  onButtonPress?: (story: PersonalizationStory, slide: PersonalizationStorySlide, button: PersonalizationStoryElement) => void
+  /**
+   * Товар: карточка с картинкой товара или кнопка товарного слайда без элементов `button`
+   * (element — элемент `product`), или товар карусели (element — `{ type: 'product', item }`).
+   */
+  onProductPress?: (
+    story: PersonalizationStory,
+    slide: PersonalizationStorySlide,
+    product: Record<string, unknown>,
+    element: PersonalizationStoryElement,
+  ) => void
+  /** Промокод скопирован — из плашки цены (элемент `product`) или из текст-блока. */
+  onPromoCopied?: (story: PersonalizationStory, slide: PersonalizationStorySlide, code: string, element: PersonalizationStoryElement) => void
+  /** Свои отступы безопасной зоны; без них — core SafeAreaView на iOS, статус-бар и навигационная панель на Android. */
+  insets?: { top?: number; bottom?: number; left?: number; right?: number }
+  /** Иконки; без него — встроенные иконки сторис. */
+  renderIcon?: (svg: string, color: string, size: number) => ReactNode
+}
+export const PersonalizationStoryViewer: ComponentType<PersonalizationStoryViewerProps>
+
 // --- Виджеты с данными SDK ------------------------------------------------------------------------
 
 /** Категория из поиска: из подсказок (есть id) или из популярных категорий пустого запроса. */
@@ -690,3 +943,74 @@ export interface PersonalizationSearchResultsScreenProps {
   style?: object
 }
 export const PersonalizationSearchResultsScreen: ComponentType<PersonalizationSearchResultsScreenProps>
+
+/** Колбэки и тексты виджета сторис — и у компонента, и у `PersonalizationStories.show()`. */
+export interface PersonalizationStoriesOptions extends PersonalizationStoriesTexts {
+  /** Код блока сторис. */
+  code: string
+  /** Явный инстанс; иначе резолв по shopId через фасад. */
+  sdk?: unknown
+  /** Магазин при нескольких зарегистрированных; без него — единственный. */
+  shopId?: string
+  /**
+   * Уведомление о нажатии, как у прежних сторис: кнопка, товар (элемент `product` или
+   * `{ type: 'product', item }` из карусели), промокод (элемент `product` или `text_block`).
+   */
+  onElementPress?: (element: PersonalizationStoryElement) => void
+  /** Ссылка кнопки; задан — переход за хостом, иначе системный обработчик. Просмотр уже закрыт. */
+  onLinkClick?: (url: string) => void
+  /** Товар; задан — переход за хостом, иначе его ссылка (`deeplink_*` / `url`). Просмотр уже закрыт. */
+  onProductClick?: (product: Record<string, unknown>) => void
+  /** Нет кода, несколько магазинов без shopId, ошибка загрузки или 15 с без ответа; блок прячется. */
+  onError?: (error: unknown) => void
+  insets?: { top?: number; bottom?: number; left?: number; right?: number }
+  /** Иконки; без него — встроенные иконки сторис. */
+  renderIcon?: (svg: string, color: string, size: number) => ReactNode
+}
+
+/**
+ * Сторис V2 с данными SDK: лента обложек (скелетоны при загрузке) и просмотр. Сам грузит
+ * `getStories(code)`, трекает `view` на каждый показанный слайд и `click` на кнопку, товар и
+ * промокод (с источником `stories`), помнит виденные слайды по магазину. Пустой блок или ошибка —
+ * ничего не рисуется. Нажатие закрывает просмотр перед переходом.
+ */
+export interface PersonalizationStoriesProps extends PersonalizationStoriesOptions {
+  /** Лента обложек; `false` — только просмотр, открываемый через ref. По умолчанию `true`. */
+  bar?: boolean
+  contentContainerStyle?: object
+  style?: object
+}
+
+/**
+ * Управление виджетом через ref. Открытие до загрузки ждёт её; при открытом просмотре — листает к
+ * сторис внутри него.
+ */
+export interface PersonalizationStoriesHandle {
+  /** Открыть сторис по индексу в ленте. */
+  open(index?: number): void
+  /** Открыть сторис по id; такой нет — ничего. */
+  openStory(id: string | number): void
+  /** Пауза открытого просмотра; без него — ничего (следующее открытие начнётся без паузы). */
+  pause(): void
+  /** Продолжить после `pause()`; без открытого просмотра — ничего. */
+  resume(): void
+  /** Загрузить блок заново. */
+  reload(): void
+}
+
+export interface PersonalizationStoriesShowOptions extends PersonalizationStoriesOptions {
+  /** С какой сторис открыть; без него или с неизвестным id — с первой. */
+  startStoryId?: string | number
+}
+
+export const PersonalizationStories: ForwardRefExoticComponent<
+  PersonalizationStoriesProps & RefAttributes<PersonalizationStoriesHandle>
+> & {
+  /**
+   * Показ сторис блока без ленты. Нужен смонтированный `<SdkPopupOverlay />` (тот же хост, что у
+   * in-app попапов); без него — `onError` и сразу завершение (тогда —
+   * `<PersonalizationStories bar={false} ref={...} />` и `ref.open()`). Промис завершается, когда
+   * просмотр закрыт; пустой блок или ошибка загрузки — `onError` и завершение.
+   */
+  show(options: PersonalizationStoriesShowOptions): Promise<void>
+}

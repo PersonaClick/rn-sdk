@@ -1,6 +1,6 @@
 {
   "name": "@personaclick/rn-sdk",
-  "version": "4.0.22",
+  "version": "4.0.23",
   "description": "PersonaClick React Native SDK",
   "type": "module",
   "types": "./index.d.ts",
@@ -57,6 +57,7 @@
   "peerDependencies": {
     "@notifee/react-native": "^9.1.8",
     "@react-native-async-storage/async-storage": "^1.23.1",
+    "@react-native-clipboard/clipboard": ">=1.11.0",
     "@react-native-community/netinfo": ">=5.0.0",
     "@react-native-firebase/app": ">=23 <27",
     "@react-native-firebase/messaging": ">=23 <27",
@@ -66,6 +67,9 @@
     "react-native-volume-manager": "^2.0.8"
   },
   "peerDependenciesMeta": {
+    "@react-native-clipboard/clipboard": {
+      "optional": true
+    },
     "@react-native-community/netinfo": {
       "optional": true
     },

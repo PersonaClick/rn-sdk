@@ -31,6 +31,13 @@ import { PERSONALIZATION_TYPOGRAPHY } from '../constants/typography.constants'
  */
 const PersonalizationThemeContext = createContext(null)
 
+/**
+ * Схема, навязанная поддереву: `'light'` / `'dark'`, `null` — как у системы.
+ * Отдельно от темы: тема — брендирование хоста, а схема — свойство экрана. Экран сторис
+ * с фотографией или видео всегда рисуется тёмными токенами, какой бы ни была системная схема.
+ */
+const PersonalizationColorSchemeContext = createContext(null)
+
 const EMPTY = {}
 
 /** @param {{ theme?: object, children?: React.ReactNode }} props */
@@ -45,13 +52,41 @@ export function PersonalizationThemeProvider({ theme, children }) {
 }
 
 /**
+ * Навязывает поддереву схему: компоненты внутри берут цвета из набора `scheme`, а не из
+ * системного. Без провайдера (или с `scheme={null}`) всё как раньше — схема системы.
+ *
+ * ```jsx
+ * <PersonalizationColorSchemeProvider scheme="dark">
+ *   <StoryNavigation … />   // белые штрихи и крестик поверх фотографии
+ * </PersonalizationColorSchemeProvider>
+ * ```
+ *
+ * Переопределения темы (`PersonalizationThemeProvider`) действуют и здесь: берётся их набор
+ * для навязанной схемы.
+ *
+ * @param {{ scheme?: 'light'|'dark'|null, children?: React.ReactNode }} props
+ */
+export function PersonalizationColorSchemeProvider({ scheme, children }) {
+  const parent = useContext(PersonalizationColorSchemeContext)
+  const value = scheme === 'dark' || scheme === 'light' ? scheme : parent
+  return (
+    <PersonalizationColorSchemeContext.Provider value={value}>
+      {children}
+    </PersonalizationColorSchemeContext.Provider>
+  )
+}
+
+/**
  * Тема, уже разрешённая под текущую схему: `colors` — плоский набор, не пара
  * light/dark. Без провайдера отдаёт значения из макета, поэтому компоненты
- * работают и у хоста, которому тема не нужна.
+ * работают и у хоста, которому тема не нужна. Схема — навязанная
+ * PersonalizationColorSchemeProvider, иначе системная.
  */
 export function usePersonalizationTheme() {
   const override = useContext(PersonalizationThemeContext)
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light'
+  const forced = useContext(PersonalizationColorSchemeContext)
+  const system = useColorScheme() === 'dark' ? 'dark' : 'light'
+  const scheme = forced || system
 
   return useMemo(() => {
     const source = override || EMPTY
