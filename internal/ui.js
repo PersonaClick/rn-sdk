@@ -15,13 +15,19 @@ export { PERSONALIZATION_ICONS, PERSONALIZATION_ICON_NAMES } from '../constants/
 export { PERSONALIZATION_COLORS } from '../constants/colors.constants';
 
 // Тема. Оборачивает дерево, чтобы перекрасить цвета, радиусы и шрифт;
-// без неё компоненты берут значения из макета.
+// без неё компоненты берут значения из макета. Схему поддерева (светлая / тёмная вместо
+// системной) навязывает PersonalizationColorSchemeProvider.
 export {
   PersonalizationThemeProvider,
+  PersonalizationColorSchemeProvider,
   usePersonalizationTheme,
 } from '../theme/personalization-theme'
 
-// Компоненты. Чистые примитивы React Native, без нативных зависимостей.
+// Компоненты. Чистые примитивы React Native, без нативных зависимостей. Исключение — сторис:
+// просмотр берёт react-native-video, react-native-volume-manager (громкость включает звук) и
+// react-native-safe-area-context (отступ навигационной панели Android), а плашка цены — буфер
+// обмена (@react-native-clipboard/clipboard, без него — устаревший Clipboard ядра); всё это —
+// необязательные peer-зависимости, только если они установлены. Иконки сторис встроены (PNG).
 export {
   Badge as PersonalizationBadge,
   Tag as PersonalizationTag,
@@ -54,11 +60,24 @@ export {
   ToastPresenter as PersonalizationToastPresenter,
   Barcode as PersonalizationBarcode,
   LoyaltyCard as PersonalizationLoyaltyCard,
+  StoryCover as PersonalizationStoryCover,
+  StoryPreview as PersonalizationStoryPreview,
+  StoriesBar as PersonalizationStoriesBar,
+  StoryProgress as PersonalizationStoryProgress,
+  StoryNavigation as PersonalizationStoryNavigation,
+  StoryPrice as PersonalizationStoryPrice,
+  StoryTimer as PersonalizationStoryTimer,
+  StoryTextBlock as PersonalizationStoryTextBlock,
+  StoryUsedProducts as PersonalizationStoryUsedProducts,
+  StoryViewer as PersonalizationStoryViewer,
 } from '../components/design-system'
 
 // Виджеты с данными SDK. Резолвят инстанс через фасад (awaitInstance по shopId), ходят в
-// поиск и держат своё состояние; история запросов — в AsyncStorage (peer-зависимость SDK).
+// поиск и сторис и держат своё состояние; история запросов — в AsyncStorage (peer-зависимость
+// SDK). Видео в сторис — react-native-video, если он стоит (опциональный peer, как у прежних сторис).
+// PersonalizationStories.show() рисуется слоем <SdkPopupOverlay> — хоста in-app попапов.
 export {
   InstantSearchField as PersonalizationInstantSearchField,
   SearchResultsScreen as PersonalizationSearchResultsScreen,
+  Stories as PersonalizationStories,
 } from '../components/widgets'

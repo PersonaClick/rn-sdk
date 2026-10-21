@@ -7,6 +7,7 @@ import {
   reset,
   pendingShopIds,
   setSdkFactory,
+  isAmbiguousDefault,
 } from '../lib/facade/facade.js'
 import { UnknownShopIdError, AmbiguousShopError } from '../lib/facade/errors.js'
 import registry from '../lib/registry/SdkRegistry.js'
@@ -163,5 +164,16 @@ describe('facade — factory guard', () => {
   test('initialize without a factory throws a clear error', () => {
     setSdkFactory(null)
     expect(() => initialize({ shopId: 'shop-a' })).toThrow(/factory is not set/)
+  })
+})
+
+describe('facade.isAmbiguousDefault', () => {
+  test('true only without a shopId while several shops are registered', () => {
+    expect(isAmbiguousDefault()).toBe(false)
+    registerShops([{ shopId: 'shop-a' }])
+    expect(isAmbiguousDefault()).toBe(false)
+    registerShops([{ shopId: 'shop-b' }])
+    expect(isAmbiguousDefault()).toBe(true)
+    expect(isAmbiguousDefault('shop-a')).toBe(false)
   })
 })

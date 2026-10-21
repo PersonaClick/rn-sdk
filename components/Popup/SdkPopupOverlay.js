@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import Popup from './Popup'
 import PopupLogic from '../../lib/popup'
+import { OverlayLayers } from './overlayLayers'
 
 const POPUP_CLOSE_ANIMATION_DELAY_MS = 300
 
@@ -201,7 +202,13 @@ export default function SdkPopupOverlay({ sdk }) {
     }
   }, [sdk])
 
-  return <SdkPopupOverlayInternal />
+  // Feature layers (e.g. stories shown without a widget) render here too, independent of popups.
+  return (
+    <>
+      <SdkPopupOverlayInternal />
+      <OverlayLayers />
+    </>
+  )
 }
 
 /**

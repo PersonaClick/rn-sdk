@@ -13,9 +13,15 @@ const light = {
   brandPrimary: '#007DF2',
   // neutral: полупрозрачная ступень, одинаково заметна на любом фоне — заглушки картинок
   neutral50: 'rgba(0, 0, 0, 0.05)',
+  // Neutral 100: подложка таймера сторис — чёрный 10 % в светлой, белый 10 % в тёмной.
+  neutral100: 'rgba(0, 0, 0, 0.1)',
   // semantic
   semanticWarning: '#F37A17',
   semanticDanger: '#E51919',
+  // Info: фон текст-блока сторис в пресетах кита, одинаковый в обеих схемах.
+  semanticInfo: '#0087E8',
+  // Neutral Subtle: кольцо просмотренной сторис.
+  neutralSubtle: '#CCCCCC',
   // background
   backgroundGeneric: '#F2F2F2',
   backgroundCard: '#FFFFFF',
@@ -68,9 +74,12 @@ const dark = {
   brandPrimary: '#007DF2',
   // neutral: полупрозрачная ступень, одинаково заметна на любом фоне — заглушки картинок
   neutral50: 'rgba(255, 255, 255, 0.05)',
+  neutral100: 'rgba(255, 255, 255, 0.1)',
   // semantic
   semanticWarning: '#F37A17',
   semanticDanger: '#E51919',
+  semanticInfo: '#0087E8',
+  neutralSubtle: '#262626',
   // background
   backgroundGeneric: '#0D0D0D',
   backgroundCard: '#1A1A1A',
