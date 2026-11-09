@@ -2,3 +2,4 @@
 .eslintignore
 .eslintrc
 .idea
+tests/fixtures/

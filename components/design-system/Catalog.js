@@ -22,10 +22,15 @@ import Button from './Button'
  * заголовок тот же, вместо плитки EmptyState. Показывается, когда задан emptyText и
  * товаров нет.
  *
+ * Ошибка загрузки в макете не нарисована, поэтому собрана из тех же деталей: текст errorText
+ * в EmptyState и под ним кнопка retryText того же вида, что «загрузить ещё». Показывается
+ * вместо плитки и пустого состояния, когда задан errorText и товаров нет.
+ *
  * @param {{ header?: React.ReactNode, layout?: 'grid'|'list', products: Array<object>,
- *           imageAspect?: 'square'|'landscape'|'portrait',
+ *           imageAspect?: 'square'|'landscape'|'portrait', showRating?: boolean,
  *           onProductAction?: (product: object) => void, onProductPress?: (product: object) => void,
- *           emptyText?: string, loading?: boolean,
+ *           emptyText?: string, errorText?: string, retryText?: string, onRetry?: Function,
+ *           loading?: boolean,
  *           count?: { prefix: string, shown: number, separator: string, total: number },
  *           loadMoreText?: string, onLoadMore?: Function,
  *           renderIcon?: (svg: string, color: string, size: number) => React.ReactNode,
@@ -36,9 +41,13 @@ export default function Catalog({
   layout = 'grid',
   products = [],
   imageAspect = 'square',
+  showRating = true,
   onProductAction,
   onProductPress,
   emptyText,
+  errorText,
+  retryText,
+  onRetry,
   loading = false,
   count,
   loadMoreText,
@@ -49,13 +58,28 @@ export default function Catalog({
   return (
     <View style={[styles.column, style]}>
       {header}
-      {products.length === 0 && emptyText ? (
+      {products.length === 0 && errorText ? (
+        <View style={styles.error}>
+          <EmptyState message={errorText} style={styles.errorMessage} />
+          {retryText ? (
+            <Button
+              label={retryText}
+              size="md"
+              view="secondary"
+              iconStart={PERSONALIZATION_ICONS.arrowRotateCw}
+              renderIcon={renderIcon}
+              onPress={onRetry}
+            />
+          ) : null}
+        </View>
+      ) : products.length === 0 && emptyText ? (
         <EmptyState message={emptyText} />
       ) : (
         <ProductsList
           layout={layout}
           products={products}
           imageAspect={imageAspect}
+          showRating={showRating}
           onProductAction={onProductAction}
           onProductPress={onProductPress}
           renderIcon={renderIcon}
@@ -83,4 +107,7 @@ export default function Catalog({
 const styles = StyleSheet.create({
   column: { gap: 12 },
   loadMore: { alignSelf: 'stretch' },
+  // Тот же вертикальный отступ 92, что у EmptyState, но вокруг текста с кнопкой.
+  error: { paddingBottom: 92, alignItems: 'center', gap: 16 },
+  errorMessage: { paddingBottom: 0, alignSelf: 'stretch' },
 })

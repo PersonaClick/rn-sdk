@@ -22,6 +22,10 @@ export const STORY_PAUSE = Object.freeze({
   BACKGROUND: 'background',
   /** Пауза хоста — `pause()` виджета (B8). */
   HOST: 'host',
+  /** Открыто системное окно «Поделиться». */
+  SHARE: 'share',
+  /** Карточку опроса держат пальцем, в её поле фокус или ответ отправляется. */
+  POLL: 'poll',
   /** Медиа ещё не готово или видео подгружается (C4, C5). */
   LOADING: 'loading',
   /** Медиа не загрузилось — на слайде кнопка «Повторить» (C5). */
@@ -73,6 +77,8 @@ function startSlide(state, stories, storyIndex, slideIndex, { canPlayVideo = tru
   let pauses = withPause(state.pauses, STORY_PAUSE.SHEET, false)
   pauses = withPause(pauses, STORY_PAUSE.ERROR, false)
   pauses = withPause(pauses, STORY_PAUSE.LOADING, loading)
+  // Карточки опросов прежнего слайда ушли вместе с ним — их пауза не должна залипнуть.
+  pauses = withPause(pauses, STORY_PAUSE.POLL, false)
   return {
     ...state,
     open: true,
@@ -115,6 +121,17 @@ function enterStory(state, action, index, direction) {
   return startSlide(state, stories, target, storyStartSlide(story, seenOf(action.seen, story)), action)
 }
 
+/**
+ * Вход в сторис `index` сразу на слайде `slide` (открытие по ссылке «Поделиться»: слайд из
+ * ответа, в обход A4); номер зажимается в границы. В сторис нет слайдов — обычный вход.
+ */
+function enterStoryAt(state, action, index, slide) {
+  const stories = action.stories || []
+  const count = slidesOf(stories[index]).length
+  if (count === 0) return enterStory(state, action, index, 1)
+  return startSlide(state, stories, index, Math.min(count - 1, slide), action)
+}
+
 function next(state, action) {
   const stories = action.stories || []
   const count = slidesOf(stories[state.story]).length
@@ -135,7 +152,8 @@ function previous(state, action) {
  * Редьюсер просмотра. Действия, которым нужны данные, несут их сами: `stories` (как у
  * StoryViewer), `seen` (`{ [storyId]: slideId[] }` — для A4) и `canPlayVideo` (есть ли плеер).
  *
- * - `open` `{ index }` — открыть с сторис `index` (её стартовый слайд по A4);
+ * - `open` `{ index, slide? }` — открыть с сторис `index` (её стартовый слайд по A4; `slide` —
+ *   сразу этот слайд, в обход A4);
  * - `page` `{ index }` — открыть сторис `index` в уже открытом просмотре (F11): листание к ней с её
  *   стартового слайда; она уже на экране, её нет или в ней нет слайдов — ничего;
  * - `reset` — просмотр закрыт хостом;
@@ -156,7 +174,12 @@ export function storyViewerReducer(state, action) {
   switch (action.type) {
     case 'open': {
       const base = { ...STORY_VIEWER_CLOSED, entry: state.entry, epoch: state.epoch, load: state.load }
-      const opened = enterStory(base, action, Math.max(0, Math.floor(Number(action.index) || 0)), 1)
+      const index = Math.max(0, Math.floor(Number(action.index) || 0))
+      const slide = Number(action.slide)
+      const opened =
+        action.slide !== undefined && action.slide !== null && Number.isInteger(slide) && slide >= 0
+          ? enterStoryAt(base, action, index, slide)
+          : enterStory(base, action, index, 1)
       return opened.open ? opened : { ...base, closing: true }
     }
     case 'reset':
@@ -240,6 +263,8 @@ export function storyViewerReducer(state, action) {
       if (state.media !== 'error') return state
       let pauses = withPause(state.pauses, STORY_PAUSE.ERROR, false)
       pauses = withPause(pauses, STORY_PAUSE.LOADING, true)
+      // Слайд монтируется заново — и карточки опросов на нём тоже.
+      pauses = withPause(pauses, STORY_PAUSE.POLL, false)
       return { ...state, media: 'loading', pauses, epoch: state.epoch + 1, load: state.load + 1 }
     }
     default:

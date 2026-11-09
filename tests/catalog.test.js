@@ -130,6 +130,30 @@ describe('Catalog - getCategory', () => {
     expect(category.brands[0].name).toBe('Apple')
   })
 
+  test('sends price, sorting, brands and facets as they are', async () => {
+    mockRequest.mockImplementation((endpoint) =>
+      endpoint === 'category/tehnika-dlja-kuhni'
+        ? Promise.resolve({ products_total: 0, products: [], brands: [] })
+        : Promise.resolve({})
+    )
+    const params = {
+      limit: 20,
+      page: 2,
+      brands: 'Artel,Ava',
+      filters: JSON.stringify({ Тип: ['Чайник'] }),
+      price_min: '1000',
+      price_max: 5000,
+      sort_by: 'price',
+      sort_dir: 'asc',
+      locations: '12',
+    }
+
+    await sdk.getCategory('tehnika-dlja-kuhni', params)
+
+    const [, , options] = mockRequest.mock.calls.find(([endpoint]) => endpoint === 'category/tehnika-dlja-kuhni')
+    expect(options.params).toEqual({ shop_id: SHOP_ID, stream: 'android', ...params })
+  })
+
   test('defaults to empty lists when response is malformed', async () => {
     mockRequest.mockImplementation((endpoint) =>
       endpoint === 'category/x' ? Promise.resolve(null) : Promise.resolve({})

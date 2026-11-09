@@ -1,0 +1,297 @@
+{
+  "_fixture": {
+    "about": "Сетка: доли колонок в процентах и старый parts, выравнивание ячейки → строки → left/top, порядок элементов, отступы, minHeight, фон строки, выпадающие элементы.",
+    "expect": {
+      "rows_gap": 8,
+      "rows": {
+        "row-a": {
+          "fractions": [
+            0.5,
+            0.5
+          ],
+          "gap": 12,
+          "minHeight": 80,
+          "cells": [
+            {
+              "align": "left",
+              "verticalAlign": "top",
+              "elements": [
+                "a0-1",
+                "a0-2",
+                "a0-3"
+              ]
+            },
+            {
+              "align": "center",
+              "verticalAlign": "center",
+              "elements": [
+                "a1"
+              ]
+            }
+          ]
+        },
+        "row-b": {
+          "fractions": [
+            0.3333,
+            0.3333,
+            0.3333
+          ],
+          "gap": 8,
+          "minHeight": 60,
+          "cells": [
+            {
+              "align": "right",
+              "verticalAlign": "bottom",
+              "elements": [
+                "b0"
+              ]
+            },
+            {
+              "align": "right",
+              "verticalAlign": "bottom",
+              "elements": []
+            },
+            {
+              "align": "right",
+              "verticalAlign": "top",
+              "elements": [
+                "b2"
+              ],
+              "note": "элемент с cellVerticalAlign: ячейка становится flex-start, элемент сам выбирает вертикаль (точная CSS-механика в Base не видна — уточнить)"
+            }
+          ]
+        },
+        "row-c": {
+          "fractions": [
+            0.25,
+            0.75
+          ],
+          "gap": 8,
+          "minHeight": 110,
+          "background": {
+            "color": "#fef3c7ff",
+            "image": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/141206.jpg",
+            "size": "contain",
+            "position": "top",
+            "repeat": "repeat-x"
+          },
+          "cells": [
+            {
+              "align": "left",
+              "verticalAlign": "top",
+              "elements": []
+            },
+            {
+              "align": "left",
+              "verticalAlign": "top",
+              "elements": [
+                "c1"
+              ],
+              "note": "c1 сам прижат вправо (cellAlign)"
+            }
+          ]
+        },
+        "row-d": {
+          "fractions": [
+            0.1,
+            0.1,
+            0.2,
+            0.2,
+            0.2,
+            0.2
+          ],
+          "gap": 4,
+          "minHeight": 0,
+          "cells": "6 ячеек, d5 в последней"
+        }
+      },
+      "dropped": [
+        "orphan",
+        "out-of-range"
+      ],
+      "note": "minHeight без значения = 110 (компилятор). Строки идут столбиком с промежутком 8. Строка обрезает содержимое (overflow hidden)."
+    }
+  },
+  "id": 9111,
+  "layout": "modal",
+  "placement": "center",
+  "selector": null,
+  "trigger_type": "manual",
+  "trigger_value": null,
+  "trigger_event": null,
+  "frequency": "every_page",
+  "cooldown_minutes": 0,
+  "promo_code_list_id": null,
+  "target_screens": [],
+  "design": {
+    "frameStyle": {
+      "width": 92,
+      "height": 320,
+      "widthMode": "%",
+      "heightMode": "auto",
+      "maxWidth": 480,
+      "maxWidthMode": "px",
+      "bgColor": "#ffffff",
+      "borderColor": "#e5e7eb",
+      "borderWidth": 1,
+      "borderRadius": 16,
+      "padding": 20
+    },
+    "rows": [
+      {
+        "id": "row-a",
+        "columns": [
+          50,
+          50
+        ],
+        "cells": [
+          {
+            "align": "left",
+            "verticalAlign": "top"
+          },
+          {
+            "align": "center",
+            "verticalAlign": "center"
+          }
+        ],
+        "gap": 12,
+        "minHeight": "80"
+      },
+      {
+        "id": "row-b",
+        "parts": 3,
+        "align": "right",
+        "verticalAlign": "bottom",
+        "gap": null,
+        "minHeight": 60
+      },
+      {
+        "id": "row-c",
+        "columns": [
+          25,
+          75
+        ],
+        "cells": [
+          {},
+          {
+            "align": "nonsense"
+          }
+        ],
+        "minHeight": null,
+        "bgColor": "#fef3c7",
+        "bgImageUrl": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/141206.jpg",
+        "bgSize": "contain",
+        "bgPosition": "top",
+        "bgRepeat": "repeat-x"
+      },
+      {
+        "id": "row-d",
+        "columns": [
+          10,
+          10,
+          20,
+          20,
+          20,
+          20
+        ],
+        "gap": 4,
+        "minHeight": 0
+      }
+    ],
+    "elements": [
+      {
+        "id": "a0-1",
+        "type": "text",
+        "rowId": "row-a",
+        "partIndex": 0,
+        "style": {
+          "message": "A0 первый"
+        }
+      },
+      {
+        "id": "a0-2",
+        "type": "text",
+        "rowId": "row-a",
+        "partIndex": 0,
+        "style": {
+          "message": "A0 второй"
+        }
+      },
+      {
+        "id": "a1",
+        "type": "button",
+        "rowId": "row-a",
+        "partIndex": "1",
+        "style": {
+          "buttonText": "A1"
+        }
+      },
+      {
+        "id": "b0",
+        "type": "text",
+        "rowId": "row-b",
+        "partIndex": 0,
+        "style": {
+          "message": "B0"
+        }
+      },
+      {
+        "id": "b2",
+        "type": "text",
+        "rowId": "row-b",
+        "partIndex": 2,
+        "style": {
+          "message": "B2 внизу",
+          "cellVerticalAlign": "top"
+        }
+      },
+      {
+        "id": "c1",
+        "type": "text",
+        "rowId": "row-c",
+        "partIndex": 1,
+        "style": {
+          "message": "C1 справа",
+          "cellAlign": "right"
+        }
+      },
+      {
+        "id": "d5",
+        "type": "box",
+        "rowId": "row-d",
+        "partIndex": 5,
+        "style": {
+          "message": "D5"
+        }
+      },
+      {
+        "id": "orphan",
+        "type": "text",
+        "rowId": "row-missing",
+        "partIndex": 0,
+        "style": {
+          "message": "Нет такой строки"
+        }
+      },
+      {
+        "id": "out-of-range",
+        "type": "text",
+        "rowId": "row-a",
+        "partIndex": 5,
+        "style": {
+          "message": "Колонки 5 в строке A нет"
+        }
+      },
+      {
+        "id": "a0-3",
+        "type": "text",
+        "rowId": "row-a",
+        "partIndex": 0,
+        "style": {
+          "message": "A0 третий (порядок по массиву)"
+        }
+      }
+    ],
+    "variables": {}
+  }
+}

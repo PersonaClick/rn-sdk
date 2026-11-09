@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { awaitInstance } from '../../lib/facade/facade'
 import InstantSearch from '../design-system/InstantSearch'
-import { RecentSearches, parentName, toCardProduct } from './searchSupport'
+import { RecentSearches, createInstantSearchLoader, parentName } from './searchSupport'
+import { toPersonalizationProduct } from './productSupport'
 
 /**
  * InstantSearchField — мгновенный поиск с данными SDK: поле ввода, недавние запросы,
@@ -18,7 +19,8 @@ import { RecentSearches, parentName, toCardProduct } from './searchSupport'
  * (локальная, по магазину, в AsyncStorage), а из `searchBlank` — товары и популярные
  * категории; популярные фразы (`suggests`) подставляются тегами, только если истории нет.
  * При вводе после `debounce` уходит instant-поиск: фразы из `queries` — тегами, категории
- * и товары — строками. Ответ на устаревший запрос отбрасывается.
+ * и товары — строками. Ответ на устаревший запрос отбрасывается. Ошибка — и отклонённый
+ * промис, и ответ-ошибка метода SDK — уходит в `onError`, как в экране выдачи.
  *
  * Нажатие на товар или категорию запоминает источник `instant_search` (`trackSource`) и
  * отдаёт объект хосту; отправка кладёт фразу в историю и вызывает `onSubmit` — экран полной
@@ -84,8 +86,20 @@ export default function InstantSearchField({
   const [recentExpanded, setRecentExpanded] = useState(false)
   const [blank, setBlank] = useState(null)
   const [instant, setInstant] = useState(null)
-  const seq = useRef(0)
   const timer = useRef(null)
+  const onErrorRef = useRef(onError)
+  onErrorRef.current = onError
+  const loaderRef = useRef(null)
+  if (!loaderRef.current) {
+    loaderRef.current = createInstantSearchLoader({
+      onBlank: setBlank,
+      onInstant: setInstant,
+      onError: (error) => onErrorRef.current && onErrorRef.current(error),
+    })
+  }
+  const loader = loaderRef.current
+  // После размонтирования ответы в полёте отбрасываются, onError не зовётся.
+  useEffect(() => () => loader.cancel(), [loader])
 
   const store = useMemo(
     () => (sdk ? new RecentSearches(sdk.shop_id || shopId || 'default', recentLimit) : null),
@@ -99,34 +113,17 @@ export default function InstantSearchField({
     if (!sdk || !store) return undefined
     let alive = true
     store.load().then((items) => alive && setRecent(items))
-    const current = ++seq.current
-    sdk
-      .searchBlank()
-      .then((response) => {
-        if (alive && current === seq.current) setBlank(response || {})
-      })
-      .catch((error) => alive && onError && onError(error))
+    loader.blank(sdk)
     return () => {
       alive = false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sdk, store])
+  }, [sdk, store, loader])
 
   const runInstant = useCallback(
     (text) => {
-      if (!sdk) return
-      const current = ++seq.current
-      // Ключи только со значением: слой запросов SDK шлёт undefined строкой «undefined».
-      const options = { type: 'instant_search', search_query: text }
-      if (locations) options.locations = locations
-      sdk
-        .search(options)
-        .then((response) => {
-          if (current === seq.current) setInstant(response || {})
-        })
-        .catch((error) => onError && onError(error))
+      if (sdk) loader.instant(sdk, text, locations)
     },
-    [sdk, locations, onError],
+    [sdk, locations, loader],
   )
 
   const typed = useCallback(
@@ -134,13 +131,13 @@ export default function InstantSearchField({
       setQuery(text)
       if (timer.current) clearTimeout(timer.current)
       if (text.trim().length < minChars) {
-        seq.current += 1
+        loader.clearInstant()
         setInstant(null)
         return
       }
       timer.current = setTimeout(() => runInstant(text.trim()), debounce)
     },
-    [minChars, debounce, runInstant],
+    [minChars, debounce, runInstant, loader],
   )
   useEffect(() => () => timer.current && clearTimeout(timer.current), [])
 
@@ -194,7 +191,7 @@ export default function InstantSearchField({
     : []
   const productRows = showProducts
     ? products.slice(0, productsLimit).map((product) => {
-        const card = toCardProduct(product, null)
+        const card = toPersonalizationProduct(product, null)
         return {
           id: card.id,
           title: card.name,

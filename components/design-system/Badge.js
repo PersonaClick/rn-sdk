@@ -32,7 +32,9 @@ export default function Badge({ label, size = 'lg', view = 'warning', style }) {
         style,
       ]}
     >
+      {/* Плашка в одну строку: в тесноте подпись укорачивается, а не ломается по буквам. */}
       <Text
+        numberOfLines={1}
         style={{
           fontFamily: fontFor(theme, '600'),
           fontSize: metrics.fontSize,

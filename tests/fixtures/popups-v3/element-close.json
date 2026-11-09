@@ -1,0 +1,134 @@
+{
+  "_fixture": {
+    "about": "Элемент close: text (по умолчанию ×), image, svg; размер иконки 8–128.",
+    "expect": {
+      "el-close-default": {
+        "mode": "text",
+        "text": "×",
+        "align": "right",
+        "bgColor": "#00000000",
+        "textColor": "#71717aff",
+        "fontSize": 22,
+        "paddingX": 8,
+        "paddingY": 2,
+        "radius": 999,
+        "event": "close"
+      },
+      "el-close-text": {
+        "mode": "text",
+        "text": "Закрыть ×",
+        "align": "left",
+        "fontSize": 16
+      },
+      "el-close-image": {
+        "mode": "image",
+        "url": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/141206.jpg",
+        "size": 128,
+        "note": "200 → 128"
+      },
+      "el-close-svg": {
+        "mode": "svg",
+        "size": 8,
+        "note": "4 → 8. Скрипты и on*-атрибуты вырезать. Допустимо нарисовать стандартный крестик"
+      }
+    }
+  },
+  "id": 9104,
+  "layout": "modal",
+  "placement": "center",
+  "selector": null,
+  "trigger_type": "manual",
+  "trigger_value": null,
+  "trigger_event": null,
+  "frequency": "every_page",
+  "cooldown_minutes": 0,
+  "promo_code_list_id": null,
+  "target_screens": [],
+  "design": {
+    "frameStyle": {
+      "width": 92,
+      "height": 320,
+      "widthMode": "%",
+      "heightMode": "auto",
+      "maxWidth": 480,
+      "maxWidthMode": "px",
+      "bgColor": "#ffffff",
+      "borderColor": "#e5e7eb",
+      "borderWidth": 1,
+      "borderRadius": 16,
+      "padding": 20
+    },
+    "rows": [
+      {
+        "id": "row-1",
+        "columns": [
+          100
+        ],
+        "cells": [
+          {
+            "align": "right",
+            "verticalAlign": "top"
+          }
+        ],
+        "gap": 4,
+        "minHeight": 0
+      },
+      {
+        "id": "row-2",
+        "columns": [
+          34,
+          33,
+          33
+        ],
+        "gap": 4,
+        "minHeight": 0
+      }
+    ],
+    "elements": [
+      {
+        "id": "el-close-default",
+        "type": "close",
+        "rowId": "row-1",
+        "partIndex": 0,
+        "style": {}
+      },
+      {
+        "id": "el-close-text",
+        "type": "close",
+        "rowId": "row-2",
+        "partIndex": 0,
+        "style": {
+          "closeIconMode": "text",
+          "buttonText": "Закрыть ×",
+          "buttonAlign": "left",
+          "buttonTextColor": "#ef4444",
+          "buttonFontSize": "16"
+        }
+      },
+      {
+        "id": "el-close-image",
+        "type": "close",
+        "rowId": "row-2",
+        "partIndex": 1,
+        "style": {
+          "closeIconMode": "image",
+          "imageUrl": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/141206.jpg",
+          "imageAlt": "Закрыть",
+          "closeIconSize": "200"
+        }
+      },
+      {
+        "id": "el-close-svg",
+        "type": "close",
+        "rowId": "row-2",
+        "partIndex": 2,
+        "style": {
+          "closeIconMode": "svg",
+          "closeSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" onload=\"alert(1)\"><script>alert(2)</script><path d=\"M6 6l12 12M18 6L6 18\" stroke=\"#111827\" stroke-width=\"2\"/></svg>",
+          "closeIconSize": "4"
+        }
+      }
+    ],
+    "variables": {}
+  }
+}

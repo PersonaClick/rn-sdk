@@ -7,6 +7,14 @@ export type {
   PurchaseRecommendedBy,
   PurchaseTrackingRequest,
 } from './types/purchaseTracking.js'
+export type {
+  Product,
+  ProductCategory,
+  ProductFilter,
+  ProductInfo,
+  ProductPriceRange,
+  ProductsListResponse,
+} from './types/productModels.js'
 
 export const SESSION_CODE_EXPIRE: number
 export const SDK_API_URL: string
@@ -14,9 +22,32 @@ export const SDK_STORAGE_NAME: string
 export const SDK_PUSH_CHANNEL: string
 
 export function parseCartItem(json: Record<string, unknown>): unknown
-export function parseProduct(json: Record<string, unknown>): unknown
-export function parseProductInfo(json: Record<string, unknown>): unknown
-export function parseProductsListResponse(json: Record<string, unknown>): unknown
+export function parseProduct(json: Record<string, unknown>): import('./types/productModels.js').Product
+export function parseProductInfo(json: Record<string, unknown>): import('./types/productModels.js').ProductInfo
+export function parseProductsListResponse(
+  json: Record<string, unknown>,
+): import('./types/productModels.js').ProductsListResponse
+
+/**
+ * Optional params of `getCategory` (`GET /category/{category}`), sent as they are. Other keys
+ * pass through too.
+ */
+export interface CategoryParams {
+  limit?: number
+  page?: number
+  /** Comma-separated brands, or a list (joined with commas). */
+  brands?: string | string[]
+  /** Facets as a JSON string: `JSON.stringify({ [facet]: [value, ...] })`. */
+  filters?: string
+  price_min?: number | string
+  price_max?: number | string
+  /** `popular`, `price`, `discount`, `sales_rate`, `date`; none — the default order. */
+  sort_by?: string
+  sort_dir?: 'asc' | 'desc'
+  /** Comma-separated location ids, or a list (joined with commas). */
+  locations?: string | string[]
+  [key: string]: unknown
+}
 
 /** Configuration for `PersonaClick.initialize` / `PersonaClick.registerShops`. */
 export interface PersonaClickConfig {
@@ -112,6 +143,13 @@ declare class PersonaClick {
   static handlePush(payload: Record<string, unknown>, event: PushEventValue): void
 
   /**
+   * Whether the SDK presents popups by itself. Off — the popups the SDK shows by itself stay hidden
+   * (one shown by hand is shown all the same). Defaults to `true`; may be changed at any time — off,
+   * say, while a screen of the app must not be covered.
+   */
+  enableAutoPopupPresentation: boolean
+
+  /**
    * Legacy event tracking API.
    *
    * Note: the SDK also supports other events via this method; only the `purchase`
@@ -160,10 +198,29 @@ declare class PersonaClick {
   getProductCounters(item: string): Promise<unknown>
 
   /**
-   * Fetches a category listing (`GET /category/{category}`). `category` is the slug;
-   * optional `params` may include `limit`, `page`, `brands`, `locations`, `filters`.
+   * Fetches full product info by id (`GET /products/get`, `item_id`).
    */
-  getCategory(category: string, params?: Record<string, unknown>): Promise<unknown>
+  getProductInfo(id: string): Promise<import('./types/productModels.js').ProductInfo>
+
+  /**
+   * Fetches a products list (`GET /products`) with optional filters; `filters` is sent as a JSON
+   * string.
+   */
+  getProductsList(options?: {
+    brands?: string
+    merchants?: string
+    categories?: string
+    locations?: string
+    limit?: number
+    page?: number
+    filters?: Record<string, unknown>
+  }): Promise<import('./types/productModels.js').ProductsListResponse>
+
+  /**
+   * Fetches a category listing (`GET /category/{category}`). `category` is the slug; `params`
+   * are sent as they are — see `CategoryParams` (other keys pass through too).
+   */
+  getCategory(category: string, params?: CategoryParams): Promise<unknown>
 
   /**
    * Fetches a configured product collection (`GET /collection/{id}`). `collectionId`

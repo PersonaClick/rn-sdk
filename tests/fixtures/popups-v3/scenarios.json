@@ -1,0 +1,214 @@
+{
+  "_fixture": {
+    "about": "Сценарии движка для общих юнит-тестов: триггеры, экраны, частота, конкуренция, промокод. Время в секундах от старта. screen(x) — вызов API «открыт экран x». Попапы — из list-response.json."
+  },
+  "scenarios": [
+    {
+      "name": "app_start без экранов",
+      "popup": 512,
+      "steps": [
+        "init",
+        "list loaded"
+      ],
+      "expect": "show at list loaded"
+    },
+    {
+      "name": "app_start ждёт подходящий экран",
+      "popup": {
+        "from": 512,
+        "target_screens": [
+          "product"
+        ]
+      },
+      "steps": [
+        "list loaded",
+        "screen(home)",
+        "screen(product)"
+      ],
+      "expect": "show at screen(product)"
+    },
+    {
+      "name": "screen_open по списку экранов",
+      "popup": 513,
+      "steps": [
+        "screen(home)",
+        "screen(product)"
+      ],
+      "expect": "show at screen(product)"
+    },
+    {
+      "name": "screen_open с пустым списком",
+      "popup": {
+        "from": 513,
+        "target_screens": []
+      },
+      "steps": [
+        "screen(home)"
+      ],
+      "expect": "show at screen(home)"
+    },
+    {
+      "name": "time_on_screen ушёл раньше",
+      "popup": 514,
+      "steps": [
+        "t=0 screen(home)",
+        "t=9 screen(category)",
+        "t=20"
+      ],
+      "expect": "no show"
+    },
+    {
+      "name": "time_on_screen досидел",
+      "popup": 514,
+      "steps": [
+        "t=0 screen(home)",
+        "t=10"
+      ],
+      "expect": "show at t=10"
+    },
+    {
+      "name": "time_on_screen и фон",
+      "popup": 514,
+      "steps": [
+        "t=0 screen(home)",
+        "t=5 background",
+        "t=30 foreground",
+        "t=39",
+        "t=40"
+      ],
+      "expect": "show at t=40 (таймер сбрасывается в фоне и стартует заново) — предложение"
+    },
+    {
+      "name": "track_event",
+      "popup": 515,
+      "steps": [
+        "trackEvent(other)",
+        "trackEvent(promo_view)"
+      ],
+      "expect": "show at trackEvent(promo_view)"
+    },
+    {
+      "name": "track_event не на том экране",
+      "popup": {
+        "from": 515,
+        "target_screens": [
+          "cart"
+        ]
+      },
+      "steps": [
+        "screen(home)",
+        "trackEvent(promo_view)",
+        "screen(cart)"
+      ],
+      "expect": "no show (событийный триггер не ждёт экран)"
+    },
+    {
+      "name": "manual",
+      "popup": 516,
+      "steps": [
+        "list loaded",
+        "screen(home)",
+        "show(516)"
+      ],
+      "expect": "GET /popups/516 → show; частота не записана"
+    },
+    {
+      "name": "once_session",
+      "popup": 512,
+      "steps": [
+        "show",
+        "close",
+        "init (тот же sid)",
+        "init (новый sid)"
+      ],
+      "expect": "show, no show, show"
+    },
+    {
+      "name": "once_day и пауза 60 минут",
+      "popup": 513,
+      "steps": [
+        "t=0 screen(product) → show",
+        "t=30m screen(product)",
+        "t=23h screen(product)",
+        "t=24h screen(product)"
+      ],
+      "expect": "show, no, no, show"
+    },
+    {
+      "name": "every_page — раз на экран",
+      "popup": {
+        "from": 512,
+        "frequency": "every_page"
+      },
+      "steps": [
+        "screen(home) → show",
+        "trigger again on home",
+        "screen(product)"
+      ],
+      "expect": "show, no show, show (app_start на каждом экране не стреляет повторно — уточнить)"
+    },
+    {
+      "name": "testmode не пишет частоту",
+      "popup": {
+        "from": 512,
+        "frequency": "once_life"
+      },
+      "steps": [
+        "testmode on",
+        "show",
+        "init"
+      ],
+      "expect": "show, show"
+    },
+    {
+      "name": "одна модалка",
+      "popups": [
+        513,
+        {
+          "from": 513,
+          "id": 613
+        }
+      ],
+      "steps": [
+        "screen(product)"
+      ],
+      "expect": "513 показан, 613 в очереди и показан после закрытия 513, если частота ещё позволяет"
+    },
+    {
+      "name": "баннер не ждёт модалку",
+      "popups": [
+        512,
+        {
+          "from": 514,
+          "trigger_type": "app_start",
+          "target_screens": []
+        }
+      ],
+      "steps": [
+        "list loaded"
+      ],
+      "expect": "модалка 512 и баннер 514 видны вместе"
+    },
+    {
+      "name": "нет промокода",
+      "popup": {
+        "from": 519,
+        "design": "element-promo-code.json"
+      },
+      "steps": [
+        "list loaded",
+        "promo_codes/fetch → 404"
+      ],
+      "expect": "no show, no show event"
+    },
+    {
+      "name": "смена контекста",
+      "steps": [
+        "list loaded",
+        "profile set",
+        "t+2s"
+      ],
+      "expect": "кеш списка сброшен, новый GET через ~2 с; одинаковый profile set в той же сессии повторно не сбрасывает"
+    }
+  ]
+}

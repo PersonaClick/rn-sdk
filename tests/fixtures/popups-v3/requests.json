@@ -1,0 +1,93 @@
+{
+  "_fixture": {
+    "about": "Какие запросы делает SDK (контекст в context). Порядок параметров запроса не важен.",
+    "context": {
+      "shop_id": "c1140c8254976de297c3caf971701a",
+      "did": "DID123",
+      "sid": "SID123",
+      "app_host": "app.personaClick.ru",
+      "api_host": "api.personaClick.ru"
+    }
+  },
+  "list": {
+    "method": "GET",
+    "url": "https://app.personaClick.ru/api/v3/storefront/popups?shop_id=c1140c8254976de297c3caf971701a&did=DID123&sid=SID123&channel=mobile"
+  },
+  "list_testmode_debug": {
+    "method": "GET",
+    "url": "https://app.personaClick.ru/api/v3/storefront/popups?shop_id=c1140c8254976de297c3caf971701a&did=DID123&sid=SID123&channel=mobile&testmode=true&debug=1"
+  },
+  "one": {
+    "method": "GET",
+    "url": "https://app.personaClick.ru/api/v3/storefront/popups/516?shop_id=c1140c8254976de297c3caf971701a&did=DID123&sid=SID123"
+  },
+  "one_testmode": {
+    "method": "GET",
+    "url": "https://app.personaClick.ru/api/v3/storefront/popups/516?shop_id=c1140c8254976de297c3caf971701a&did=DID123&sid=SID123&testmode=true"
+  },
+  "event_show": {
+    "method": "POST",
+    "url": "https://app.personaClick.ru/api/v3/storefront/popups/512/events",
+    "json": {
+      "shop_id": "c1140c8254976de297c3caf971701a",
+      "did": "DID123",
+      "sid": "SID123",
+      "event": "show"
+    }
+  },
+  "event_subscribe": {
+    "method": "POST",
+    "url": "https://app.personaClick.ru/api/v3/storefront/popups/512/events",
+    "json": {
+      "shop_id": "c1140c8254976de297c3caf971701a",
+      "did": "DID123",
+      "sid": "SID123",
+      "event": "subscribe",
+      "channel": "email"
+    }
+  },
+  "init_testmode": {
+    "method": "GET",
+    "url": "https://api.personaclick.com/init?shop_id=c1140c8254976de297c3caf971701a&stream=android&testmode=true",
+    "note": "в тестовом режиме /init тоже с testmode=true, иначе флаг не учтёт попапы в статусе «Тест»"
+  },
+  "promo": {
+    "method": "GET",
+    "url": "https://api.personaclick.com/promo_codes/fetch?shop_id=c1140c8254976de297c3caf971701a&did=DID123&sid=SID123&id=7"
+  },
+  "review_nps": {
+    "method": "POST",
+    "url": "https://app.personaClick.ru/api/v3/polls/nps/reviews",
+    "json": {
+      "shop_id": "c1140c8254976de297c3caf971701a",
+      "did": "DID123",
+      "sid": "SID123",
+      "channel": "popup",
+      "category": "test",
+      "rate": 0,
+      "comment": "Долгая доставка"
+    }
+  },
+  "review_csat_no_comment": {
+    "method": "POST",
+    "url": "https://app.personaClick.ru/api/v3/polls/csat/reviews",
+    "json": {
+      "shop_id": "c1140c8254976de297c3caf971701a",
+      "did": "DID123",
+      "sid": "SID123",
+      "channel": "popup",
+      "campaign": "MNTEST",
+      "rate": 5
+    }
+  },
+  "segment_add": {
+    "method": "POST",
+    "url": "https://api.personaclick.com/segments/add",
+    "json_subset": {
+      "shop_id": "c1140c8254976de297c3caf971701a",
+      "did": "DID123",
+      "segment_id": 123
+    },
+    "note": "после записи профиля/подписки; только по did — обходит баг Android (phone пишется в email)"
+  }
+}

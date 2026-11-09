@@ -1,16 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Image, Pressable, Platform, StyleSheet } from 'react-native'
 import { PersonalizationColorSchemeProvider, fontFor, usePersonalizationTheme } from '../../theme/personalization-theme'
 import { PERSONALIZATION_ICONS } from '../../constants/icons.constants'
 import Button from './Button'
 import Loader from './Loader'
 import StoryNavigation from './StoryNavigation'
+import StoryPollLayer from './StoryPoll'
 import StoryPrice from './StoryPrice'
 import StoryTextBlock from './StoryTextBlock'
 import StoryUsedProducts from './StoryUsedProducts'
 import { storyIconRenderer } from './storyIcons'
 import { copyToClipboard, storyVideoComponent } from './storyNative'
 import { fetchGifLoopMs } from './storyGif'
+import { slidePolls, storyPollTop } from './storyPollSupport'
 import {
   hasText,
   isMediaSlide,
@@ -49,9 +51,13 @@ import {
  *   тап по ней листает, I1) / низ с шагом 16: StoryPrice и все кнопки слайда стопкой (Button LG
  *   Primary)»; кнопок нет — одна с `productButtonText`, она открывает товар. Подпись над промокодом — `title` элемента `product`,
  *   иначе `promoCaption` (C9). Текст-блоки на товарном слайде не рисуются;
- * - медиа: непустые текст-блоки на `y_offset` % высоты слайда (не выше шапки); блок с промокодом
- *   копирует его по тапу (C12); кнопки `button` — Button LG Primary внизу стопкой.
+ * - медиа: непустые текст-блоки на `y_offset` % всей высоты слайда, сдвинутые целиком в область
+ *   между шапкой и кнопками / «товарами» — по правилу карточек опросов; блок с промокодом копирует
+ *   его по тапу (C12); кнопки `button` — Button LG Primary внизу стопкой.
  * Внизу — «Used products» (элемент `products`) и кнопка звука у видео (C7), на любом слайде.
+ * В шапке слева от крестика — «Поделиться», если у слайда есть ссылка (`onShare` просмотрщика).
+ * Опросы (элемент `poll`, API v3) — карточками StoryPoll поверх слайда, если просмотрщику дали
+ * транспорт опросов: между шапкой и кнопками / «товарами», под лоадером и «Повторить».
  *
  * Медиа (C4, C5): картинка готова, когда декодирована; видео — когда пошли кадры. Видео идёт без
  * повтора, о позиции, подгрузке и конце сообщает просмотрщику. Пока медиа грузится — лоадер кита;
@@ -90,6 +96,7 @@ function SlideFrame({
   sheetOpen,
   onSheetToggle,
   onClose,
+  onShare,
   onButtonPress,
   onProductPress,
   onPromoCopied,
@@ -98,6 +105,11 @@ function SlideFrame({
   texts,
   renderIcon,
   media,
+  storyId,
+  pollTransport,
+  pollShopId,
+  onPollHold,
+  onPollFocus,
 }) {
   const theme = usePersonalizationTheme()
   const { colors } = theme
@@ -152,18 +164,27 @@ function SlideFrame({
     onPromoCopied(code, element)
   }
 
-  // Текст-блоки не выше шапки: поле 16 + шапка 46 + шаг 16 от верха безопасной зоны.
+  // Верх тела слайда под шапкой: поле 16 + шапка 46 + шаг 16 от верха безопасной зоны.
   const minTop = (insets.top || 0) + 16 + NAVIGATION_HEIGHT + 16
-  const textBlocks = height
-    ? slideTextBlocks(slide).map((block, index) => (
-        <TextBlockSlot
-          key={index}
-          block={block}
-          top={Math.max(minTop, ((block.yOffset || 0) / 100) * height)}
-          onCopy={copyPromo}
-        />
-      ))
-    : null
+
+  // Область текст-блоков и опросов (опросы — только с транспортом): от верха тела слайда (`minTop`)
+  // до кнопок; у медиа — распорка над кнопками, у товарного — до блока цены и кнопок.
+  const polls = useMemo(() => (pollTransport ? slidePolls(slide) : []), [slide, pollTransport])
+  const blocks = useMemo(() => slideTextBlocks(slide), [slide])
+  const [free, setFree] = useState(null)
+  const measureFree = polls.length || blocks.length
+    ? (event) => {
+        const { y, height: h } = event.nativeEvent.layout
+        setFree((value) => (value && value.y === y && value.height === h ? value : { y, height: h }))
+      }
+    : undefined
+  const region = free ? { top: minTop + free.y, bottom: minTop + free.y + Math.max(0, free.height) } : null
+  const textBlocks =
+    height && region
+      ? blocks.map((block, index) => (
+          <TextBlockSlot key={index} block={block} slideHeight={height} region={region} onCopy={copyPromo} />
+        ))
+      : null
 
   const buttonsColumn = (list) =>
     list.map((button, index) => (
@@ -180,7 +201,11 @@ function SlideFrame({
           product={product}
           label={hasText(product.name) ? product.name : texts.productButtonText}
         />
-        <View style={styles.bottomGroup} pointerEvents="box-none">
+        <View
+          style={styles.bottomGroup}
+          pointerEvents="box-none"
+          onLayout={measureFree ? (event) => measureFree({ nativeEvent: { layout: { y: 0, height: event.nativeEvent.layout.y } } }) : undefined}
+        >
           <StoryPrice
             type={view.type}
             price={view.price}
@@ -210,7 +235,7 @@ function SlideFrame({
   } else {
     body = (
       <>
-        <View style={styles.spacer} pointerEvents="none" />
+        <View style={styles.spacer} pointerEvents="none" onLayout={measureFree} />
         {buttonsColumn(buttons)}
       </>
     )
@@ -257,6 +282,8 @@ function SlideFrame({
             progress={progress}
             onClose={onClose}
             closeLabel={texts.closeLabel}
+            onShare={onShare}
+            shareLabel={texts.shareLabel}
             renderIcon={renderIcon}
           />
           <View style={styles.body} pointerEvents={touches}>
@@ -265,6 +292,20 @@ function SlideFrame({
         </View>
         {bottomRow}
       </View>
+      <StoryPollLayer
+        polls={polls}
+        storyId={storyId}
+        slideId={slide.id}
+        transport={pollTransport}
+        shopId={pollShopId}
+        texts={texts}
+        slideHeight={height}
+        region={region}
+        topLimit={insets.top || 0}
+        onHold={onPollHold}
+        onFocus={onPollFocus}
+        pointerEvents={touches}
+      />
       {mediaState === 'loading' ? (
         <View style={styles.center} pointerEvents="none">
           <Loader />
@@ -280,10 +321,15 @@ function SlideFrame({
 }
 
 /**
- * Текст-блок на своей высоте. С промокодом (C12) он нажимается: код уходит в буфер обмена,
- * сверху тост, просмотрщику — клик; без промокода касания проходят сквозь него к слайду.
+ * Текст-блок на своей высоте — по правилу карточек опросов (storyPollTop): `y_offset` % всей высоты
+ * слайда, потом целиком в `region` между шапкой и кнопками (выше области — к её верху). С промокодом
+ * (C12) он нажимается: код уходит в буфер обмена, сверху тост, просмотрщику — клик; без промокода
+ * касания проходят сквозь него к слайду.
  */
-function TextBlockSlot({ block, top, onCopy }) {
+function TextBlockSlot({ block, slideHeight, region, onCopy }) {
+  const [size, setSize] = useState(0)
+  const top = storyPollTop(block.yOffset, slideHeight, region, size)
+  const measure = (event) => setSize(event.nativeEvent.layout.height)
   const content = (
     <StoryTextBlock
       text={block.text}
@@ -300,7 +346,7 @@ function TextBlockSlot({ block, top, onCopy }) {
   )
   if (!block.promocode) {
     return (
-      <View pointerEvents="none" style={[styles.textBlock, { top }]}>
+      <View pointerEvents="none" style={[styles.textBlock, { top }]} onLayout={measure}>
         {content}
       </View>
     )
@@ -308,6 +354,7 @@ function TextBlockSlot({ block, top, onCopy }) {
   return (
     <Pressable
       style={[styles.textBlock, { top }]}
+      onLayout={measure}
       onPress={() => onCopy(block.promocode, block.element)}
       accessibilityRole="button"
       accessibilityLabel={block.text}

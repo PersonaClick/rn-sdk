@@ -1,0 +1,180 @@
+{
+  "_fixture": {
+    "about": "Мини-опрос NPS/CSAT/CES: шкала, комментарий после оценки, отправка, «спасибо». Коды кампаний — живые у демо-магазина (nps/categories: test, csat/campaigns: MNTEST, ces/campaigns: «MN TEST»).",
+    "expect": {
+      "el-survey-nps": {
+        "scale": [
+          0,
+          10
+        ],
+        "flow": "оценка → поле комментария и кнопка → отправка → surveyThanksText",
+        "request": {
+          "url": "POST https://app.personaClick.ru/api/v3/polls/nps/reviews",
+          "body": {
+            "shop_id": "c1140c8254976de297c3caf971701a",
+            "did": "<did>",
+            "sid": "<sid>",
+            "channel": "popup",
+            "category": "test",
+            "rate": 0,
+            "comment": "<если введён>"
+          }
+        },
+        "events": [
+          {
+            "event": "submit"
+          }
+        ],
+        "note": "rate 0 допустим; старые review() на iOS и RN отклоняют 0 — нужен v3 или правка"
+      },
+      "el-survey-csat": {
+        "scale": [
+          1,
+          5
+        ],
+        "request_body_key": {
+          "campaign": "MNTEST"
+        },
+        "defaults": {
+          "submit": "Отправить",
+          "thanks": "Спасибо!",
+          "scaleBg": "#f3f4f6ff",
+          "activeBg": "#2563ebff"
+        }
+      },
+      "el-survey-ces": {
+        "scale": [
+          1,
+          7
+        ],
+        "request_body_key": {
+          "campaign": "MN TEST"
+        }
+      },
+      "el-survey-unknown": {
+        "type": "nps",
+        "scale": [
+          0,
+          10
+        ]
+      },
+      "blocker": "канал popup должен существовать у магазина (Опросы → Настройки → Каналы), иначе 404 «Channel not found». У демо-магазина сейчас только канал test"
+    }
+  },
+  "id": 9109,
+  "layout": "modal",
+  "placement": "center",
+  "selector": null,
+  "trigger_type": "manual",
+  "trigger_value": null,
+  "trigger_event": null,
+  "frequency": "every_page",
+  "cooldown_minutes": 0,
+  "promo_code_list_id": null,
+  "target_screens": [],
+  "design": {
+    "frameStyle": {
+      "width": 92,
+      "height": 320,
+      "widthMode": "%",
+      "heightMode": "auto",
+      "maxWidth": 480,
+      "maxWidthMode": "px",
+      "bgColor": "#ffffff",
+      "borderColor": "#e5e7eb",
+      "borderWidth": 1,
+      "borderRadius": 16,
+      "padding": 20
+    },
+    "rows": [
+      {
+        "id": "row-1",
+        "columns": [
+          100
+        ],
+        "gap": 8,
+        "minHeight": 0
+      },
+      {
+        "id": "row-2",
+        "columns": [
+          100
+        ],
+        "gap": 8,
+        "minHeight": 0
+      },
+      {
+        "id": "row-3",
+        "columns": [
+          100
+        ],
+        "gap": 8,
+        "minHeight": 0
+      },
+      {
+        "id": "row-4",
+        "columns": [
+          100
+        ],
+        "gap": 8,
+        "minHeight": 0
+      }
+    ],
+    "elements": [
+      {
+        "id": "el-survey-nps",
+        "type": "survey",
+        "rowId": "row-1",
+        "partIndex": 0,
+        "style": {
+          "surveyType": "nps",
+          "surveyCampaignId": "1",
+          "surveyCampaignCode": "test",
+          "surveyQuestion": "Порекомендуете нас **друзьям**?",
+          "surveyMinLabel": "Точно нет",
+          "surveyMaxLabel": "Обязательно",
+          "surveyCommentPlaceholder": "Что можно улучшить?",
+          "surveySubmitText": "Отправить",
+          "surveyThanksText": "Спасибо за *оценку*!",
+          "surveyScaleBg": "#f3f4f6",
+          "surveyScaleColor": "#111827",
+          "surveyScaleActiveBg": "#2563eb",
+          "surveyScaleActiveColor": "#ffffff"
+        }
+      },
+      {
+        "id": "el-survey-csat",
+        "type": "survey",
+        "rowId": "row-2",
+        "partIndex": 0,
+        "style": {
+          "surveyType": "csat",
+          "surveyCampaignCode": "MNTEST",
+          "surveyQuestion": "Как вам заказ?"
+        }
+      },
+      {
+        "id": "el-survey-ces",
+        "type": "survey",
+        "rowId": "row-3",
+        "partIndex": 0,
+        "style": {
+          "surveyType": "ces",
+          "surveyCampaignCode": "MN TEST",
+          "surveyQuestion": "Легко ли было оформить заказ?"
+        }
+      },
+      {
+        "id": "el-survey-unknown",
+        "type": "survey",
+        "rowId": "row-4",
+        "partIndex": 0,
+        "style": {
+          "surveyType": "star",
+          "surveyCampaignCode": "test"
+        }
+      }
+    ],
+    "variables": {}
+  }
+}

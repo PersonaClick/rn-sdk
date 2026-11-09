@@ -16,6 +16,16 @@ export const STORY_DEFAULT_DURATION = 10
 export const hasText = (value) => typeof value === 'string' && value.trim().length > 0
 
 /**
+ * Пропсы без перечисленных: так компоненты кита отбрасывают пропсы v3 — их принимает только шлюз
+ * internal/v3.
+ */
+export function withoutProps(props, names) {
+  const rest = { ...(props || {}) }
+  names.forEach((name) => delete rest[name])
+  return rest
+}
+
+/**
  * Число из значения API: число как есть, строка — десятичная дробь (C10: никогда не целое
  * отсечением). Пробелы-разделители тысяч убираются, запятая считается десятичной точкой,
  * хвост с валютой отбрасывается: `"19 990.50 ₽"` → 19990.5, `"12,5"` → 12.5. Не число — `null`.
@@ -373,6 +383,11 @@ export function slideProductsElement(slide) {
   return elementsOf(slide).find((el) => el.type === 'products' && Array.isArray(el.products) && el.products.length) || null
 }
 
+/** Элементы `poll` слайда (API v3) как пришли; разбор и виды — `slidePolls` в storyPollSupport. */
+export function slidePollElements(slide) {
+  return elementsOf(slide).filter((el) => el && typeof el === 'object' && el.type === 'poll')
+}
+
 /**
  * Текст-блоки слайда, уже разобранные, без пустых (C15). На товарном слайде их нет (C8):
  * там рисуется карточка товара.
@@ -587,4 +602,143 @@ export function playableStories(stories) {
     ids.add(id)
     return true
   })
+}
+
+/** Параметры ссылки «Поделиться»: блок, кампания и слайд (как у JS SDK). */
+export const STORY_SHARE_PARAMS = Object.freeze({ code: 'r46_stories', story: 'r46_story', slide: 'r46_slide' })
+
+const SHARE_STORY_ID = /^\d{1,10}$/
+// Слайд — число или виртуальный слайд товарной кампании `{story_id}_{index}`.
+const SHARE_SLIDE_ID = /^\d{1,10}(_\d{1,4})?$/
+
+/**
+ * Ссылка «Поделиться» показанного слайда (API v3): у кампании с `shareable: false` — нет; иначе
+ * своя ссылка слайда, а без неё — ссылка кампании с id слайда в `r46_slide` (у слайдов товарных
+ * кампаний, `39_2`, своих ссылок нет, и без id ссылка открыла бы кампанию с начала, а не с этого
+ * слайда). Только http(s), регистр схемы не важен; иначе — `null`, и кнопки на слайде нет.
+ *
+ * @param {object} story
+ * @param {object} slide
+ * @returns {string|null}
+ */
+export function storyShareUrl(story, slide) {
+  if (!story || story.shareable === false) return null
+  const own = slide ? slide.share_url : null
+  const campaign = story.share_url
+  let url = null
+  if (typeof own === 'string' && own.length > 0) url = own
+  else if (typeof campaign === 'string' && campaign.length > 0) url = storyShareUrlWithSlide(campaign, slide ? slide.id : null)
+  return typeof url === 'string' && /^https?:\/\//i.test(url) ? url : null
+}
+
+/**
+ * Ссылка кампании с `r46_slide=<id слайда>` в конце строки запроса (до `#`); остальной адрес не
+ * перекодируется. Уже есть `r46_slide` или id не годится для ссылки (до 10 цифр, у товарного слайда
+ * ещё `_` и до 4 цифр) — как есть.
+ *
+ * @param {string} url
+ * @param {string|number|null|undefined} slideId
+ * @returns {string}
+ */
+export function storyShareUrlWithSlide(url, slideId) {
+  const id = slideId === null || slideId === undefined ? '' : String(slideId)
+  if (!SHARE_SLIDE_ID.test(id) || queryParams(url).has(STORY_SHARE_PARAMS.slide)) return url
+  const hash = url.indexOf('#')
+  const base = hash < 0 ? url : url.slice(0, hash)
+  const fragment = hash < 0 ? '' : url.slice(hash)
+  const separator = base.indexOf('?') < 0 ? '?' : /[?&]$/.test(base) ? '' : '&'
+  return `${base}${separator}${STORY_SHARE_PARAMS.slide}=${id}${fragment}`
+}
+
+/**
+ * Слайд, с которого кампания по ссылке «Поделиться» открывается: слайд ссылки (`r46_slide`), если он
+ * в ней есть, иначе `start_position` сервера. Сервер ставит `start_position` только по своим слайдам —
+ * виртуальные слайды товарных кампаний (`39_2`) он не знает.
+ *
+ * @param {object} story
+ * @param {string|null|undefined} slideId
+ * @returns {number}
+ */
+export function storyLinkStartIndex(story, slideId) {
+  if (slideId !== null && slideId !== undefined && slideId !== '') {
+    const slides = Array.isArray(story?.slides) ? story.slides : []
+    const index = slides.findIndex((slide) => slide && String(slide.id) === String(slideId))
+    if (index >= 0) return index
+  }
+  return storyStartIndex(story)
+}
+
+/**
+ * Ссылка для системного окна «Поделиться»: `transform` хоста (например, своя схема приложения
+ * вместо `https://`), без него — как есть. Ошибка, пустой или не строковый результат — исходная.
+ *
+ * @param {string} url
+ * @param {((url: string) => string) | undefined} transform
+ * @returns {string}
+ */
+export function storyShareTarget(url, transform) {
+  if (typeof transform !== 'function') return url
+  try {
+    const next = transform(url)
+    return typeof next === 'string' && next.trim().length > 0 ? next : url
+  } catch (error) {
+    return url
+  }
+}
+
+/**
+ * Ссылка «Поделиться» сторис: `…?r46_stories=<code>&r46_story=<id>[&r46_slide=<id>]`, другие
+ * параметры не мешают. Разбор как у JS SDK (`parseShareLink`): блок непустой, кампания — до 10
+ * цифр; неверный слайд — `null`, кампания всё равно открывается. Не ссылка сторис — `null`.
+ *
+ * @param {string} url
+ * @returns {{ code: string, storyId: number, slideId: string|null } | null}
+ */
+export function parseStoriesShareLink(url) {
+  const params = queryParams(url)
+  const code = params.get(STORY_SHARE_PARAMS.code)
+  const storyId = params.get(STORY_SHARE_PARAMS.story)
+  if (!code || !storyId || !SHARE_STORY_ID.test(storyId)) return null
+  const slideId = params.get(STORY_SHARE_PARAMS.slide)
+  return { code, storyId: Number(storyId), slideId: slideId && SHARE_SLIDE_ID.test(slideId) ? slideId : null }
+}
+
+/** Ключ ссылки сторис для отсева повторов: блок, кампания и слайд. */
+export function storiesShareLinkKey(link) {
+  return link ? `${link.code}\n${link.storyId}\n${link.slideId ?? ''}` : ''
+}
+
+/**
+ * Параметры строки запроса до `#`: первое значение каждого ключа, `+` — пробел, как у
+ * `URLSearchParams.get` (URL в React Native реализован не целиком). Битая %-последовательность
+ * остаётся как есть.
+ *
+ * @returns {Map<string, string>}
+ */
+function queryParams(url) {
+  const result = new Map()
+  if (typeof url !== 'string') return result
+  const hash = url.indexOf('#')
+  const base = hash < 0 ? url : url.slice(0, hash)
+  const start = base.indexOf('?')
+  if (start < 0) return result
+  base
+    .slice(start + 1)
+    .split('&')
+    .forEach((pair) => {
+      if (!pair) return
+      const index = pair.indexOf('=')
+      const key = decodeQueryPart(index < 0 ? pair : pair.slice(0, index))
+      if (!result.has(key)) result.set(key, decodeQueryPart(index < 0 ? '' : pair.slice(index + 1)))
+    })
+  return result
+}
+
+function decodeQueryPart(part) {
+  const text = part.replace(/\+/g, ' ')
+  try {
+    return decodeURIComponent(text)
+  } catch (error) {
+    return text
+  }
 }

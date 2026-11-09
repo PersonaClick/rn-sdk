@@ -1,0 +1,69 @@
+{
+  "_fixture": {
+    "about": "Старый дизайн без rows: компилятор ставит элементы абсолютно по x/y. Предложение для mobile: в потоке, сверху вниз по y, при равном y — по x.",
+    "expect": {
+      "order": [
+        "first",
+        "third",
+        "second"
+      ]
+    }
+  },
+  "id": 9305,
+  "layout": "modal",
+  "placement": "center",
+  "selector": null,
+  "trigger_type": "manual",
+  "trigger_value": null,
+  "trigger_event": null,
+  "frequency": "every_page",
+  "cooldown_minutes": 0,
+  "promo_code_list_id": null,
+  "target_screens": [],
+  "design": {
+    "frameStyle": {
+      "width": 92,
+      "height": 320,
+      "widthMode": "%",
+      "heightMode": "auto",
+      "maxWidth": 480,
+      "maxWidthMode": "px",
+      "bgColor": "#ffffff",
+      "borderColor": "#e5e7eb",
+      "borderWidth": 1,
+      "borderRadius": 16,
+      "padding": 20
+    },
+    "rows": [],
+    "elements": [
+      {
+        "id": "second",
+        "type": "text",
+        "x": 20,
+        "y": 120,
+        "style": {
+          "message": "Второй по y"
+        }
+      },
+      {
+        "id": "first",
+        "type": "text",
+        "x": 200,
+        "y": 10,
+        "style": {
+          "message": "Первый по y"
+        }
+      },
+      {
+        "id": "third",
+        "type": "button",
+        "x": 0,
+        "y": 120,
+        "style": {
+          "buttonText": "Тот же y, левее"
+        }
+      }
+    ],
+    "variables": {}
+  }
+}

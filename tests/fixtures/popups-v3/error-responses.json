@@ -1,0 +1,56 @@
+{
+  "_fixture": {
+    "about": "Ответы ошибок API попапов. Список: 4xx кешируем как пустой на ttl по умолчанию (300 с), сеть/5xx — не кешируем. События: 429 — пауза отправки, остальное не повторяем."
+  },
+  "list_400": {
+    "status": "fail",
+    "message": "Invalid request parameters"
+  },
+  "list_402": {
+    "status": "fail",
+    "message": "Payment required"
+  },
+  "list_403": {
+    "status": "fail",
+    "message": "Access denied"
+  },
+  "list_404": {
+    "status": "fail",
+    "message": "Resource not found"
+  },
+  "one_404": {
+    "status": "fail",
+    "message": "Resource not found"
+  },
+  "events_400_channel": {
+    "status": "fail",
+    "message": "Invalid request parameters",
+    "note": "channel = mobile/web → 400; channel только у subscribe"
+  },
+  "events_429": {
+    "status": "fail",
+    "message": "Too many requests"
+  },
+  "events_ok": {
+    "status": "success"
+  },
+  "promo_404": {
+    "status": "error",
+    "message": "Promo codes list is not found"
+  },
+  "promo_ok": {
+    "code": "ABC123"
+  },
+  "review_404_channel": {
+    "status": "fail",
+    "message": "Channel not found"
+  },
+  "review_ok": {
+    "status": "success",
+    "payload": {
+      "review": {
+        "id": 1
+      }
+    }
+  }
+}

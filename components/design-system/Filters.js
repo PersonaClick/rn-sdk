@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { View, Text, StyleSheet } from 'react-native'
+import { View, Text, ScrollView, StyleSheet } from 'react-native'
 import { usePersonalizationTheme } from '../../theme/personalization-theme'
 import { PERSONALIZATION_ICONS } from '../../constants/icons.constants'
 import Title from './Title'
@@ -127,12 +127,17 @@ export default function Filters({
           <Button size="md" view="ghost" iconStart={PERSONALIZATION_ICONS.crossLarge} renderIcon={renderIcon} onPress={onClose} />
         }
       />
-      {state.map((section) => (
-        <View key={section.id} style={styles.section}>
-          <Text style={[theme.typography.lgEmphasized, { color: colors.textPrimary }]}>{section.title}</Text>
-          {section.kind === 'range' ? range(section) : options(section)}
-        </View>
-      ))}
+      {/* Заголовок и кнопки закреплены, прокручиваются только секции: фасетов бывает десятки,
+          и до «Apply» не надо листать весь список. Высоту задаёт хост (flex: 1 в style);
+          без неё (экран в общей прокрутке хоста) секции идут по содержимому. */}
+      <ScrollView style={styles.sections} contentContainerStyle={styles.sectionsContent} keyboardShouldPersistTaps="handled">
+        {state.map((section) => (
+          <View key={section.id} style={styles.section}>
+            <Text style={[theme.typography.lgEmphasized, { color: colors.textPrimary }]}>{section.title}</Text>
+            {section.kind === 'range' ? range(section) : options(section)}
+          </View>
+        ))}
+      </ScrollView>
       <View style={styles.buttons}>
         <Button label={resetText} size="md" view="secondary" onPress={onReset} style={styles.button} />
         <Button label={applyText} size="md" view="primary" onPress={onApply ? () => onApply(state) : undefined} style={styles.button} />
@@ -145,10 +150,12 @@ const DEFAULT_COLLAPSED = 5
 
 const styles = StyleSheet.create({
   screen: { gap: 16 },
+  sections: { flexGrow: 1, flexShrink: 1 },
+  sectionsContent: { gap: 16, paddingBottom: 16 },
   section: { gap: 12 },
   range: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   field: { flex: 1 },
   options: { gap: 12, alignItems: 'flex-start' },
-  buttons: { flexDirection: 'row', gap: 16, paddingTop: 16 },
+  buttons: { flexDirection: 'row', gap: 16 },
   button: { flex: 1 },
 })

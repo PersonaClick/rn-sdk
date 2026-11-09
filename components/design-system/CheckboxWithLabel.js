@@ -8,18 +8,38 @@ import Checkbox from './Checkbox'
  *
  * Источник: Figma Mobile SDK UI Kit, фрейм Checkbox with Label (205:10151).
  * Зазор 8, подпись 16/20 обычного начертания; в disabled подпись уходит
- * в Text/Hint.
+ * в Text/Hint. Цвета самого чекбокса (`checkedColor`, `checkColor`, `uncheckedColor`,
+ * `borderColor`) передаются в Checkbox как есть.
  *
  * @param {{ label: string, state?: 'unchecked'|'checked'|'indeterminate',
- *           disabled?: boolean, onChange?: (next: string) => void, style?: object }} props
+ *           disabled?: boolean, onChange?: (next: string) => void, checkedColor?: string,
+ *           checkColor?: string, uncheckedColor?: string, borderColor?: string,
+ *           style?: object }} props
  */
-export default function CheckboxWithLabel({ label, state = 'unchecked', disabled = false, onChange, style }) {
+export default function CheckboxWithLabel({
+  label,
+  state = 'unchecked',
+  disabled = false,
+  onChange,
+  checkedColor,
+  checkColor,
+  uncheckedColor,
+  borderColor,
+  style,
+}) {
   const theme = usePersonalizationTheme()
   const { colors } = theme
 
   const row = (
     <View style={[styles.row, style]}>
-      <Checkbox state={state} disabled={disabled} />
+      <Checkbox
+        state={state}
+        disabled={disabled}
+        checkedColor={checkedColor}
+        checkColor={checkColor}
+        uncheckedColor={uncheckedColor}
+        borderColor={borderColor}
+      />
       <Text
         style={[
           styles.label,

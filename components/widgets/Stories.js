@@ -13,9 +13,20 @@ import {
   storyCoverRing,
   storyIndexForId,
   storyLink,
+  storyLinkStartIndex,
   withSlideSeen,
+  withoutProps,
 } from '../design-system/storySupport'
-import { attachStoriesShowHost, requestStoriesShow } from './storiesShow'
+import { attachStoriesShowHost, registerOpenStoriesViewer, requestStoriesShow } from './storiesShow'
+import {
+  fetchStoriesFeedV3,
+  resolveStoriesApiV3Domain,
+  setStoriesApiV3Domain,
+  storiesApiV3Domain,
+  trackStoriesV3,
+} from './storiesApiV3'
+import { handleStoriesLink } from './storiesLink'
+import { createStoriesPollsApi } from './storiesPollsApi'
 
 /**
  * Stories — сторис V2 с данными SDK: лента обложек и полноэкранный просмотр. Виджет сам ходит
@@ -39,6 +50,15 @@ import { attachStoriesShowHost, requestStoriesShow } from './storiesShow'
  * открытие шторки. Id не целые (динамические товарные слайды `39_0`) не трекаются. Источник
  * `stories` с кодом блока (`trackSource`, 48 ч) ставится на каждый показ и клик.
  *
+ * API v3 (`apiV3Domain` виджета, не задан — глобальный `PersonalizationStories.apiV3Domain`;
+ * у каждого виджета своё, соседние независимы): лента и события — на этот хост
+ * (`storiesApiV3`), события и у виртуальных слайдов товарных кампаний; в ленте есть ссылки
+ * «Поделиться» — кнопка в шапке просмотра и событие `share` на нажатие. Хост берётся на загрузке
+ * блока: события уходят туда же, откуда пришла лента. Не задан — всё как раньше.
+ * `shareUrlTransform` — ссылка для окна «Поделиться» из ссылки слайда (событие `share` то же).
+ * Опросы на слайдах (элемент `poll`) — тоже только в v3: просмотру уходит транспорт опросов на тот
+ * же хост (`storiesPollsApi`) или `pollTransport` хоста; без v3 опросы не рисуются.
+ *
  * Нажатия (D): просмотр закрывается, потом `onElementPress(element)` (уведомление, как у прежних
  * сторис) и переход: кнопка → `onLinkClick(url)`, если задан, иначе системный обработчик; товар →
  * `onProductClick(product)`, если задан, иначе его ссылка. Кнопка товарного слайда без ссылки
@@ -50,7 +70,11 @@ import { attachStoriesShowHost, requestStoriesShow } from './storiesShow'
  * по ref. Статический `PersonalizationStories.show()` показывает блок без виджета через
  * `<SdkPopupOverlay>` (см. ui.d.ts).
  *
- * @param {object} props см. PersonalizationStoriesProps в ui.d.ts
+ * Шлюз v3: пропсы v3 (`STORIES_V3_PROPS`) и статика `apiV3Domain` / `handleLink` — только у
+ * PersonalizationStoriesV3 из internal/v3. Виджет кита (экспорт по умолчанию) их отбрасывает и без
+ * своего значения берёт глобальный `apiV3Domain`, как раньше; задать его можно только через шлюз.
+ *
+ * @param {object} props см. PersonalizationStoriesProps в ui.d.ts и PersonalizationStoriesV3Props в v3.d.ts
  */
 function Stories(
   {
@@ -70,12 +94,21 @@ function Stories(
     hideProductsText,
     retryText,
     closeLabel,
+    shareLabel,
     soundOnLabel,
     soundOffLabel,
     insets,
     renderIcon,
     contentContainerStyle,
     style,
+    apiV3Domain,
+    shareUrlTransform,
+    pollTransport,
+    pollReanswerText,
+    pollSubmitText,
+    pollErrorText,
+    // Внутреннее, для handleLink: ответ v3 уже загружен (`{ response, host }`), блок не грузится.
+    preloaded,
   },
   ref,
 ) {
@@ -107,14 +140,15 @@ function Stories(
   const [generation, setGeneration] = useState(0)
   const [failed, setFailed] = useState(false)
 
-  // Открытый просмотр: `{ index, request }` или `null`. `request` растёт на каждое открытие — так
-  // открытие при открытом просмотре листает к сторис, даже если индекс тот же (F11). Ref — чтобы
-  // `pause()` сразу после `open()` видел просмотр, не дожидаясь рендера.
+  // Открытый просмотр: `{ index, request, slide? }` или `null`. `request` растёт на каждое открытие —
+  // так открытие при открытом просмотре листает к сторис, даже если индекс тот же (F11). `slide` —
+  // открыть сразу этот слайд (по ссылке). Ref — чтобы `pause()` сразу после `open()` видел
+  // просмотр, не дожидаясь рендера.
   const [opened, setOpened] = useState(null)
   const openedRef = useRef(null)
   const requests = useRef(0)
-  const showViewer = useCallback((index) => {
-    const next = index === null ? null : { index, request: ++requests.current }
+  const showViewer = useCallback((index, slide) => {
+    const next = index === null ? null : { index, request: ++requests.current, slide }
     openedRef.current = next
     setOpened(next)
     // Пауза хоста — только у открытого просмотра: следующее открытие начинается без неё (F11).
@@ -133,19 +167,26 @@ function Stories(
     }
   }, [code, generation, report, showViewer])
 
-  // Инстанс и код есть — грузим блок, затем виденные слайды по магазину (A2). Ответ на прежний
-  // код отбрасывается.
+  // Инстанс и код есть — грузим блок (v3 или старое API), затем виденные слайды по магазину (A2).
+  // Ответ на прежний код отбрасывается. Хост v3, откуда пришёл блок, — для событий.
+  const v3Host = useRef(null)
+  const ownHost = resolveStoriesApiV3Domain(apiV3Domain)
   useEffect(() => {
     if (!sdk || !code) return undefined
     let alive = true
+    const host = preloaded ? preloaded.host : ownHost
     Promise.resolve()
-      .then(() => sdk.getStories(code))
+      .then(() => {
+        if (preloaded) return preloaded.response
+        return host ? fetchStoriesFeedV3(sdk, code, host) : sdk.getStories(code)
+      })
       .then(async (response) => {
         const list = playableStories(response?.stories)
         const entries = await Promise.all(
           list.map(async (story) => [String(story.id), await getViewedSlides(String(story.id), shop)]),
         )
         if (!alive) return
+        v3Host.current = host || null
         setSeen(Object.fromEntries(entries.filter(([, ids]) => ids.length > 0)))
         setStories(list)
       })
@@ -157,7 +198,7 @@ function Stories(
     return () => {
       alive = false
     }
-  }, [sdk, shop, code, generation, report])
+  }, [sdk, shop, code, generation, report, preloaded, ownHost])
 
   // Загрузка не дольше 15 с — иначе ошибка, и блок прячется, а не висит скелетоном (D).
   const loading = stories === null && !failed && !ambiguous
@@ -170,8 +211,8 @@ function Stories(
     return () => clearTimeout(timer)
   }, [loading, code, generation, report])
 
-  // Трекинг не должен ронять интерфейс (A6): источник `stories` — на каждое событие, сам
-  // `track/stories` — только для целых id.
+  // Трекинг не должен ронять интерфейс (A6): источник `stories` — на каждое событие; v3 — любое
+  // событие и любые id, старый `track/stories` — только `view` / `click` и только целые id.
   const track = useCallback(
     (kind, story, slide) => {
       if (!sdk) return
@@ -180,6 +221,13 @@ function Stories(
       } catch (error) {
         // Источник — атрибуция, не причина ронять сторис.
       }
+      if (v3Host.current) {
+        Promise.resolve()
+          .then(() => trackStoriesV3(sdk, code, kind, story.id, slide.id, v3Host.current))
+          .catch(() => {})
+        return
+      }
+      if (kind !== 'view' && kind !== 'click') return
       if (!isTrackableId(story.id) || !isTrackableId(slide.id)) return
       const call = kind === 'view' ? sdk.trackStoryView : sdk.trackStoryClick
       if (typeof call !== 'function') return
@@ -225,21 +273,37 @@ function Stories(
 
   const visible = useMemo(() => (failed || ambiguous ? [] : stories || []), [failed, ambiguous, stories])
 
+  // Транспорт опросов — только у ленты из v3: свой хоста или клиент опросов на хост ленты.
+  const pollHost = stories === null ? null : v3Host.current
+  const polls = useMemo(
+    () => (pollHost && sdk ? pollTransport || createStoriesPollsApi(sdk, pollHost) : null),
+    [pollHost, sdk, pollTransport],
+  )
+
   // Открытие по ref до загрузки ждёт её (B8, F11); при открытом просмотре листает к сторис в нём
   // (F11). Открывать нечего — показ кончился (внутренний `onViewerClose` для show()); у show()
   // пустой блок ещё и ошибка (F12).
   const pendingOpen = useRef(null)
   const openAt = useCallback(
-    (resolveIndex, { reportEmpty = false } = {}) => {
+    (resolveIndex, { reportEmpty = false, shared = false } = {}) => {
       if (failed || ambiguous) {
         callbacks.current.onViewerClose && callbacks.current.onViewerClose()
         return
       }
       if (stories === null) {
-        pendingOpen.current = { resolveIndex, reportEmpty }
+        pendingOpen.current = { resolveIndex, reportEmpty, shared }
         return
       }
       const index = resolveIndex(visible)
+      if (index >= 0 && index < visible.length && shared) {
+        // По ссылке: слайд ссылки, если он есть в сторис, иначе `start_position` из ответа — в
+        // обход A4; `shared_open` один раз, со слайда, с которого начали.
+        const story = visible[index]
+        const slide = storyLinkStartIndex(story, preloaded ? preloaded.slideId : null)
+        showViewer(index, slide)
+        track('shared_open', story, story.slides[slide])
+        return
+      }
       if (index >= 0 && index < visible.length) {
         showViewer(index)
         return
@@ -247,13 +311,13 @@ function Stories(
       if (reportEmpty && visible.length === 0) report(new Error('PersonalizationStories: the stories block is empty.'))
       callbacks.current.onViewerClose && callbacks.current.onViewerClose()
     },
-    [failed, ambiguous, stories, visible, showViewer, report],
+    [failed, ambiguous, stories, visible, showViewer, report, track, preloaded],
   )
   useEffect(() => {
     if (stories === null || !pendingOpen.current) return
-    const { resolveIndex, reportEmpty } = pendingOpen.current
+    const { resolveIndex, reportEmpty, shared } = pendingOpen.current
     pendingOpen.current = null
-    openAt(resolveIndex, { reportEmpty })
+    openAt(resolveIndex, { reportEmpty, shared })
   }, [stories, openAt])
   // Блок не загрузился, пока ждали открытия, — показ кончился.
   useEffect(() => {
@@ -276,6 +340,8 @@ function Stories(
       reload: () => setGeneration((value) => value + 1),
       // Внутреннее, для show() (F12): неизвестная или не заданная сторис — первая, пустой блок — onError.
       showFrom: (id) => openAt((list) => storyIndexForId(list, id, true), { reportEmpty: true }),
+      // Внутреннее, для handleLink: первая сторис ответа со слайда ссылки.
+      showShared: () => openAt((list) => (list.length > 0 ? 0 : -1), { reportEmpty: true, shared: true }),
     }),
     [openAt],
   )
@@ -296,6 +362,13 @@ function Stories(
     callbacks.current.onViewerClose && callbacks.current.onViewerClose()
   }, [showViewer])
 
+  // Открытый просмотр на учёте: открытие по ссылке закрывает его перед показом своей кампании.
+  const viewerOpen = opened !== null
+  useEffect(() => {
+    if (!viewerOpen) return undefined
+    return registerOpenStoriesViewer(closeViewer)
+  }, [viewerOpen, closeViewer])
+
   if (failed || ambiguous || (stories !== null && visible.length === 0)) return null
 
   return (
@@ -315,6 +388,7 @@ function Stories(
         stories={visible}
         seen={seen}
         initialStoryIndex={opened ? opened.index : 0}
+        initialSlideIndex={opened ? opened.slide : undefined}
         openRequest={opened ? opened.request : 0}
         paused={hostPaused}
         onClose={closeViewer}
@@ -340,6 +414,13 @@ function Stories(
           track('click', story, slide)
           callbacks.current.onElementPress && callbacks.current.onElementPress(element)
         }}
+        onShare={(story, slide) => track('share', story, slide)}
+        shareUrlTransform={shareUrlTransform}
+        pollTransport={polls}
+        pollShopId={shop || ''}
+        pollReanswerText={pollReanswerText}
+        pollSubmitText={pollSubmitText}
+        pollErrorText={pollErrorText}
         productButtonText={productButtonText}
         promoCaption={promoCaption}
         promoCopiedText={promoCopiedText}
@@ -347,6 +428,7 @@ function Stories(
         hideProductsText={hideProductsText}
         retryText={retryText}
         closeLabel={closeLabel}
+        shareLabel={shareLabel}
         soundOnLabel={soundOnLabel}
         soundOffLabel={soundOffLabel}
         insets={insets}
@@ -359,7 +441,33 @@ function Stories(
 /** Блок грузится не дольше, мс (D). */
 const LOAD_TIMEOUT = 15000
 
-const PersonalizationStories = forwardRef(Stories)
+/**
+ * Пропсы v3 виджета и параметры v3 show(): хост API v3, «Поделиться» (подпись, ссылка для окна),
+ * опросы. Плюс внутренние `preloaded` и `shared` открытия по ссылке (handleLink).
+ */
+export const STORIES_V3_PROPS = [
+  'apiV3Domain',
+  'shareLabel',
+  'shareUrlTransform',
+  'pollTransport',
+  'pollReanswerText',
+  'pollSubmitText',
+  'pollErrorText',
+  'preloaded',
+  'shared',
+]
+
+/**
+ * Виджет целиком, с пропсами v3. Наружу — только через шлюз internal/v3 (под именем
+ * PersonalizationStories, со статикой v3 ниже); внутри его рисуют слой показа и виджет кита.
+ */
+export const PersonalizationStoriesV3 = forwardRef(Stories)
+PersonalizationStoriesV3.displayName = 'PersonalizationStories'
+
+/** Виджет кита (`PersonalizationStories` из `ui`): тот же виджет без пропсов v3. */
+const PersonalizationStories = forwardRef(function KitStories(props, ref) {
+  return <PersonalizationStoriesV3 {...withoutProps(props, STORIES_V3_PROPS)} ref={ref} />
+})
 PersonalizationStories.displayName = 'PersonalizationStories'
 
 /**
@@ -368,12 +476,40 @@ PersonalizationStories.displayName = 'PersonalizationStories'
  * попапы; без него `onError` и сразу завершение. Промис завершается, когда просмотр закрыт;
  * пустой блок или ошибка загрузки — `onError` и завершение; неизвестный `startStoryId` — с первой
  * сторис (F12). Без `<SdkPopupOverlay>` — `<PersonalizationStories bar={false} ref={...} />` и
- * `ref.open()` / `ref.openStory(id)`.
+ * `ref.open()` / `ref.openStory(id)`. Параметры v3 кит отбрасывает.
  *
  * @param {object} options
  * @returns {Promise<void>}
  */
-PersonalizationStories.show = (options) => requestStoriesShow(options || {})
+PersonalizationStories.show = (options) => requestStoriesShow(withoutProps(options, STORIES_V3_PROPS))
+
+/** show() шлюза v3: то же, плюс параметры v3 (`apiV3Domain`, `shareUrlTransform`, опросы). */
+PersonalizationStoriesV3.show = (options) => requestStoriesShow(options || {})
+
+/**
+ * Глобальный хост API v3 сторис V2 без схемы, например `app.personaClick.ru`; `null` (по умолчанию) —
+ * старое API. Значение по умолчанию для `apiV3Domain` виджета, show() и handleLink (и для виджетов
+ * кита — у них своего значения нет): с ним лента, кампания по ссылке и события идут на
+ * `https://{apiV3Domain}/api/v3/storefront/stories/…`, и у слайдов со ссылкой появляется
+ * «Поделиться». Читается при загрузке блока.
+ */
+Object.defineProperty(PersonalizationStoriesV3, 'apiV3Domain', {
+  get: storiesApiV3Domain,
+  set: setStoriesApiV3Domain,
+  enumerable: true,
+})
+
+/**
+ * Открытие кампании по ссылке «Поделиться» (`?r46_stories=…&r46_story=…[&r46_slide=…]`) —
+ * `handleLink(url, { sdk | shopId, ...колбэки, ...тексты })`, параметры как у show(), кроме `code`
+ * и `startStoryId`. `true` — ссылка сторис и `apiV3Domain` задан, открытие идёт асинхронно (через
+ * `<SdkPopupOverlay>`, как show); иначе `false`, и ничего не происходит. См. storiesLink.
+ *
+ * @param {string} url
+ * @param {object} [options]
+ * @returns {boolean}
+ */
+PersonalizationStoriesV3.handleLink = (url, options) => handleStoriesLink(url, options || {})
 
 /** Слой показа в `<SdkPopupOverlay>`: текущий запрос — скрытый виджет, открывающий просмотр. */
 function StoriesShowLayer() {
@@ -385,14 +521,17 @@ function StoriesShowLayer() {
 
 function StoriesShowRequest({ request }) {
   const widget = useRef(null)
-  const { startStoryId, onError, ...props } = request.options
+  const { startStoryId, onError, shared, ...props } = request.options
   useEffect(() => {
-    if (widget.current) widget.current.showFrom(startStoryId)
+    if (!widget.current) return
+    if (shared) widget.current.showShared()
+    else widget.current.showFrom(startStoryId)
     // Один раз на запрос: запрос монтируется заново по ключу.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  // Виджет целиком: параметры v3 сюда доходят только из show() / handleLink шлюза v3.
   return (
-    <PersonalizationStories
+    <PersonalizationStoriesV3
       {...props}
       ref={widget}
       bar={false}

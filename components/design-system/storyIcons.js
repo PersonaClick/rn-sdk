@@ -9,11 +9,12 @@ import { PERSONALIZATION_ICONS } from '../../constants/icons.constants'
  * растеризованные из тех же путей SVG кита (PERSONALIZATION_ICONS, рамка 32), чёрные с альфой —
  * цвет даёт `tintColor`. `renderIcon` хоста, если он есть, по-прежнему главнее.
  *
- * Только для сторис (крестик, звук вкл/выкл, копирование, звезда, стрелки «Used products»):
+ * Только для сторис (крестик, «Поделиться», звук вкл/выкл, копирование, звезда, стрелки «Used products»):
  * остальной кит не меняется.
  */
 const BUILT_IN = new Map([
   [PERSONALIZATION_ICONS.cross, require('../../assets/personalization-story-cross.png')],
+  [PERSONALIZATION_ICONS.share, require('../../assets/personalization-story-share.png')],
   [PERSONALIZATION_ICONS.speaker, require('../../assets/personalization-story-speaker.png')],
   [PERSONALIZATION_ICONS.speakerOff, require('../../assets/personalization-story-speaker-off.png')],
   [PERSONALIZATION_ICONS.copy, require('../../assets/personalization-story-copy.png')],
