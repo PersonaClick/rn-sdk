@@ -1,0 +1,379 @@
+{
+ "status": "success",
+ "payload": {
+  "id": 1,
+  "settings": {
+   "avatar_size": "54",
+   "avatar_shape": "circle",
+   "border_not_viewed": "#119400",
+   "border_viewed": "#a0fdbc",
+   "pin_background": "#00cc33",
+   "pin_size": "20",
+   "background": "#ffffff",
+   "background_transparency": "100",
+   "color": "#212529",
+   "font_family": "-apple-system, Inter, system-ui, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif",
+   "font_size": "10",
+   "viewed_transparency": "0",
+   "progress_background": "#ffffff",
+   "close_color": "#ffffff",
+   "button_background": "#3b82f6",
+   "product_slide_background": "#000000",
+   "product_title_color": "#ffffff",
+   "product_price_background": "#f0f0f0",
+   "product_price_transparency": "0",
+   "product_price_color": "#18181b",
+   "product_old_price_color": "#868688",
+   "product_discount_background": "#f97316",
+   "product_status_color": "#ffffff",
+   "product_promo_code_background": "#18181b",
+   "product_promo_code_title_color": "#ffffff",
+   "product_notification_background": "#ffffff",
+   "product_notification_color": "#000000",
+   "pin_symbol": "📌",
+   "css_url": "https://storage.yandexcloud.net/r46v8/1/stories/1.css?v=1793634325-19616ad6"
+  },
+  "stories": [
+   {
+    "id": 9001,
+    "avatar": "https://cdn.stories.personaClick.ru/14fcae67-551d-4a7a-828a-afc13fd5146c.jpg",
+    "name": "Опросы",
+    "pinned": false,
+    "share_url": null,
+    "shareable": false,
+    "start_position": 0,
+    "viewed": false,
+    "slides": [
+     {
+      "id": 900,
+      "background": "https://cdn.stories.personaClick.ru/2e6305ca-06db-4cca-8a75-0f50a0a42a97.jpg",
+      "duration": 10,
+      "elements": [
+       {
+        "type": "poll",
+        "poll_type": "mini_poll",
+        "y_offset": 50,
+        "allow_reanswer": true,
+        "labels": {
+         "reanswer": "Ответить заново",
+         "error": "Не удалось отправить ответ. Попробуйте еще раз"
+        },
+        "poll": {
+         "code": "demo_single",
+         "kind": "single_choice",
+         "question": "Что вам больше нравится?",
+         "placeholder": null,
+         "max_length": null,
+         "submit_label": null,
+         "thanks_text": "Спасибо за ответ!",
+         "show_results": true,
+         "options": [
+          {
+           "id": 1,
+           "label": "Кроссовки"
+          },
+          {
+           "id": 2,
+           "label": "Ботинки"
+          },
+          {
+           "id": 3,
+           "label": "Сандалии"
+          }
+         ]
+        },
+        "answer": null,
+        "results": null
+       }
+      ],
+      "preview": "",
+      "type": "image",
+      "share_url": null
+     },
+     {
+      "id": 901,
+      "background": "https://cdn.stories.personaClick.ru/5458c2f8-816a-4f53-82bb-89ad7995d4e1.jpg",
+      "duration": 10,
+      "elements": [
+       {
+        "type": "poll",
+        "poll_type": "mini_poll",
+        "y_offset": "40",
+        "allow_reanswer": false,
+        "labels": null,
+        "poll": {
+         "code": "demo_multi",
+         "kind": "multiple_choice",
+         "question": "Какие категории вам интересны?",
+         "placeholder": null,
+         "max_length": null,
+         "submit_label": "Отправить ответ",
+         "thanks_text": "Спасибо!",
+         "show_results": true,
+         "options": [
+          {
+           "id": 1,
+           "label": "Обувь"
+          },
+          {
+           "id": 2,
+           "label": "Одежда"
+          },
+          {
+           "id": 3,
+           "label": "Аксессуары"
+          },
+          {
+           "id": 4,
+           "label": "Спорт"
+          },
+          {
+           "id": 5,
+           "label": "Дом"
+          }
+         ]
+        },
+        "answer": null,
+        "results": null
+       }
+      ],
+      "preview": "",
+      "type": "image",
+      "share_url": null
+     },
+     {
+      "id": 902,
+      "background": "https://cdn.stories.personaClick.ru/2e6305ca-06db-4cca-8a75-0f50a0a42a97.jpg",
+      "duration": 10,
+      "elements": [
+       {
+        "type": "poll",
+        "poll_type": "mini_poll",
+        "y_offset": 30,
+        "allow_reanswer": true,
+        "labels": {
+         "reanswer": "Ответить заново",
+         "error": "Не удалось отправить ответ. Попробуйте еще раз"
+        },
+        "poll": {
+         "code": "demo_text",
+         "kind": "text",
+         "question": "Что нам улучшить?",
+         "placeholder": "Ваш ответ",
+         "max_length": "120",
+         "submit_label": null,
+         "thanks_text": "Спасибо за отзыв!",
+         "show_results": false,
+         "options": []
+        },
+        "answer": null,
+        "results": null
+       }
+      ],
+      "preview": "",
+      "type": "image",
+      "share_url": null
+     },
+     {
+      "id": 903,
+      "background": "https://cdn.stories.personaClick.ru/5458c2f8-816a-4f53-82bb-89ad7995d4e1.jpg",
+      "duration": 10,
+      "elements": [
+       {
+        "type": "poll",
+        "poll_type": "nps",
+        "y_offset": 60,
+        "allow_reanswer": true,
+        "labels": {
+         "reanswer": "Ответить заново",
+         "error": "Не удалось отправить ответ. Попробуйте еще раз"
+        },
+        "poll": {
+         "code": "test",
+         "channel": "test",
+         "name": "NPS",
+         "rate_min": 0,
+         "rate_max": 10,
+         "question": "Насколько вероятно, что вы порекомендуете нас друзьям?",
+         "bands": [
+          {
+           "from": 0,
+           "to": 6,
+           "success": "Спасибо, мы станем лучше"
+          },
+          {
+           "from": 7,
+           "to": 8,
+           "success": "Спасибо за оценку"
+          },
+          {
+           "from": 9,
+           "to": 10,
+           "success": "Спасибо, мы рады!"
+          }
+         ]
+        },
+        "answer": null,
+        "results": null
+       }
+      ],
+      "preview": "",
+      "type": "image",
+      "share_url": null
+     },
+     {
+      "id": 904,
+      "background": "https://cdn.stories.personaClick.ru/2e6305ca-06db-4cca-8a75-0f50a0a42a97.jpg",
+      "duration": 10,
+      "elements": [
+       {
+        "type": "poll",
+        "poll_type": "csat",
+        "y_offset": 90,
+        "allow_reanswer": false,
+        "labels": null,
+        "poll": {
+         "code": "demo_csat",
+         "channel": null,
+         "name": "CSAT",
+         "rate_min": null,
+         "rate_max": null,
+         "question": "Как вам наш магазин?",
+         "bands": [
+          {
+           "from": 1,
+           "to": 3,
+           "success": "Жаль"
+          },
+          {
+           "from": 4,
+           "to": 5,
+           "success": "Ура"
+          }
+         ]
+        },
+        "answer": null,
+        "results": null
+       }
+      ],
+      "preview": "",
+      "type": "image",
+      "share_url": null
+     },
+     {
+      "id": 905,
+      "background": "https://cdn.stories.personaClick.ru/5458c2f8-816a-4f53-82bb-89ad7995d4e1.jpg",
+      "duration": 10,
+      "elements": [
+       {
+        "type": "poll",
+        "poll_type": "ces",
+        "y_offset": 5,
+        "allow_reanswer": true,
+        "labels": null,
+        "poll": {
+         "code": "demo_ces",
+         "channel": "stories",
+         "name": "CES",
+         "rate_min": "1",
+         "rate_max": "7",
+         "question": "Легко ли было оформить заказ?",
+         "bands": null
+        },
+        "answer": null,
+        "results": null
+       }
+      ],
+      "preview": "",
+      "type": "image",
+      "share_url": null
+     },
+     {
+      "id": 906,
+      "background": "https://cdn.stories.personaClick.ru/2e6305ca-06db-4cca-8a75-0f50a0a42a97.jpg",
+      "duration": 10,
+      "elements": [
+       {
+        "type": "poll",
+        "poll_type": "mini_poll",
+        "y_offset": 50,
+        "allow_reanswer": true,
+        "labels": {
+         "reanswer": "Ответить заново",
+         "error": "Не удалось отправить ответ. Попробуйте еще раз"
+        },
+        "poll": {
+         "code": "demo_answered",
+         "kind": "single_choice",
+         "question": "Уже отвечено: выбор с результатами",
+         "placeholder": null,
+         "max_length": null,
+         "submit_label": null,
+         "thanks_text": "Спасибо за ответ!",
+         "show_results": true,
+         "options": [
+          {
+           "id": 1,
+           "label": "Да"
+          },
+          {
+           "id": 2,
+           "label": "Нет"
+          }
+         ]
+        },
+        "answer": {
+         "id": 77,
+         "option_ids": [
+          2
+         ],
+         "text": null
+        },
+        "results": {
+         "total": 120,
+         "options": [
+          {
+           "id": 1,
+           "percent": 40
+          },
+          {
+           "id": 2,
+           "percent": 60
+          }
+         ]
+        }
+       }
+      ],
+      "preview": "",
+      "type": "image",
+      "share_url": null
+     },
+     {
+      "id": 907,
+      "background": "https://cdn.stories.personaClick.ru/5458c2f8-816a-4f53-82bb-89ad7995d4e1.jpg",
+      "duration": 10,
+      "elements": [
+       {
+        "type": "poll",
+        "poll_type": "quiz",
+        "y_offset": 50,
+        "allow_reanswer": true,
+        "labels": null,
+        "poll": {
+         "code": "demo_unknown",
+         "kind": "single_choice",
+         "question": "Неизвестный вид — не рисуется"
+        },
+        "answer": null,
+        "results": null
+       }
+      ],
+      "preview": "",
+      "type": "image",
+      "share_url": null
+     }
+    ]
+   }
+  ]
+ }
+}

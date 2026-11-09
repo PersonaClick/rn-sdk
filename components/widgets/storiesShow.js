@@ -66,3 +66,36 @@ export function requestStoriesShow(options = {}) {
 export function activeStoriesShow() {
   return active
 }
+
+// Открытые просмотры сторис V2 — из ленты виджета, show() и по ссылке. Открытие по ссылке
+// закрывает их перед показом своей кампании.
+const openViewers = new Set()
+
+/**
+ * Регистрирует открытый просмотр: `close` закрывает его так же, как крестик.
+ * @returns {() => void} снятие с учёта (просмотр закрыт)
+ */
+export function registerOpenStoriesViewer(close) {
+  const entry = { close }
+  openViewers.add(entry)
+  return () => {
+    openViewers.delete(entry)
+  }
+}
+
+/**
+ * Закрывает все открытые просмотры.
+ * @returns {boolean} был ли открыт хоть один
+ */
+export function closeOpenStoriesViewers() {
+  const list = [...openViewers]
+  openViewers.clear()
+  list.forEach((entry) => {
+    try {
+      entry.close()
+    } catch (error) {
+      // Чужой просмотр не должен мешать показу по ссылке.
+    }
+  })
+  return list.length > 0
+}

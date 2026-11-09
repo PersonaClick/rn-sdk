@@ -183,6 +183,23 @@ async function getSourceParams(shop_id) {
 
 export var DEBUG = false
 
+/**
+ * Popups v3 hook: the engine is attached by `PersonalizationPopups.of(sdk)` (internal/v3) and stays
+ * absent otherwise. A failing hook never breaks the SDK call that triggered it.
+ * @param {MainSDK} sdk
+ * @param {string} hook
+ * @param {...any} args
+ */
+function popupsV3Hook(sdk, hook, ...args) {
+  const engine = sdk._popupsV3
+  if (!engine || typeof engine[hook] !== 'function') return
+  try {
+    engine[hook](...args)
+  } catch (error) {
+    if (DEBUG) console.warn(`[Popups v3] ${hook} failed:`, error)
+  }
+}
+
 class MainSDK extends Performer {
   /**
    * @param {string} shop_id
@@ -222,6 +239,14 @@ class MainSDK extends Performer {
      * @type {(popup: any, sdk: MainSDK) => void | null}
      */
     this.popupPresentationDelegate = null
+
+    /**
+     * Whether the SDK presents popups by itself. Off — the popups the SDK shows by itself stay hidden
+     * (one shown by hand is shown all the same). May be changed at any time — off, say, while a screen
+     * of the app must not be covered.
+     * @type {boolean}
+     */
+    this.enableAutoPopupPresentation = true
 
     // Firebase is initialized automatically by native modules
     // Initialize messaging lazily when needed
@@ -563,6 +588,10 @@ class MainSDK extends Performer {
     if (did) {
       params.did = did
     }
+    // Popups v3 test mode: the /init flag must count popups in the "Test" status too.
+    if (this._popupsV3 && this._popupsV3.testMode) {
+      params.testmode = true
+    }
 
     let retries = 0
     for (;;) {
@@ -620,6 +649,9 @@ class MainSDK extends Performer {
 
     this.initialized = true
     if (DEBUG) console.log('[SDK Init] SDK initialized successfully!')
+    // Popups v3 flag: the engine (if the host enabled it) starts with it.
+    this._popupsV3Flag = response?.popups_v3 === true
+    popupsV3Hook(this, 'onInit')
 
     try {
       // Check for popup in init response
@@ -751,6 +783,7 @@ class MainSDK extends Performer {
   }
 
   track(event, options) {
+    if (event === 'purchase') popupsV3Hook(this, 'onPurchase')
     this.push(async () => {
       try {
         const queryParams = await convertParams(event, options)
@@ -788,6 +821,7 @@ class MainSDK extends Performer {
       console.error(err?.message ?? err)
       return
     }
+    popupsV3Hook(this, 'onPurchase')
 
     this.push(async () => {
       try {
@@ -826,6 +860,7 @@ class MainSDK extends Performer {
       console.error(err?.message ?? err)
       return
     }
+    popupsV3Hook(this, 'onTrackEvent', event)
 
     this.push(async () => {
       try {
@@ -1519,8 +1554,9 @@ class MainSDK extends Performer {
    * Fetches a category listing (`GET /category/{category}`).
    *
    * `shop_id`, `did`, `sid` are added automatically. [category] is the category
-   * slug (not a numeric id). Optional `params` may include `limit`, `page`,
-   * `brands`, `locations`, `filters`.
+   * slug (not a numeric id). Optional `params` are sent as they are: `limit`, `page`,
+   * `brands`, `locations`, `filters` (facets as a JSON string), `price_min`, `price_max`,
+   * `sort_by`, `sort_dir`.
    *
    * @param {string} category - Category slug (path segment).
    * @param {Object} [params={}] - Optional filter/paging params.
@@ -1743,6 +1779,7 @@ class MainSDK extends Performer {
    * @returns {void}
    */
   setProfile(params) {
+    popupsV3Hook(this, 'onContextChange', 'profile', 'set', params)
     this.push(async () => {
       if (
         params.hasOwnProperty('birthday') &&
@@ -2078,6 +2115,7 @@ class MainSDK extends Performer {
    * @returns {void}
    */
   triggers(trigger_name, data) {
+    popupsV3Hook(this, 'onContextChange', 'subscription', trigger_name, data)
     this.push(async () => {
       try {
         return await request(`subscriptions/${trigger_name}`, this.shop_id, {
@@ -2124,6 +2162,7 @@ class MainSDK extends Performer {
    * @param {Record<string, any>} data
    */
   segments(action, data) {
+    if (action !== 'get') popupsV3Hook(this, 'onContextChange', 'segment', action, data)
     return new Promise((resolve, reject) => {
       this.push(() => {
         try {
@@ -2308,6 +2347,11 @@ class MainSDK extends Performer {
           } catch (error) {
             if (DEBUG) console.error('[MainSDK] Error forwarding popup to delegate:', error)
           }
+          return
+        }
+
+        if (!manual && this.enableAutoPopupPresentation === false) {
+          if (DEBUG) console.log('[MainSDK] Popup skipped: automatic popup presentation is off')
           return
         }
 

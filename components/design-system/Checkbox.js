@@ -13,13 +13,29 @@ import { usePersonalizationTheme } from '../../theme/personalization-theme'
  * отрезка собраны из повёрнутых прямоугольников: длины и углы посчитаны из
  * исходных координат (5.30 под 45° и 8.84 под -45°), а не подобраны на глаз.
  *
+ * Цвета по умолчанию — токены кита (следуют схеме). Хост, который рисует чекбокс в своих
+ * цветах (форма попапа), передаёт `checkedColor` (заливка отмеченного), `checkColor` (галка и
+ * черта), `uncheckedColor` (заливка пустого) и `borderColor` (рамка пустого); заданный цвет
+ * заменяет свой токен, кроме заливки disabled — она всегда из токенов кита; незаданный
+ * остаётся токеном.
+ *
  * @param {{ state?: 'unchecked'|'checked'|'indeterminate', disabled?: boolean,
- *           onChange?: (next: string) => void, style?: object }} props
+ *           onChange?: (next: string) => void, checkedColor?: string, checkColor?: string,
+ *           uncheckedColor?: string, borderColor?: string, style?: object }} props
  */
-export default function Checkbox({ state = 'unchecked', disabled = false, onChange, style }) {
+export default function Checkbox({
+  state = 'unchecked',
+  disabled = false,
+  onChange,
+  checkedColor,
+  checkColor,
+  uncheckedColor,
+  borderColor,
+  style,
+}) {
   const theme = usePersonalizationTheme()
-  const { colors } = theme
   const filled = state !== 'unchecked'
+  const paint = checkboxColors(theme.colors, { disabled, checkedColor, checkColor, uncheckedColor, borderColor })
 
   const box = (
     <View
@@ -27,23 +43,19 @@ export default function Checkbox({ state = 'unchecked', disabled = false, onChan
         styles.box,
         { borderRadius: theme.radius.sm },
         filled
-          ? { backgroundColor: disabled ? colors.buttonPrimaryDisabled : colors.buttonPrimary }
-          : {
-              backgroundColor: disabled ? colors.backgroundInputDisabled : colors.backgroundInput,
-              borderWidth: 1,
-              borderColor: colors.lineInput,
-            },
+          ? { backgroundColor: paint.checked }
+          : { backgroundColor: paint.unchecked, borderWidth: 1, borderColor: paint.border },
         style,
       ]}
     >
       {state === 'checked' && (
         <>
-          <View style={[styles.stroke, styles.checkShort, { backgroundColor: colors.textLightPrimary }]} />
-          <View style={[styles.stroke, styles.checkLong, { backgroundColor: colors.textLightPrimary }]} />
+          <View style={[styles.stroke, styles.checkShort, { backgroundColor: paint.check }]} />
+          <View style={[styles.stroke, styles.checkLong, { backgroundColor: paint.check }]} />
         </>
       )}
       {state === 'indeterminate' && (
-        <View style={[styles.stroke, styles.dash, { backgroundColor: colors.textLightPrimary }]} />
+        <View style={[styles.stroke, styles.dash, { backgroundColor: paint.check }]} />
       )}
     </View>
   )
@@ -55,6 +67,21 @@ export default function Checkbox({ state = 'unchecked', disabled = false, onChan
       {box}
     </Pressable>
   )
+}
+
+/**
+ * Цвета чекбокса: заданные хостом, иначе токены кита из `colors` (уже под схему); заливка
+ * disabled — всегда токены кита.
+ * `checked` — заливка отмеченного и неопределённого, `check` — галка и черта,
+ * `unchecked` — заливка пустого, `border` — его рамка.
+ */
+export function checkboxColors(colors, { disabled = false, checkedColor, checkColor, uncheckedColor, borderColor } = {}) {
+  return {
+    checked: disabled ? colors.buttonPrimaryDisabled : checkedColor || colors.buttonPrimary,
+    check: checkColor || colors.textLightPrimary,
+    unchecked: disabled ? colors.backgroundInputDisabled : uncheckedColor || colors.backgroundInput,
+    border: borderColor || colors.lineInput,
+  }
 }
 
 const styles = StyleSheet.create({

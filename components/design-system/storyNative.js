@@ -11,7 +11,11 @@
  *   звук включается только кнопкой на слайде.
  * - react-native-safe-area-context — нижний отступ под навигационной панелью Android, когда
  *   модалка рисуется под ней (edge-to-edge); без него — оценка по размерам экрана и окна.
+ *
+ * «Поделиться» — `Share` ядра React Native, без зависимостей.
  */
+
+import { AppState, Platform, Share } from 'react-native'
 
 // Модули берутся при первом обращении, а не при импорте: плашке цены нужен только буфер обмена,
 // и импорт кита не должен поднимать видеоплеер.
@@ -149,4 +153,60 @@ export function storySoundMuted() {
 /** Запоминает выбор звука до конца процесса. */
 export function rememberStorySoundMuted(muted) {
   soundMuted = !!muted
+}
+
+/** Сколько на Android ждать, что окно выбора заберёт фокус, мс; не забрало — окна не было. */
+const ANDROID_SHARE_SHEET_WAIT = 1000
+
+/**
+ * Системное окно «Поделиться» с одной ссылкой. iOS — `{ url }`, поповер iPad привязан к `anchor`
+ * (тег кнопки); Android — `{ message: url }`. Промис завершается, когда окно закрыто, и никогда
+ * не отклоняется. На iOS это промис `Share.share` (его завершает completionWithItemsHandler); на
+ * Android он завершается сразу после запуска окна выбора, поэтому ждём, пока окно приложения
+ * вернёт фокус (`blur` → `focus` или фон → `active`).
+ *
+ * @param {string} url
+ * @param {number|null} [anchor]
+ * @returns {Promise<void>}
+ */
+export function shareStoryLink(url, anchor) {
+  const open = () =>
+    Platform.OS === 'android' ? Share.share({ message: url }) : Share.share({ url }, anchor ? { anchor } : undefined)
+  if (Platform.OS !== 'android') {
+    return Promise.resolve()
+      .then(open)
+      .then(
+        () => undefined,
+        () => undefined,
+      )
+  }
+  return new Promise((resolve) => {
+    let left = false
+    let done = false
+    let timer = null
+    const subscriptions = []
+    const finish = () => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      subscriptions.forEach((subscription) => subscription?.remove?.())
+      resolve()
+    }
+    const leave = () => {
+      left = true
+      clearTimeout(timer)
+    }
+    try {
+      subscriptions.push(AppState.addEventListener('blur', leave))
+      subscriptions.push(AppState.addEventListener('focus', () => left && finish()))
+      subscriptions.push(AppState.addEventListener('change', (next) => (next === 'active' ? left && finish() : leave())))
+    } catch (error) {
+      // Без событий окна пауза снимется по таймеру.
+    }
+    Promise.resolve()
+      .then(open)
+      .then(() => {
+        if (!left && !done) timer = setTimeout(finish, ANDROID_SHARE_SHEET_WAIT)
+      }, finish)
+  })
 }

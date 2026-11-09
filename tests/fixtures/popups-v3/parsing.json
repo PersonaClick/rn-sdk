@@ -1,0 +1,158 @@
+{
+  "_fixture": {
+    "about": "Векторы для разбора цветов и чисел. Цвет → #RRGGBBAA (в нижнем регистре) или null (нет цвета → запасное значение элемента). Число → значение или запасное. Значения со звёздочкой — наше предложение, у бэка не подтверждено."
+  },
+  "colors": [
+    {
+      "in": "#2563eb",
+      "out": "#2563ebff"
+    },
+    {
+      "in": "#ABC",
+      "out": "#aabbccff"
+    },
+    {
+      "in": "#2563eb80",
+      "out": "#2563eb80",
+      "note": "CSS-порядок RRGGBBAA, не Android AARRGGBB"
+    },
+    {
+      "in": "#abcd",
+      "out": "#aabbccdd",
+      "note": "*"
+    },
+    {
+      "in": "rgba(37, 99, 235, 0.5)",
+      "out": "#2563eb80"
+    },
+    {
+      "in": "rgb(0,0,0)",
+      "out": "#000000ff"
+    },
+    {
+      "in": "rgba(0 0 0 / 50%)",
+      "out": "#00000080",
+      "note": "*"
+    },
+    {
+      "in": "red",
+      "out": "#ff0000ff"
+    },
+    {
+      "in": "RebeccaPurple",
+      "out": "#663399ff"
+    },
+    {
+      "in": "transparent",
+      "out": "#00000000"
+    },
+    {
+      "in": "  #fff  ",
+      "out": "#ffffffff"
+    },
+    {
+      "in": "#GGGGGG",
+      "out": null
+    },
+    {
+      "in": "",
+      "out": null
+    },
+    {
+      "in": null,
+      "out": null
+    },
+    {
+      "in": 255,
+      "out": null
+    },
+    {
+      "in": "url(javascript:alert(1))",
+      "out": null
+    }
+  ],
+  "numbers": [
+    {
+      "in": 12,
+      "fallback": 0,
+      "out": 12
+    },
+    {
+      "in": "12",
+      "fallback": 0,
+      "out": 12
+    },
+    {
+      "in": "12.5",
+      "fallback": 0,
+      "out": 12.5
+    },
+    {
+      "in": " 7 ",
+      "fallback": 0,
+      "out": 7
+    },
+    {
+      "in": "12px",
+      "fallback": 0,
+      "out": 12,
+      "note": "* как parseFloat"
+    },
+    {
+      "in": "",
+      "fallback": 8,
+      "out": 8
+    },
+    {
+      "in": null,
+      "fallback": 110,
+      "out": 110
+    },
+    {
+      "in": "abc",
+      "fallback": 16,
+      "out": 16
+    },
+    {
+      "in": true,
+      "fallback": 1,
+      "out": 1
+    },
+    {
+      "in": -4,
+      "fallback": 0,
+      "out": -4
+    },
+    {
+      "in": "0",
+      "fallback": 22,
+      "out": 0
+    }
+  ],
+  "booleans": [
+    {
+      "in": true,
+      "out": true
+    },
+    {
+      "in": "true",
+      "out": true
+    },
+    {
+      "in": 1,
+      "out": true
+    },
+    {
+      "in": false,
+      "out": false
+    },
+    {
+      "in": "false",
+      "out": false
+    },
+    {
+      "in": null,
+      "out": null
+    }
+  ]
+}

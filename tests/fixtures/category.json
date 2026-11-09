@@ -1,0 +1,217 @@
+{
+ "products_total": 2320,
+ "products": [
+  {
+   "name": "Наушники накладные HONOR CHOICE Headphones Lite Gray (5504ADGF)",
+   "url": "https://www.technodom.kz/p/naushniki-nakladnye-honor-choice-headphones-lite-gray-5504adgf-300252?recommended_by=listing",
+   "deeplink_android": "https://www.technodom.kz/p/naushniki-nakladnye-honor-choice-headphones-lite-gray-5504adgf-300252",
+   "deeplink_ios": "https://www.technodom.kz/p/naushniki-nakladnye-honor-choice-headphones-lite-gray-5504adgf-300252",
+   "category_ids": [
+    "smartfony-i-gadzhety",
+    "naushniki",
+    "vse-naushniki"
+   ],
+   "barcode": "300252",
+   "vendor_code": "5504ADGF",
+   "brand": "Honor",
+   "model": "5504ADGF",
+   "sales_rate": 6755,
+   "relative_sales_rate": 100,
+   "picture": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/146384.jpg",
+   "categories": [
+    {
+     "id": "smartfony-i-gadzhety",
+     "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety?recommended_by=listing",
+     "name": "Смартфоны и гаджеты",
+     "level": "1",
+     "url_handle": "/catalog/smartfony-i-gadzhety?recommended_by=listing"
+    },
+    {
+     "id": "naushniki",
+     "parent_id": "smartfony-i-gadzhety",
+     "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety/naushniki?recommended_by=listing",
+     "name": "Смартфоны и гаджеты - Наушники",
+     "level": "2",
+     "url_handle": "/catalog/smartfony-i-gadzhety/naushniki?recommended_by=listing"
+    },
+    {
+     "id": "vse-naushniki",
+     "parent_id": "naushniki",
+     "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety/naushniki/vse-naushniki?recommended_by=listing",
+     "name": "Наушники - Все наушники",
+     "level": "3",
+     "url_handle": "/catalog/smartfony-i-gadzhety/naushniki/vse-naushniki?recommended_by=listing"
+    }
+   ],
+   "price_formatted": "15 990 ₽",
+   "price_full_formatted": "15 990.00 ₽",
+   "price": 15990,
+   "price_full": 15990,
+   "image_url": "https://api.technodom.kz/f3/api/v1/images/300252_1.jpg",
+   "image_url_handle": "/f3/api/v1/images/300252_1.jpg",
+   "image_url_resized": {
+    "120": "https://pictures.personaClick.ru/resize-images/120/c1140c8254976de297c3caf971701a/146384.jpg",
+    "140": "https://pictures.personaClick.ru/resize-images/140/c1140c8254976de297c3caf971701a/146384.jpg",
+    "160": "https://pictures.personaClick.ru/resize-images/160/c1140c8254976de297c3caf971701a/146384.jpg",
+    "180": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/146384.jpg",
+    "200": "https://pictures.personaClick.ru/resize-images/200/c1140c8254976de297c3caf971701a/146384.jpg",
+    "220": "https://pictures.personaClick.ru/resize-images/220/c1140c8254976de297c3caf971701a/146384.jpg",
+    "310": "https://pictures.personaClick.ru/resize-images/310/c1140c8254976de297c3caf971701a/146384.jpg",
+    "520": "https://pictures.personaClick.ru/resize-images/520/c1140c8254976de297c3caf971701a/146384.jpg",
+    "original": "https://api.technodom.kz/f3/api/v1/images/300252_1.jpg"
+   },
+   "url_handle": "/p/naushniki-nakladnye-honor-choice-headphones-lite-gray-5504adgf-300252?recommended_by=listing",
+   "currency": "₽",
+   "_id": "146384",
+   "id": "300252",
+   "stock_quantity": 999999,
+   "group_id": "_146384_"
+  },
+  {
+   "name": "Гарнитура Накладная Logitech H150, White, 981-000350",
+   "url": "https://www.technodom.kz/p/garnitura-nakladnaa-logitech-h-white-868?recommended_by=listing",
+   "deeplink_android": "https://www.technodom.kz/p/garnitura-nakladnaa-logitech-h-white-868",
+   "deeplink_ios": "https://www.technodom.kz/p/garnitura-nakladnaa-logitech-h-white-868",
+   "category_ids": [
+    "smartfony-i-gadzhety",
+    "naushniki",
+    "vse-naushniki"
+   ],
+   "barcode": "868",
+   "vendor_code": "981-000350",
+   "brand": "Logitech",
+   "model": "981-000350",
+   "picture": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/131887.jpg",
+   "categories": [
+    {
+     "id": "smartfony-i-gadzhety",
+     "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety?recommended_by=listing",
+     "name": "Смартфоны и гаджеты",
+     "level": "1",
+     "url_handle": "/catalog/smartfony-i-gadzhety?recommended_by=listing"
+    },
+    {
+     "id": "naushniki",
+     "parent_id": "smartfony-i-gadzhety",
+     "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety/naushniki?recommended_by=listing",
+     "name": "Смартфоны и гаджеты - Наушники",
+     "level": "2",
+     "url_handle": "/catalog/smartfony-i-gadzhety/naushniki?recommended_by=listing"
+    },
+    {
+     "id": "vse-naushniki",
+     "parent_id": "naushniki",
+     "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety/naushniki/vse-naushniki?recommended_by=listing",
+     "name": "Наушники - Все наушники",
+     "level": "3",
+     "url_handle": "/catalog/smartfony-i-gadzhety/naushniki/vse-naushniki?recommended_by=listing"
+    }
+   ],
+   "price_formatted": "14 990 ₽",
+   "price_full_formatted": "14 990.00 ₽",
+   "price": 14990,
+   "price_full": 14990,
+   "image_url": "https://api.technodom.kz/f3/api/v1/images/garnitura_nakladnaa_logitech_h_white_868_1.jpg",
+   "image_url_handle": "/f3/api/v1/images/garnitura_nakladnaa_logitech_h_white_868_1.jpg",
+   "image_url_resized": {
+    "120": "https://pictures.personaClick.ru/resize-images/120/c1140c8254976de297c3caf971701a/131887.jpg",
+    "140": "https://pictures.personaClick.ru/resize-images/140/c1140c8254976de297c3caf971701a/131887.jpg",
+    "160": "https://pictures.personaClick.ru/resize-images/160/c1140c8254976de297c3caf971701a/131887.jpg",
+    "180": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/131887.jpg",
+    "200": "https://pictures.personaClick.ru/resize-images/200/c1140c8254976de297c3caf971701a/131887.jpg",
+    "220": "https://pictures.personaClick.ru/resize-images/220/c1140c8254976de297c3caf971701a/131887.jpg",
+    "310": "https://pictures.personaClick.ru/resize-images/310/c1140c8254976de297c3caf971701a/131887.jpg",
+    "520": "https://pictures.personaClick.ru/resize-images/520/c1140c8254976de297c3caf971701a/131887.jpg",
+    "original": "https://api.technodom.kz/f3/api/v1/images/garnitura_nakladnaa_logitech_h_white_868_1.jpg"
+   },
+   "url_handle": "/p/garnitura-nakladnaa-logitech-h-white-868?recommended_by=listing",
+   "currency": "₽",
+   "_id": "131887",
+   "id": "868",
+   "stock_quantity": 999999,
+   "group_id": "_131887_"
+  }
+ ],
+ "price_range": {
+  "min": 190,
+  "max": 1863890
+ },
+ "price_ranges": [
+  {
+   "to": 10000,
+   "count": 501
+  },
+  {
+   "from": 10000,
+   "to": 25000,
+   "count": 378
+  },
+  {
+   "from": 25000,
+   "to": 50000,
+   "count": 415
+  }
+ ],
+ "price_median": 35000,
+ "filters": {
+  "NFC": {
+   "count": 6,
+   "values": {
+    "Нет": 6
+   }
+  },
+  "has_gift": {
+   "count": 81,
+   "values": {
+    "1": 81
+   },
+   "ranges": {
+    "min": 1,
+    "max": 1
+   }
+  },
+  "is_preorder": {
+   "count": 2320,
+   "values": {
+    "False": 2320
+   }
+  }
+ },
+ "brands": [
+  {
+   "name": "A-Case",
+   "count": 1
+  },
+  {
+   "name": "ACEFAST",
+   "count": 21
+  },
+  {
+   "name": "AULA",
+   "count": 3
+  }
+ ],
+ "categories": [
+  {
+   "id": "smartfony-i-gadzhety",
+   "name": "Смартфоны и гаджеты",
+   "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety?recommended_by=listing",
+   "url_handle": "/catalog/smartfony-i-gadzhety?recommended_by=listing",
+   "count": 2320
+  },
+  {
+   "id": "brendy",
+   "name": "Бренды",
+   "url": "https://www.technodom.kz/catalog/brendy?recommended_by=listing",
+   "url_handle": "/catalog/brendy?recommended_by=listing",
+   "count": 77
+  },
+  {
+   "id": "tv-audio-foto-video",
+   "name": "ТВ, аудио, фото, видео",
+   "url": "https://www.technodom.kz/catalog/tv-audio-foto-video?recommended_by=listing",
+   "url_handle": "/catalog/tv-audio-foto-video?recommended_by=listing",
+   "count": 21
+  }
+ ]
+}

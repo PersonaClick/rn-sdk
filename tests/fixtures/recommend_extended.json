@@ -1,0 +1,151 @@
+{
+ "id": 877,
+ "title": "Популярные",
+ "recommends": [
+  {
+   "name": "Двухкамерный холодильник Beko RDSK-240M00W",
+   "url": "https://www.technodom.kz/p/holodilnik-beko-rdsk-mw-52173?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962",
+   "deeplink_android": "https://www.technodom.kz/p/holodilnik-beko-rdsk-mw-52173",
+   "deeplink_ios": "https://www.technodom.kz/p/holodilnik-beko-rdsk-mw-52173",
+   "category_ids": [
+    "bytovaja-tehnika",
+    "holodil-niki",
+    "hranenie-produktov-i-napitkov"
+   ],
+   "barcode": "52173",
+   "vendor_code": "RDSK-240M00W",
+   "brand": "Beko",
+   "model": "RDSK-240M00W",
+   "sales_rate": 3969,
+   "relative_sales_rate": 58.76,
+   "picture": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/132229.jpg",
+   "categories": [
+    {
+     "id": "bytovaja-tehnika",
+     "url": "https://www.technodom.kz/catalog/bytovaja-tehnika?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962",
+     "name": "Бытовая техника",
+     "level": "1",
+     "name_with_parent": "Бытовая техника",
+     "url_handle": "/catalog/bytovaja-tehnika?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962"
+    },
+    {
+     "id": "hranenie-produktov-i-napitkov",
+     "parent_id": "bytovaja-tehnika",
+     "url": "https://www.technodom.kz/catalog/bytovaja-tehnika/hranenie-produktov-i-napitkov?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962",
+     "name": "Хранение продуктов и напитков",
+     "level": "2",
+     "name_with_parent": "Бытовая техника - Хранение продуктов и напитков",
+     "url_handle": "/catalog/bytovaja-tehnika/hranenie-produktov-i-napitkov?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962"
+    },
+    {
+     "id": "holodil-niki",
+     "parent_id": "hranenie-produktov-i-napitkov",
+     "url": "https://www.technodom.kz/catalog/bytovaja-tehnika/hranenie-produktov-i-napitkov/holodil-niki?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962",
+     "name": "Холодильники",
+     "level": "3",
+     "name_with_parent": "Хранение продуктов и напитков - Холодильники",
+     "url_handle": "/catalog/bytovaja-tehnika/hranenie-produktov-i-napitkov/holodil-niki?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962"
+    }
+   ],
+   "discount_percent": 5,
+   "price_formatted": "164 990 ₽",
+   "price_full_formatted": "164 990.00 ₽",
+   "price": 164990,
+   "price_full": 164990,
+   "oldprice_formatted": "174 990 ₽",
+   "oldprice_full_formatted": "174 990.00 ₽",
+   "oldprice": 174990,
+   "oldprice_full": 174990,
+   "image_url": "https://api.technodom.kz/f3/api/v1/images/holodilnik_beko_rdsk_mw_52173_1.jpg",
+   "image_url_handle": "/f3/api/v1/images/holodilnik_beko_rdsk_mw_52173_1.jpg",
+   "image_url_resized": {
+    "120": "https://pictures.personaClick.ru/resize-images/120/c1140c8254976de297c3caf971701a/132229.jpg",
+    "140": "https://pictures.personaClick.ru/resize-images/140/c1140c8254976de297c3caf971701a/132229.jpg",
+    "160": "https://pictures.personaClick.ru/resize-images/160/c1140c8254976de297c3caf971701a/132229.jpg",
+    "180": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/132229.jpg",
+    "200": "https://pictures.personaClick.ru/resize-images/200/c1140c8254976de297c3caf971701a/132229.jpg",
+    "220": "https://pictures.personaClick.ru/resize-images/220/c1140c8254976de297c3caf971701a/132229.jpg",
+    "310": "https://pictures.personaClick.ru/resize-images/310/c1140c8254976de297c3caf971701a/132229.jpg",
+    "520": "https://pictures.personaClick.ru/resize-images/520/c1140c8254976de297c3caf971701a/132229.jpg",
+    "original": "https://api.technodom.kz/f3/api/v1/images/holodilnik_beko_rdsk_mw_52173_1.jpg"
+   },
+   "url_handle": "/p/holodilnik-beko-rdsk-mw-52173?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962",
+   "discount": 6,
+   "discount_formatted": "6%",
+   "currency": "₽",
+   "_id": "132229",
+   "id": "52173",
+   "stock_quantity": 999999,
+   "group_id": "_132229_"
+  },
+  {
+   "name": "Наушники накладные HONOR CHOICE Headphones Lite Gray (5504ADGF)",
+   "url": "https://www.technodom.kz/p/naushniki-nakladnye-honor-choice-headphones-lite-gray-5504adgf-300252?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962",
+   "deeplink_android": "https://www.technodom.kz/p/naushniki-nakladnye-honor-choice-headphones-lite-gray-5504adgf-300252",
+   "deeplink_ios": "https://www.technodom.kz/p/naushniki-nakladnye-honor-choice-headphones-lite-gray-5504adgf-300252",
+   "category_ids": [
+    "smartfony-i-gadzhety",
+    "naushniki",
+    "vse-naushniki"
+   ],
+   "barcode": "300252",
+   "vendor_code": "5504ADGF",
+   "brand": "Honor",
+   "model": "5504ADGF",
+   "sales_rate": 6755,
+   "relative_sales_rate": 100,
+   "picture": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/146384.jpg",
+   "categories": [
+    {
+     "id": "smartfony-i-gadzhety",
+     "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962",
+     "name": "Смартфоны и гаджеты",
+     "level": "1",
+     "name_with_parent": "Смартфоны и гаджеты",
+     "url_handle": "/catalog/smartfony-i-gadzhety?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962"
+    },
+    {
+     "id": "naushniki",
+     "parent_id": "smartfony-i-gadzhety",
+     "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety/naushniki?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962",
+     "name": "Наушники",
+     "level": "2",
+     "name_with_parent": "Смартфоны и гаджеты - Наушники",
+     "url_handle": "/catalog/smartfony-i-gadzhety/naushniki?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962"
+    },
+    {
+     "id": "vse-naushniki",
+     "parent_id": "naushniki",
+     "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety/naushniki/vse-naushniki?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962",
+     "name": "Все наушники",
+     "level": "3",
+     "name_with_parent": "Наушники - Все наушники",
+     "url_handle": "/catalog/smartfony-i-gadzhety/naushniki/vse-naushniki?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962"
+    }
+   ],
+   "price_formatted": "15 990 ₽",
+   "price_full_formatted": "15 990.00 ₽",
+   "price": 15990,
+   "price_full": 15990,
+   "image_url": "https://api.technodom.kz/f3/api/v1/images/300252_1.jpg",
+   "image_url_handle": "/f3/api/v1/images/300252_1.jpg",
+   "image_url_resized": {
+    "120": "https://pictures.personaClick.ru/resize-images/120/c1140c8254976de297c3caf971701a/146384.jpg",
+    "140": "https://pictures.personaClick.ru/resize-images/140/c1140c8254976de297c3caf971701a/146384.jpg",
+    "160": "https://pictures.personaClick.ru/resize-images/160/c1140c8254976de297c3caf971701a/146384.jpg",
+    "180": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/146384.jpg",
+    "200": "https://pictures.personaClick.ru/resize-images/200/c1140c8254976de297c3caf971701a/146384.jpg",
+    "220": "https://pictures.personaClick.ru/resize-images/220/c1140c8254976de297c3caf971701a/146384.jpg",
+    "310": "https://pictures.personaClick.ru/resize-images/310/c1140c8254976de297c3caf971701a/146384.jpg",
+    "520": "https://pictures.personaClick.ru/resize-images/520/c1140c8254976de297c3caf971701a/146384.jpg",
+    "original": "https://api.technodom.kz/f3/api/v1/images/300252_1.jpg"
+   },
+   "url_handle": "/p/naushniki-nakladnye-honor-choice-headphones-lite-gray-5504adgf-300252?recommended_by=dynamic&recommended_code=e6249bb15043644bf25b135006149962",
+   "currency": "₽",
+   "_id": "146384",
+   "id": "300252",
+   "stock_quantity": 999999,
+   "group_id": "_146384_"
+  }
+ ]
+}

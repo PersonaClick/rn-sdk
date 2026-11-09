@@ -1,0 +1,82 @@
+{
+  "_fixture": {
+    "about": "Блок рекомендаций: товары по коду блока, горизонтальная лента, placeholder до загрузки. Код — живой блок «Популярные» демо-магазина.",
+    "expect": {
+      "el-rec": {
+        "code": "e6249bb15043644bf25b135006149962",
+        "layout": "горизонтальная лента карточек кита",
+        "placeholder_minHeight": 40,
+        "box": "фон прозрачный, без рамки, отступов и тени — как Recommendation#box_declarations",
+        "click": "обычный клик по рекомендации (источник dynamic/код блока) + событие click попапа (уточнить у бэка)"
+      },
+      "el-rec-empty": {
+        "rendered": false
+      }
+    }
+  },
+  "id": 9110,
+  "layout": "modal",
+  "placement": "center",
+  "selector": null,
+  "trigger_type": "manual",
+  "trigger_value": null,
+  "trigger_event": null,
+  "frequency": "every_page",
+  "cooldown_minutes": 0,
+  "promo_code_list_id": null,
+  "target_screens": [],
+  "design": {
+    "frameStyle": {
+      "width": 92,
+      "height": 320,
+      "widthMode": "%",
+      "heightMode": "auto",
+      "maxWidth": 480,
+      "maxWidthMode": "px",
+      "bgColor": "#ffffff",
+      "borderColor": "#e5e7eb",
+      "borderWidth": 1,
+      "borderRadius": 16,
+      "padding": 20
+    },
+    "rows": [
+      {
+        "id": "row-1",
+        "columns": [
+          100
+        ],
+        "cells": [
+          {
+            "align": "left",
+            "verticalAlign": "top"
+          }
+        ],
+        "gap": 8,
+        "minHeight": 0
+      }
+    ],
+    "elements": [
+      {
+        "id": "el-rec",
+        "type": "recommendation",
+        "rowId": "row-1",
+        "partIndex": 0,
+        "style": {
+          "recommenderCode": "e6249bb15043644bf25b135006149962",
+          "bgColor": "#ffffff",
+          "paddingX": 16
+        }
+      },
+      {
+        "id": "el-rec-empty",
+        "type": "recommendation",
+        "rowId": "row-1",
+        "partIndex": 0,
+        "style": {
+          "recommenderCode": "  "
+        }
+      }
+    ],
+    "variables": {}
+  }
+}

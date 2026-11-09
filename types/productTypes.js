@@ -40,7 +40,7 @@ function parseCategory(json) {
     name: json.name ?? '',
     url: json.url,
     alias: json.alias,
-    parentId: json.parent ?? json.parentId,
+    parentId: json.parent ?? json.parent_id ?? json.parentId,
     count: json.count,
   };
 }
@@ -74,6 +74,32 @@ function parsePriceRange(json) {
 }
 
 /**
+ * The API sometimes sends numbers as strings (products/get: `price: "14990.0"`). A numeric string
+ * becomes a number; any other value is returned as is, so the caller's default still applies.
+ */
+function numeric(value) {
+  if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value);
+  return value;
+}
+
+/** A number (or a numeric string), otherwise `fallback`. */
+function numberOr(value, fallback) {
+  const number = numeric(value);
+  return typeof number === 'number' && Number.isFinite(number) ? number : fallback;
+}
+
+/** A number, or a numeric string as products/get sometimes sends; anything else is absent. */
+function optionalNumber(value) {
+  return numberOr(value, undefined);
+}
+
+/** `discount` is a number; products/get sends `false` for a product without one. */
+function parseDiscount(value) {
+  if (value === false) return 0;
+  return numeric(value) ?? 0;
+}
+
+/**
  * Product (short form in list responses).
  * @typedef {Object} Product
  * @property {string} id
@@ -101,6 +127,10 @@ function parsePriceRange(json) {
  * @property {number} [relativeSalesRate]
  * @property {boolean} [isNew]
  * @property {Array<Record<string, any>>} [params]
+ * @property {string} [deeplinkAndroid]
+ * @property {string} [discountFormatted] - Discount as formatted by the server, e.g. "6%".
+ * @property {number} [discountPercent]
+ * @property {string} [picture] - Resized picture URL (same value as resizedImageUrl from API).
  */
 export function parseProduct(json) {
   if (!json || typeof json !== 'object') {
@@ -116,6 +146,7 @@ export function parseProduct(json) {
       price: 0,
       priceFormatted: '',
       currency: '',
+      deeplinkAndroid: '',
     };
   }
   return {
@@ -130,20 +161,24 @@ export function parseProduct(json) {
     resizedImages: json.image_url_resized && typeof json.image_url_resized === 'object' ? json.image_url_resized : {},
     url: json.url ?? '',
     deeplinkIos: json.deeplink_ios ?? json.deeplinkIos ?? '',
-    price: typeof json.price === 'number' ? json.price : 0,
+    price: numberOr(json.price, 0),
     priceFormatted: json.price_formatted ?? '',
-    priceFull: json.price_full,
+    priceFull: numeric(json.price_full),
     priceFullFormatted: json.price_full_formatted,
-    oldPrice: json.oldprice,
+    oldPrice: numeric(json.oldprice),
     oldPriceFormatted: json.oldprice_formatted,
-    oldPriceFull: json.oldprice_full,
+    oldPriceFull: numeric(json.oldprice_full),
     oldPriceFullFormatted: json.oldprice_full_formatted,
     currency: json.currency ?? '',
-    salesRate: json.sales_rate ?? 0,
-    discount: json.discount ?? 0,
-    relativeSalesRate: json.relative_sales_rate ?? 0,
+    salesRate: numeric(json.sales_rate) ?? 0,
+    discount: parseDiscount(json.discount),
+    relativeSalesRate: numeric(json.relative_sales_rate) ?? 0,
     isNew: json.is_new,
     params: json.params,
+    deeplinkAndroid: json.deeplink_android ?? json.deeplinkAndroid ?? '',
+    discountFormatted: json.discount_formatted,
+    discountPercent: optionalNumber(json.discount_percent),
+    picture: json.picture,
   };
 }
 
@@ -176,6 +211,10 @@ export function parseProduct(json) {
  * @property {string} [barcode]
  * @property {boolean} [isNew]
  * @property {Array<Record<string, any>>} [params]
+ * @property {string} [deeplinkAndroid]
+ * @property {string} [discountFormatted] - Discount as formatted by the server, e.g. "6%".
+ * @property {number} [discountPercent]
+ * @property {string} [picture] - Resized picture URL (same value as resizedImageUrl from API).
  */
 export function parseProductInfo(json) {
   if (!json || typeof json !== 'object') {
@@ -192,6 +231,7 @@ export function parseProductInfo(json) {
       price: 0,
       priceFormatted: '',
       currency: '',
+      deeplinkAndroid: '',
     };
   }
   const categoriesJson = Array.isArray(json.categories) ? json.categories : [];
@@ -207,21 +247,25 @@ export function parseProductInfo(json) {
     url: json.url ?? '',
     deeplinkIos: json.deeplink_ios ?? json.deeplinkIos ?? '',
     categories: categoriesJson.map(parseCategory),
-    price: typeof json.price === 'number' ? json.price : 0,
+    price: numberOr(json.price, 0),
     priceFormatted: json.price_formatted ?? '',
-    priceFull: json.price_full,
+    priceFull: numeric(json.price_full),
     priceFullFormatted: json.price_full_formatted,
-    oldPrice: json.oldprice,
+    oldPrice: numeric(json.oldprice),
     oldPriceFormatted: json.oldprice_formatted,
-    oldPriceFull: json.oldprice_full,
+    oldPriceFull: numeric(json.oldprice_full),
     oldPriceFullFormatted: json.oldprice_full_formatted,
     currency: json.currency ?? '',
-    salesRate: json.sales_rate ?? 0,
-    discount: json.discount ?? 0,
-    relativeSalesRate: json.relative_sales_rate ?? 0,
+    salesRate: numeric(json.sales_rate) ?? 0,
+    discount: parseDiscount(json.discount),
+    relativeSalesRate: numeric(json.relative_sales_rate) ?? 0,
     barcode: json.barcode ?? '',
     isNew: json.is_new,
     params: json.params,
+    deeplinkAndroid: json.deeplink_android ?? json.deeplinkAndroid ?? '',
+    discountFormatted: json.discount_formatted,
+    discountPercent: optionalNumber(json.discount_percent),
+    picture: json.picture,
   };
 }
 
@@ -233,6 +277,7 @@ export function parseProductInfo(json) {
  * @property {PriceRange} [priceRange]
  * @property {Product[]} products
  * @property {number} productsTotal
+ * @property {Category[]} [categories]
  */
 export function parseProductsListResponse(json) {
   if (!json || typeof json !== 'object') {
@@ -259,5 +304,6 @@ export function parseProductsListResponse(json) {
     priceRange: json.price_range ? parsePriceRange(json.price_range) : undefined,
     products: productsJson.map(parseProduct),
     productsTotal: typeof json.products_total === 'number' ? json.products_total : 0,
+    categories: Array.isArray(json.categories) ? json.categories.map(parseCategory) : undefined,
   };
 }

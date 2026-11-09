@@ -1,6 +1,6 @@
 {
   "name": "@personaclick/rn-sdk",
-  "version": "4.0.23",
+  "version": "4.0.24",
   "description": "PersonaClick React Native SDK",
   "type": "module",
   "types": "./index.d.ts",
@@ -13,9 +13,13 @@
       "types": "./stories.d.ts",
       "default": "./stories.js"
     },
-    "./internal/ui": {
-      "types": "./internal/ui.d.ts",
-      "default": "./internal/ui.js"
+    "./ui": {
+      "types": "./ui.d.ts",
+      "default": "./ui.js"
+    },
+    "./internal/v3": {
+      "types": "./internal/v3.d.ts",
+      "default": "./internal/v3.js"
     }
   },
   "main": "index.js",

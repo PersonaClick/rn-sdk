@@ -35,6 +35,7 @@ import {
   isTrackableId,
 } from '../components/design-system/storySupport'
 import { storyRingArcs, coverRingSegments } from '../components/design-system/StoryCover'
+import { slidePolls, storyPollTop } from '../components/design-system/storyPollSupport'
 
 // Stories V2 — the pure part: what the kit components draw from the stories block, without rendering.
 
@@ -318,6 +319,51 @@ describe('Stories V2 — text block frame', () => {
       yOffset: 100,
     })
     expect(storyTextBlockProps({ text_input: '   ' })).toBeNull()
+  })
+})
+
+describe('Stories V2 — text block position, one rule with polls', () => {
+  // Слайд высотой 1000: шапка кончается на 100, кнопки начинаются на 700; блок высотой 80.
+  // StorySlide ставит текст-блок так же, как карточку опроса: storyPollTop от всей высоты слайда.
+  const SLIDE = 1000
+  const region = { top: 100, bottom: 700 }
+  const block = (yOffset) => slideTextBlocks({ id: 38, elements: [{ type: 'text_block', text_input: 'Hi', y_offset: yOffset }] })[0]
+  const topOf = (yOffset, height = 80) => storyPollTop(block(yOffset).yOffset, SLIDE, region, height)
+
+  test('no y_offset or not a number — 0, that is the top of the area under the header', () => {
+    expect([null, undefined, '', 'abc', -20].map((y) => topOf(y))).toEqual([100, 100, 100, 100, 100])
+  })
+
+  test('5 lands under the header — moved to the top of the area', () => {
+    expect(topOf(5)).toBe(100)
+  })
+
+  test('50 — of the whole slide height, not of the area', () => {
+    expect(topOf(50)).toBe(500)
+    expect(topOf('50')).toBe(500)
+  })
+
+  test('95 — pressed to the bottom of the area; a block taller than the area stays at its top', () => {
+    expect(topOf(95)).toBe(620)
+    expect(topOf(150)).toBe(620)
+    // Ещё не измерен — пока только от процента.
+    expect(topOf(95, 0)).toBe(950)
+    expect(topOf(30, 800)).toBe(100)
+  })
+
+  test('a poll and a text block with the same y_offset stand at the same height', () => {
+    ;[null, 0, 5, '30', 50, 95, 100, 'abc'].forEach((y) => {
+      const slide = {
+        id: 38,
+        elements: [
+          { type: 'text_block', text_input: 'Hi', y_offset: y },
+          { type: 'poll', poll_type: 'nps', y_offset: y, poll: { code: 'nps_stories' } },
+        ],
+      }
+      const [text] = slideTextBlocks(slide)
+      const [poll] = slidePolls(slide)
+      expect(storyPollTop(text.yOffset, SLIDE, region, 80)).toBe(storyPollTop(poll.yOffset, SLIDE, region, 80))
+    })
   })
 })
 

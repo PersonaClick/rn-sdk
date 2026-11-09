@@ -1,0 +1,243 @@
+{
+  "_fixture": {
+    "about": "Форма профиля: нормализация полей как в компиляторе (Form#normalized_fields), до 8 полей, custom → свойство клиента, согласие, сегмент.",
+    "expect": {
+      "el-form": {
+        "fields": [
+          {
+            "id": "f-email",
+            "kind": "email",
+            "required": true,
+            "propertyKey": "",
+            "input": "email"
+          },
+          {
+            "id": "f-phone",
+            "kind": "phone",
+            "required": false,
+            "propertyKey": "",
+            "input": "phone"
+          },
+          {
+            "id": "ffirst",
+            "kind": "first_name",
+            "required": false,
+            "propertyKey": "",
+            "input": "text",
+            "note": "required только при true (булевом); id очищен до [A-Za-z0-9_-]"
+          },
+          {
+            "id": "field-3",
+            "kind": "last_name",
+            "required": false,
+            "propertyKey": "",
+            "input": "text"
+          },
+          {
+            "id": "f-bday",
+            "kind": "birthday",
+            "required": false,
+            "propertyKey": "",
+            "input": "date",
+            "wire": "YYYY-MM-DD"
+          },
+          {
+            "id": "f-gender",
+            "kind": "gender",
+            "required": false,
+            "propertyKey": "",
+            "input": "select m/f",
+            "options": [
+              "Мужской → m",
+              "Женский → f"
+            ]
+          },
+          {
+            "id": "f-color",
+            "kind": "custom",
+            "required": false,
+            "propertyKey": "fav_color",
+            "input": "text"
+          },
+          {
+            "id": "f-level",
+            "kind": "custom",
+            "required": false,
+            "propertyKey": "loyaltylevel",
+            "input": "text"
+          }
+        ],
+        "dropped": [
+          "f-address (неизвестный kind)",
+          "f-ninth (больше 8)",
+          "не объект"
+        ],
+        "consentFields": [
+          "email_bulk"
+        ],
+        "consentRequired": false,
+        "segmentId": "456",
+        "submit": {
+          "profile_set_example": {
+            "email": "anna@example.com",
+            "phone": "+79990000000",
+            "first_name": "Анна",
+            "last_name": "Иванова",
+            "birthday": "1990-04-12",
+            "gender": "f",
+            "fav_color": "зелёный",
+            "loyaltylevel": "gold"
+          },
+          "then": [
+            "флаги formConsentFields = true, если согласие отмечено (транспорт — решение №8)",
+            "segments/add segment_id=456"
+          ],
+          "events": [
+            {
+              "event": "submit"
+            }
+          ],
+          "note": "пустые необязательные поля не отправлять; id поля «field-3» — индекс после фильтра"
+        }
+      },
+      "el-form-bare": {
+        "fields": [],
+        "note": "без formFields компилятор не рисует ни одного поля (DEFAULTS редактора дали бы одно поле email); formConsentFields пуст → флагов нет (в отличие от emailCollector, где пусто = все три)"
+      }
+    }
+  },
+  "id": 9107,
+  "layout": "modal",
+  "placement": "center",
+  "selector": null,
+  "trigger_type": "manual",
+  "trigger_value": null,
+  "trigger_event": null,
+  "frequency": "every_page",
+  "cooldown_minutes": 0,
+  "promo_code_list_id": null,
+  "target_screens": [],
+  "design": {
+    "frameStyle": {
+      "width": 92,
+      "height": 320,
+      "widthMode": "%",
+      "heightMode": "auto",
+      "maxWidth": 480,
+      "maxWidthMode": "px",
+      "bgColor": "#ffffff",
+      "borderColor": "#e5e7eb",
+      "borderWidth": 1,
+      "borderRadius": 16,
+      "padding": 20
+    },
+    "rows": [
+      {
+        "id": "row-1",
+        "columns": [
+          100
+        ],
+        "cells": [
+          {
+            "align": "left",
+            "verticalAlign": "top"
+          }
+        ],
+        "gap": 8,
+        "minHeight": 0
+      }
+    ],
+    "elements": [
+      {
+        "id": "el-form",
+        "type": "form",
+        "rowId": "row-1",
+        "partIndex": 0,
+        "style": {
+          "formFields": [
+            {
+              "id": "f-email",
+              "kind": "email",
+              "label": "Email",
+              "placeholder": "you@example.com",
+              "required": true
+            },
+            {
+              "id": "f-phone",
+              "kind": "phone",
+              "label": "Телефон",
+              "placeholder": "+7…",
+              "required": false
+            },
+            {
+              "id": "f first!",
+              "kind": "first_name",
+              "label": "Имя",
+              "required": "true"
+            },
+            {
+              "id": "",
+              "kind": "last_name",
+              "label": "Фамилия"
+            },
+            {
+              "id": "f-bday",
+              "kind": "birthday",
+              "label": "Дата рождения"
+            },
+            {
+              "id": "f-gender",
+              "kind": "gender",
+              "label": "Пол"
+            },
+            {
+              "id": "f-address",
+              "kind": "address",
+              "label": "Адрес"
+            },
+            {
+              "id": "f-color",
+              "kind": "custom",
+              "label": "Любимый **цвет**",
+              "propertyKey": "Fav_Color!"
+            },
+            {
+              "id": "f-level",
+              "kind": "custom",
+              "label": "Уровень",
+              "propertyKey": "loyalty-level"
+            },
+            {
+              "id": "f-ninth",
+              "kind": "custom",
+              "label": "Девятое поле",
+              "propertyKey": "ninth"
+            },
+            "not an object"
+          ],
+          "formConsentLabel": "Согласен на обработку данных",
+          "formConsentFields": [
+            "email_bulk"
+          ],
+          "formSegmentId": " 456 ",
+          "formSubmitText": "Сохранить",
+          "formErrorMessage": "Заполните обязательные поля",
+          "formSuccessTitle": "Спасибо!",
+          "formSuccessMessage": "Данные сохранены",
+          "formInputBg": "#f8fafc",
+          "formInputColor": "#0f172a",
+          "formInputBorderColor": "#cbd5e1",
+          "formInputRadius": 10
+        }
+      },
+      {
+        "id": "el-form-bare",
+        "type": "form",
+        "rowId": "row-1",
+        "partIndex": 0,
+        "style": {}
+      }
+    ],
+    "variables": {}
+  }
+}

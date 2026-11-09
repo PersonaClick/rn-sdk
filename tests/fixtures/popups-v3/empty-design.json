@@ -1,0 +1,46 @@
+{
+  "_fixture": {
+    "about": "Пустой дизайн нового попапа (EMPTY_DESIGN).",
+    "expect": {
+      "frame": {
+        "width": "92%",
+        "maxWidth": 480,
+        "heightMode": "auto",
+        "bgColor": "#ffffffff",
+        "border": "1 #e5e7eb",
+        "radius": 16,
+        "padding": 20
+      },
+      "show": "предложение: пустой попап не показывать и логировать (иначе пустая рамка)"
+    }
+  },
+  "id": 9306,
+  "layout": "modal",
+  "placement": "center",
+  "selector": null,
+  "trigger_type": "manual",
+  "trigger_value": null,
+  "trigger_event": null,
+  "frequency": "every_page",
+  "cooldown_minutes": 0,
+  "promo_code_list_id": null,
+  "target_screens": [],
+  "design": {
+    "frameStyle": {
+      "width": 92,
+      "height": 320,
+      "widthMode": "%",
+      "heightMode": "auto",
+      "maxWidth": 480,
+      "maxWidthMode": "px",
+      "bgColor": "#ffffff",
+      "borderColor": "#e5e7eb",
+      "borderWidth": 1,
+      "borderRadius": 16,
+      "padding": 20
+    },
+    "rows": [],
+    "elements": [],
+    "variables": {}
+  }
+}

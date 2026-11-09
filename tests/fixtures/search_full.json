@@ -1,0 +1,217 @@
+{
+ "search_query": "samsung",
+ "search_query_original": "samsung",
+ "collections": [],
+ "products_total": 833,
+ "products": [
+  {
+   "name": "Стиральная машина Samsung WW60AK4S00CELT",
+   "url": "https://www.technodom.kz/p/stiralnaya-mashina-samsung-ww60ak4s00celt-292523?recommended_by=full_search&recommended_code=samsung",
+   "deeplink_android": "https://www.technodom.kz/p/stiralnaya-mashina-samsung-ww60ak4s00celt-292523",
+   "deeplink_ios": "https://www.technodom.kz/p/stiralnaya-mashina-samsung-ww60ak4s00celt-292523",
+   "category_ids": [
+    "bytovaja-tehnika",
+    "stiral-nye-mashiny",
+    "uhod-za-odezhdoj"
+   ],
+   "barcode": "292523",
+   "vendor_code": "WW60AK4S00CELT",
+   "brand": "Samsung",
+   "model": "WW60AK4S00CELT",
+   "picture": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/143748.jpg",
+   "categories": [
+    {
+     "id": "bytovaja-tehnika",
+     "url": "https://www.technodom.kz/catalog/bytovaja-tehnika?recommended_by=full_search&recommended_code=samsung",
+     "name": "Бытовая техника",
+     "level": "1",
+     "url_handle": "/catalog/bytovaja-tehnika?recommended_by=full_search&recommended_code=samsung"
+    },
+    {
+     "id": "uhod-za-odezhdoj",
+     "parent_id": "bytovaja-tehnika",
+     "url": "https://www.technodom.kz/catalog/bytovaja-tehnika/uhod-za-odezhdoj?recommended_by=full_search&recommended_code=samsung",
+     "name": "Бытовая техника - Уход за одеждой",
+     "level": "2",
+     "url_handle": "/catalog/bytovaja-tehnika/uhod-za-odezhdoj?recommended_by=full_search&recommended_code=samsung"
+    },
+    {
+     "id": "stiral-nye-mashiny",
+     "parent_id": "uhod-za-odezhdoj",
+     "url": "https://www.technodom.kz/catalog/bytovaja-tehnika/uhod-za-odezhdoj/stiral-nye-mashiny?recommended_by=full_search&recommended_code=samsung",
+     "name": "Уход за одеждой - Стиральные машины",
+     "level": "3",
+     "url_handle": "/catalog/bytovaja-tehnika/uhod-za-odezhdoj/stiral-nye-mashiny?recommended_by=full_search&recommended_code=samsung"
+    }
+   ],
+   "price_formatted": "179 990 ₽",
+   "price_full_formatted": "179 990.00 ₽",
+   "price": 179990,
+   "price_full": 179990,
+   "image_url": "https://api.technodom.kz/f3/api/v1/images/292523_1.jpg",
+   "image_url_handle": "/f3/api/v1/images/292523_1.jpg",
+   "image_url_resized": {
+    "120": "https://pictures.personaClick.ru/resize-images/120/c1140c8254976de297c3caf971701a/143748.jpg",
+    "140": "https://pictures.personaClick.ru/resize-images/140/c1140c8254976de297c3caf971701a/143748.jpg",
+    "160": "https://pictures.personaClick.ru/resize-images/160/c1140c8254976de297c3caf971701a/143748.jpg",
+    "180": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/143748.jpg",
+    "200": "https://pictures.personaClick.ru/resize-images/200/c1140c8254976de297c3caf971701a/143748.jpg",
+    "220": "https://pictures.personaClick.ru/resize-images/220/c1140c8254976de297c3caf971701a/143748.jpg",
+    "310": "https://pictures.personaClick.ru/resize-images/310/c1140c8254976de297c3caf971701a/143748.jpg",
+    "520": "https://pictures.personaClick.ru/resize-images/520/c1140c8254976de297c3caf971701a/143748.jpg",
+    "original": "https://api.technodom.kz/f3/api/v1/images/292523_1.jpg"
+   },
+   "url_handle": "/p/stiralnaya-mashina-samsung-ww60ak4s00celt-292523?recommended_by=full_search&recommended_code=samsung",
+   "currency": "₽",
+   "_id": "143748",
+   "id": "292523",
+   "stock_quantity": 999999,
+   "group_id": "_143748_"
+  },
+  {
+   "name": "Пылесос с контейнером Samsung VC-C4520S3R",
+   "url": "https://www.technodom.kz/p/pylesos-samsung-vc-c4520s3r-22510?recommended_by=full_search&recommended_code=samsung",
+   "deeplink_android": "https://www.technodom.kz/p/pylesos-samsung-vc-c4520s3r-22510",
+   "deeplink_ios": "https://www.technodom.kz/p/pylesos-samsung-vc-c4520s3r-22510",
+   "category_ids": [
+    "bytovaja-tehnika",
+    "pylesosy",
+    "uhod-za-domom"
+   ],
+   "barcode": "22510",
+   "vendor_code": "VC-C4520S3R",
+   "brand": "Samsung",
+   "model": "VC-C4520S3R",
+   "picture": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/133215.jpg",
+   "categories": [
+    {
+     "id": "bytovaja-tehnika",
+     "url": "https://www.technodom.kz/catalog/bytovaja-tehnika?recommended_by=full_search&recommended_code=samsung",
+     "name": "Бытовая техника",
+     "level": "1",
+     "url_handle": "/catalog/bytovaja-tehnika?recommended_by=full_search&recommended_code=samsung"
+    },
+    {
+     "id": "uhod-za-domom",
+     "parent_id": "bytovaja-tehnika",
+     "url": "https://www.technodom.kz/catalog/bytovaja-tehnika/uhod-za-domom?recommended_by=full_search&recommended_code=samsung",
+     "name": "Бытовая техника - Уход за домом",
+     "level": "2",
+     "url_handle": "/catalog/bytovaja-tehnika/uhod-za-domom?recommended_by=full_search&recommended_code=samsung"
+    },
+    {
+     "id": "pylesosy",
+     "parent_id": "uhod-za-domom",
+     "url": "https://www.technodom.kz/catalog/bytovaja-tehnika/uhod-za-domom/pylesosy?recommended_by=full_search&recommended_code=samsung",
+     "name": "Уход за домом - Пылесосы",
+     "level": "3",
+     "url_handle": "/catalog/bytovaja-tehnika/uhod-za-domom/pylesosy?recommended_by=full_search&recommended_code=samsung"
+    }
+   ],
+   "price_formatted": "41 990 ₽",
+   "price_full_formatted": "41 990.00 ₽",
+   "price": 41990,
+   "price_full": 41990,
+   "image_url": "https://api.technodom.kz/f3/api/v1/images/22510_2.jpg",
+   "image_url_handle": "/f3/api/v1/images/22510_2.jpg",
+   "image_url_resized": {
+    "120": "https://pictures.personaClick.ru/resize-images/120/c1140c8254976de297c3caf971701a/133215.jpg",
+    "140": "https://pictures.personaClick.ru/resize-images/140/c1140c8254976de297c3caf971701a/133215.jpg",
+    "160": "https://pictures.personaClick.ru/resize-images/160/c1140c8254976de297c3caf971701a/133215.jpg",
+    "180": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/133215.jpg",
+    "200": "https://pictures.personaClick.ru/resize-images/200/c1140c8254976de297c3caf971701a/133215.jpg",
+    "220": "https://pictures.personaClick.ru/resize-images/220/c1140c8254976de297c3caf971701a/133215.jpg",
+    "310": "https://pictures.personaClick.ru/resize-images/310/c1140c8254976de297c3caf971701a/133215.jpg",
+    "520": "https://pictures.personaClick.ru/resize-images/520/c1140c8254976de297c3caf971701a/133215.jpg",
+    "original": "https://api.technodom.kz/f3/api/v1/images/22510_2.jpg"
+   },
+   "url_handle": "/p/pylesos-samsung-vc-c4520s3r-22510?recommended_by=full_search&recommended_code=samsung",
+   "currency": "₽",
+   "_id": "133215",
+   "id": "22510",
+   "stock_quantity": 999999,
+   "group_id": "_133215_"
+  }
+ ],
+ "price_range": {
+  "min": 990,
+  "max": 6999990
+ },
+ "price_ranges": [
+  {
+   "to": 100000,
+   "count": 346
+  },
+  {
+   "from": 100000,
+   "to": 250000,
+   "count": 150
+  },
+  {
+   "from": 250000,
+   "to": 500000,
+   "count": 151
+  }
+ ],
+ "price_median": 161000,
+ "filters": {
+  "is_preorder": {
+   "count": 833,
+   "values": {
+    "False": 833
+   }
+  },
+  "merchant": {
+   "count": 833,
+   "values": {
+    "Technodom": 833
+   }
+  },
+  "product_type": {
+   "count": 833,
+   "values": {
+    "regular": 833
+   }
+  }
+ },
+ "brands": [
+  {
+   "name": "Samsung",
+   "count": 801
+  },
+  {
+   "name": "Topperr",
+   "count": 9
+  },
+  {
+   "name": "Ozone",
+   "count": 1
+  }
+ ],
+ "categories": [
+  {
+   "id": "smartfony-i-gadzhety",
+   "name": "Смартфоны и гаджеты",
+   "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety?recommended_by=full_search&recommended_code=samsung",
+   "url_handle": "/catalog/smartfony-i-gadzhety?recommended_by=full_search&recommended_code=samsung",
+   "count": 422
+  },
+  {
+   "id": "bytovaja-tehnika",
+   "name": "Бытовая техника",
+   "url": "https://www.technodom.kz/catalog/bytovaja-tehnika?recommended_by=full_search&recommended_code=samsung",
+   "url_handle": "/catalog/bytovaja-tehnika?recommended_by=full_search&recommended_code=samsung",
+   "count": 209
+  },
+  {
+   "id": "tv-audio-foto-video",
+   "name": "ТВ, аудио, фото, видео",
+   "url": "https://www.technodom.kz/catalog/tv-audio-foto-video?recommended_by=full_search&recommended_code=samsung",
+   "url_handle": "/catalog/tv-audio-foto-video?recommended_by=full_search&recommended_code=samsung",
+   "count": 148
+  }
+ ],
+ "clarification": false,
+ "requests_count": 1,
+ "html": "<div class=\"common__recommendations__list__item one-five\"><div class=\"common__recommendations__list__item__img\"><a href=\"/product/292523\" data-background-image=\"https://pictures.personaClick.ru/resize-images/520/c1140c8254976de297c3caf971701a/143748.jpg\" class=\"new\"></a></div><div class=\"common__recommendations__list__item__title\"><a href=\"/product/292523\">Стиральная машина Samsung WW60AK4S00CELT</a></div><div class=\"common__recommendations__list__item__price\"><div class=\"common__recommendations__list__item__price__current no-old\">179 990 ₽</div></div></div><div class=\"common__recommendations__list__item one-five\"><div class=\"common__recommendations__list__item__img\"><a href=\"/product/22510\" data-background-image=\"https://pictures.personaClick.ru/resize-images/520/c1140c8254976de297c3caf971701a/133215.jpg\" class=\"new\"></a></div><div class=\"common__recommendations__list__item__title\"><a href=\"/product/22510\">Пылесос с контейнером Samsung VC-C4520S3R</a></div><div class=\"common__recommendations__list__item__price\"><div class=\"common__recommendations__list__item__price__current no-old\">41 990 ₽</div></div></div><div class=\"common__recommendations__list__item one-five\"><div class=\"common__recommendations__list__item__img\"><a href=\"/product/227834\" data-background-image=\"https://pictures.personaClick.ru/resize-images/520/c1140c8254976de297c3caf971701a/133581.jpg\" class=\"new\"></a></div><div class=\"common__recommendations__list__item__title\"><a href=\"/product/227834\">Холодильник Samsung RB-37A5200SA</a></div><div class=\"common__recommendations__list__item__price\"><div class=\"common__recommendations__list__item__price__old\">349 990 ₽</div><div class=\"common__recommendations__list__item__price__current \">329 990 ₽</div></div></div>"
+}

@@ -7,6 +7,7 @@ import {
   Dimensions,
   I18nManager,
   Image,
+  Keyboard,
   PanResponder,
   Platform,
   StatusBar,
@@ -19,10 +20,19 @@ import {
 import SafeAreaView from 'react-native/Libraries/Components/SafeAreaView/SafeAreaView'
 import ToastPresenter from './ToastPresenter'
 import StorySlide from './StorySlide'
-import { isMediaSlide, isVideoSlide, slideProduct, storyStartSlide } from './storySupport'
+import {
+  isMediaSlide,
+  isVideoSlide,
+  slideProduct,
+  storyShareTarget,
+  storyShareUrl,
+  storyStartSlide,
+  withoutProps,
+} from './storySupport'
 import {
   listenVolumeUp,
   rememberStorySoundMuted,
+  shareStoryLink,
   storySoundMuted,
   storyVideoComponent,
   systemBottomInset,
@@ -74,6 +84,18 @@ import {
  *   идут с остатка (F5).
  * - Звук (C7): без звука при первом открытии в процессе, выбор помнится до конца процесса;
  *   громкость «вверх» включает звук (react-native-volume-manager, если есть).
+ * - «Поделиться»: кнопка в шапке, если у слайда есть ссылка (`storyShareUrl`, API v3). Нажатие —
+ *   своя причина паузы, `onShare` сразу (до результата), системное окно с одной ссылкой (через
+ *   `shareUrlTransform` хоста, если он есть; `onShare` получает исходную); окно закрыто — пауза
+ *   снимается, и слайд идёт, если шёл (остальные причины паузы остаются).
+ * - `initialSlideIndex` — открыть первую сторис сразу с этого слайда, в обход A4 (по ссылке).
+ * - Опросы (элемент `poll`, API v3): только с `pollTransport` — его даёт виджет, сам просмотр в
+ *   сеть не ходит. Карточка держит слайд своей причиной паузы (палец, фокус в поле, отправка), её
+ *   касания слайду не достаются; пока в её поле фокус, тап мимо карточки только прячет клавиатуру.
+ *
+ * Пропсы v3 (`STORY_VIEWER_V3_PROPS`: «Поделиться» и опросы) принимает только этот компонент — его
+ * экспортирует шлюз internal/v3. Кит экспортирует KitStoryViewer: он их отбрасывает и выключает
+ * кнопку «Поделиться» (`withShare`), даже если в данных есть ссылка.
  *
  * Тост «Copied» показывает свой ToastPresenter — последним ребёнком модалки, сверху экрана.
  *
@@ -81,12 +103,13 @@ import {
  * Android — статус-бар сверху и навигационная панель снизу, когда модалка рисуется под ней
  * (edge-to-edge): из react-native-safe-area-context, если он есть, иначе оценка по экрану и окну.
  *
- * @param {object} props см. PersonalizationStoryViewerProps в ui.d.ts
+ * @param {object} props см. PersonalizationStoryViewerProps в ui.d.ts и PersonalizationStoryViewerV3Props в v3.d.ts
  */
 export default function StoryViewer({
   visible,
   stories = [],
   initialStoryIndex = 0,
+  initialSlideIndex,
   openRequest,
   seen,
   paused = false,
@@ -95,6 +118,8 @@ export default function StoryViewer({
   onButtonPress,
   onProductPress,
   onPromoCopied,
+  onShare,
+  shareUrlTransform,
   productButtonText = 'More info',
   promoCaption = 'Promo code',
   promoCopiedText = 'Copied',
@@ -102,10 +127,18 @@ export default function StoryViewer({
   hideProductsText = 'Hide products',
   retryText = 'Retry',
   closeLabel = 'Close',
+  shareLabel = 'Share',
   soundOnLabel = 'Sound on',
   soundOffLabel = 'Sound off',
+  pollReanswerText,
+  pollSubmitText,
+  pollErrorText,
+  pollTransport,
+  pollShopId = '',
   insets,
   renderIcon,
+  // Внутреннее: `false` — без «Поделиться», даже у слайдов со ссылкой (просмотр кита).
+  withShare = true,
 }) {
   const { width, height } = useWindowDimensions()
   const toast = useRef(null)
@@ -129,7 +162,7 @@ export default function StoryViewer({
       dispatch({ type: 'reset' })
     } else if (!shown.current) {
       shown.current = true
-      dispatch({ type: 'open', index: initialStoryIndex })
+      dispatch({ type: 'open', index: initialStoryIndex, slide: initialSlideIndex })
     } else {
       dispatch({ type: 'page', index: initialStoryIndex })
     }
@@ -168,17 +201,59 @@ export default function StoryViewer({
     if (state.open) dispatch({ type: paused ? 'pause' : 'resume', reason: STORY_PAUSE.HOST })
   }, [paused, state.open, dispatch])
 
-  // Фон, потеря фокуса, погасший экран (B6). `blur` / `focus` — у Android (шторка уведомлений).
+  // Фон и погасший экран (B6).
   useEffect(() => {
     if (!visible) return undefined
     const apply = (active) => dispatch({ type: active ? 'resume' : 'pause', reason: STORY_PAUSE.BACKGROUND })
+    // Android `blur` / `focus` — фокус окна активити, а не модалки: окно просмотра забирает его при
+    // открытии и отдаёт при закрытии, так что `blur` ставил паузу, которую ничто не снимало.
     const subscriptions = [AppState.addEventListener('change', (next) => apply(next === 'active'))]
-    if (Platform.OS === 'android') {
-      subscriptions.push(AppState.addEventListener('blur', () => apply(false)))
-      subscriptions.push(AppState.addEventListener('focus', () => apply(true)))
-    }
     return () => subscriptions.forEach((subscription) => subscription?.remove?.())
   }, [visible, dispatch])
+
+  // «Поделиться»: своя пауза на время системного окна, `onShare` (трекинг) — сразу, до результата.
+  // Повторное нажатие, пока окно открыто, ничего не делает.
+  const sharing = useRef(false)
+  const share = (url, anchor) => {
+    if (sharing.current || !story || !slide) return
+    sharing.current = true
+    dispatch({ type: 'pause', reason: STORY_PAUSE.SHARE })
+    try {
+      onShare && onShare(story, slide, url)
+    } catch (error) {
+      // Уведомление хоста не должно мешать окну.
+    }
+    shareStoryLink(storyShareTarget(url, shareUrlTransform), anchor).then(() => {
+      sharing.current = false
+      dispatch({ type: 'resume', reason: STORY_PAUSE.SHARE })
+    })
+  }
+  const shareUrl = withShare ? storyShareUrl(story, slide) : null
+
+  // Опросы: пауза `POLL` — пока карточку держат; фокус в её поле — тап мимо только прячет
+  // клавиатуру. Новый слайд (или его новая загрузка) — карточки новые, фокуса нет.
+  const pollFocus = useRef(false)
+  const pollBlurAt = useRef(0)
+  useEffect(() => {
+    pollFocus.current = false
+  }, [state.entry, state.load])
+  const onPollHold = useCallback(
+    (on) => dispatch({ type: on ? 'pause' : 'resume', reason: STORY_PAUSE.POLL }),
+    [dispatch],
+  )
+  const onPollFocus = useCallback((on) => {
+    pollFocus.current = on
+    if (!on) pollBlurAt.current = Date.now()
+  }, [])
+  // Android «назад» при открытой клавиатуре: клавиатура прячется на нажатии, а модалка получает
+  // «назад» на отпускании — оно только прячет клавиатуру, просмотр не закрывается.
+  const onBack = () => {
+    if (pollFocus.current || Date.now() - pollBlurAt.current < POLL_BACK_GRACE_MS) {
+      Keyboard.dismiss()
+      return
+    }
+    dispatch({ type: 'back' })
+  }
 
   // Громкость «вверх» включает звук (C7).
   useEffect(() => {
@@ -278,7 +353,7 @@ export default function StoryViewer({
   const translateY = useRef(new Animated.Value(0)).current
   const size = useRef({ width, height })
   size.current = { width, height }
-  const gesture = useRef({ held: false, dragging: false, timer: null })
+  const gesture = useRef({ held: false, dragging: false, timer: null, keyboard: false })
   const finish = useCallback(
     (outcome) => {
       const g = gesture.current
@@ -286,6 +361,7 @@ export default function StoryViewer({
       const { held, dragging } = g
       g.held = false
       g.dragging = false
+      g.keyboard = false
       if (outcome && outcome.type === 'close') {
         Animated.timing(translateY, { toValue: size.current.height, duration: 200, useNativeDriver: true }).start(() =>
           dispatch({ type: 'close' }),
@@ -309,6 +385,9 @@ export default function StoryViewer({
           clearTimeout(g.timer)
           g.held = false
           g.dragging = false
+          // Фокус в поле опроса: касание только прячет клавиатуру — без листания и удержания.
+          g.keyboard = pollFocus.current
+          if (g.keyboard) return
           g.timer = setTimeout(() => {
             g.held = true
             dispatch({ type: 'pause', reason: STORY_PAUSE.HOLD })
@@ -316,7 +395,7 @@ export default function StoryViewer({
         },
         onPanResponderMove: (_, g) => {
           const kind = storyDragKind(g, stateRef.current.sheetOpen)
-          if (!kind) return
+          if (!kind || gesture.current.keyboard) return
           const own = gesture.current
           clearTimeout(own.timer)
           if (!own.dragging) {
@@ -327,6 +406,11 @@ export default function StoryViewer({
           if (kind === 'vertical') translateY.setValue(Math.max(0, g.dy))
         },
         onPanResponderRelease: (event, g) => {
+          if (gesture.current.keyboard) {
+            Keyboard.dismiss()
+            finish(null)
+            return
+          }
           finish(
             storyGestureOutcome({
               dx: g.dx,
@@ -343,6 +427,15 @@ export default function StoryViewer({
         },
         onPanResponderTerminate: () => finish(null),
         onPanResponderTerminationRequest: () => false,
+        // Жест держит другой ответчик и не отдаёт его: RN зовёт grant корня раньше отказа — таймер
+        // удержания, который он завёл, иначе поставил бы паузу без отпускания.
+        onPanResponderReject: () => {
+          const g = gesture.current
+          clearTimeout(g.timer)
+          g.held = false
+          g.dragging = false
+          g.keyboard = false
+        },
       }),
     [dispatch, finish, translateY],
   )
@@ -372,10 +465,28 @@ export default function StoryViewer({
       hideProductsText,
       retryText,
       closeLabel,
+      shareLabel,
       soundOnLabel,
       soundOffLabel,
+      pollReanswerText,
+      pollSubmitText,
+      pollErrorText,
     }),
-    [productButtonText, promoCaption, promoCopiedText, showProductsText, hideProductsText, retryText, closeLabel, soundOnLabel, soundOffLabel],
+    [
+      productButtonText,
+      promoCaption,
+      promoCopiedText,
+      showProductsText,
+      hideProductsText,
+      retryText,
+      closeLabel,
+      shareLabel,
+      soundOnLabel,
+      soundOffLabel,
+      pollReanswerText,
+      pollSubmitText,
+      pollErrorText,
+    ],
   )
 
   const frame =
@@ -401,6 +512,7 @@ export default function StoryViewer({
         sheetOpen={state.sheetOpen}
         onSheetToggle={(open) => dispatch({ type: 'sheet', open })}
         onClose={() => dispatch({ type: 'close' })}
+        onShare={shareUrl ? (anchor) => share(shareUrl, anchor) : undefined}
         onButtonPress={(button) => onButtonPress && onButtonPress(story, slide, button)}
         onProductPress={(item, element) => onProductPress && onProductPress(story, slide, item, element)}
         onPromoCopied={(code, element) => onPromoCopied && onPromoCopied(story, slide, code, element)}
@@ -408,6 +520,11 @@ export default function StoryViewer({
         insets={slideInsets}
         texts={texts}
         renderIcon={renderIcon}
+        storyId={story.id}
+        pollTransport={pollTransport}
+        pollShopId={pollShopId}
+        onPollHold={onPollHold}
+        onPollFocus={onPollFocus}
       />
     ) : null
 
@@ -437,7 +554,7 @@ export default function StoryViewer({
       transparent
       animationType="fade"
       statusBarTranslucent
-      onRequestClose={() => dispatch({ type: 'back' })}
+      onRequestClose={onBack}
       supportedOrientations={['portrait']}
     >
       <View style={styles.fill} onLayout={(event) => setRootHeight(event.nativeEvent.layout.height)}>
@@ -454,7 +571,33 @@ export default function StoryViewer({
   )
 }
 
+/**
+ * Пропсы v3 просмотра: «Поделиться» (колбэк, подпись, ссылка для окна) и опросы (транспорт, магазин
+ * ответов, тексты).
+ */
+export const STORY_VIEWER_V3_PROPS = [
+  'onShare',
+  'shareLabel',
+  'shareUrlTransform',
+  'pollTransport',
+  'pollShopId',
+  'pollReanswerText',
+  'pollSubmitText',
+  'pollErrorText',
+]
+
+/**
+ * Просмотр кита (`PersonalizationStoryViewer` из `ui`): тот же StoryViewer без пропсов v3 и
+ * без «Поделиться» — кнопки нет, даже если у слайда есть ссылка. Без транспорта опросы не рисуются.
+ */
+export function KitStoryViewer(props) {
+  return <StoryViewer {...withoutProps(props, STORY_VIEWER_V3_PROPS)} withShare={false} />
+}
+
 const EMPTY_SEEN = Object.freeze({})
+
+/** «Назад» сразу после того, как клавиатура поля опроса спряталась, ещё относится к ней, мс. */
+const POLL_BACK_GRACE_MS = 500
 
 /**
  * Срок `delayMs`, пока `armed`; на каждый новый `key` (загрузку медиа) — новый. Пока `frozen`

@@ -98,6 +98,21 @@ export function usePersonalizationTheme() {
   }, [override, scheme])
 }
 
+/**
+ * Оба набора цветов — `{ light, dark }` с переопределениями темы, какой бы ни была схема. Для тех,
+ * кто выбирает схему поддерева сам: элементы попапа v3 — по своему фону.
+ */
+export function usePersonalizationColorSets() {
+  const override = useContext(PersonalizationThemeContext)
+  return useMemo(() => {
+    const colors = (override || EMPTY).colors || EMPTY
+    return {
+      light: { ...PERSONALIZATION_COLORS.light, ...(colors.light || EMPTY) },
+      dark: { ...PERSONALIZATION_COLORS.dark, ...(colors.dark || EMPTY) },
+    }
+  }, [override])
+}
+
 /** Шрифт по начертанию: для стилей, заданных в компоненте вручную. */
 export function fontFor(theme, weight) {
   return theme.fontFamily[weight === '600' ? 'emphasized' : 'regular']

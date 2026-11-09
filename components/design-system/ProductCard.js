@@ -19,10 +19,13 @@ import Button from './Button'
  * мастер-компонент Product там же даёт 14/20 — расхождение в макете, взяты страницы.
  *
  * Собрана из готовых блоков: ProductImage, Rating, Badge (скидка, вид danger), Button.
+ * Рейтинг рисуется, только если он передан и не выключен флагом showRating: в API рейтинга
+ * нет, поэтому виджеты с данными выключают его по умолчанию.
  *
  * @param {{ type?: 'carousel'|'grid'|'list', source?: object,
  *           imageAspect?: 'square'|'landscape'|'portrait', brand?: string, name: string,
- *           rating?: { value: string, reviews: number }, price: string, oldPrice?: string,
+ *           rating?: { value: string, reviews: number }, showRating?: boolean,
+ *           price: string, oldPrice?: string,
  *           discount?: string, actionText?: string, onAction?: Function, onPress?: Function,
  *           renderIcon?: (svg: string, color: string, size: number) => React.ReactNode,
  *           style?: object }} props
@@ -34,6 +37,7 @@ export default function ProductCard({
   brand,
   name,
   rating,
+  showRating = true,
   price,
   oldPrice,
   discount,
@@ -60,14 +64,18 @@ export default function ProductCard({
       </Text>
     </View>
   )
-  const ratingRow = rating ? (
+  const ratingRow = rating && showRating ? (
     <Rating value={rating.value} reviews={rating.reviews} renderIcon={renderIcon} />
   ) : null
+  // Цены не ломаются посреди числа: не влезают рядом — старая цена уходит на свою строку.
   const priceText = (
-    <Text style={[theme.typography[metrics.price], { color: colors.textPrimary }]}>{price}</Text>
+    <Text style={[theme.typography[metrics.price], { color: colors.textPrimary }]} numberOfLines={1}>
+      {price}
+    </Text>
   )
   const oldPriceText = oldPrice ? (
     <Text
+      numberOfLines={1}
       style={[
         theme.typography[metrics.oldPrice],
         { fontFamily: fontFor(theme, '400'), color: colors.textHint, textDecorationLine: 'line-through' },
@@ -96,7 +104,7 @@ export default function ProductCard({
             {ratingRow}
           </View>
           <View style={styles.listBottom}>
-            <View>
+            <View style={styles.listPrice}>
               <View style={styles.priceLine}>
                 {priceText}
                 {discountBadge}
@@ -144,7 +152,8 @@ export default function ProductCard({
 const TYPES = {
   carousel: { name: 'baseDefault', price: 'xlEmphasized', oldPrice: 'baseDefault', badgeInset: 8, button: { alignSelf: 'stretch' } },
   grid: { name: 'baseDefault', price: 'lgEmphasized', oldPrice: 'smDefault', badgeInset: 4, button: { alignSelf: 'stretch' } },
-  list: { name: 'smDefault', price: 'baseEmphasized', oldPrice: 'smDefault', badgeInset: 0, button: undefined },
+  // Кнопка у правого края; не влезла рядом с ценой — переносится под неё туда же.
+  list: { name: 'smDefault', price: 'baseEmphasized', oldPrice: 'smDefault', badgeInset: 0, button: { marginLeft: 'auto', alignSelf: 'center', flexShrink: 1 } },
 }
 
 const styles = StyleSheet.create({
@@ -152,10 +161,15 @@ const styles = StyleSheet.create({
   group: { gap: 8 },
   carousel: { width: 220 },
   imageBadge: { position: 'absolute' },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  // Длинные цены («799 990 ₽» и «1 574 990 ₽») в колонку плитки рядом не влезают: wrap-reverse
+  // поднимает старую цену строкой над ценой, и цена с кнопкой остаются на линии соседей.
+  priceRow: { flexDirection: 'row', flexWrap: 'wrap-reverse', alignItems: 'baseline', columnGap: 8 },
   listRow: { flexDirection: 'row', gap: 12 },
   listImage: { width: 120 },
   listColumn: { flex: 1, justifyContent: 'space-between' },
-  listBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  priceLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  // В узкой колонке (360 dp, крупный шрифт) цена, бейдж и кнопка в строку не влезают:
+  // бейдж переносится под цену, кнопка — под блок цены.
+  listBottom: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, rowGap: 8 },
+  listPrice: { flexShrink: 1 },
+  priceLine: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, rowGap: 4 },
 })

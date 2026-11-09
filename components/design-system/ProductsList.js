@@ -11,10 +11,12 @@ import ProductCard from './ProductCard'
  * в две колонки с шагом 16 по обеим осям; список — карточки list столбиком с шагом 16.
  *
  * Товар: { id, name, price, source?, brand?, rating?: { value, reviews }, oldPrice?,
- * discount?, actionText? } — строки уже отформатированы, локализация за интегратором.
+ * discount?, actionText?, url?, deeplink? } — строки уже отформатированы, локализация за
+ * интегратором. Виджеты с данными собирают его из товара API одним маппером
+ * (widgets/productSupport).
  *
  * @param {{ layout?: 'carousel'|'grid'|'list', products: Array<object>,
- *           imageAspect?: 'square'|'landscape'|'portrait',
+ *           imageAspect?: 'square'|'landscape'|'portrait', showRating?: boolean,
  *           onProductAction?: (product: object) => void,
  *           onProductPress?: (product: object) => void,
  *           onFirstVisibleChanged?: (index: number) => void,
@@ -25,6 +27,7 @@ export default function ProductsList({
   layout = 'carousel',
   products = [],
   imageAspect = 'square',
+  showRating = true,
   onProductAction,
   onProductPress,
   onFirstVisibleChanged,
@@ -51,6 +54,7 @@ export default function ProductsList({
           brand={item.brand}
           name={item.name}
           rating={item.rating}
+          showRating={showRating}
           price={item.price}
           oldPrice={item.oldPrice}
           discount={item.discount}
@@ -61,7 +65,7 @@ export default function ProductsList({
         />
       </View>
     ),
-    [layout, imageAspect, onProductAction, onProductPress, renderIcon]
+    [layout, imageAspect, showRating, onProductAction, onProductPress, renderIcon]
   )
 
   const carousel = layout === 'carousel'

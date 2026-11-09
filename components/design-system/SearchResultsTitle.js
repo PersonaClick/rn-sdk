@@ -22,7 +22,7 @@ import Tag from './Tag'
  * @param {{ title: string, selectedViewIndex?: number, onBack?: Function,
  *           onViewChange?: (index: number) => void, onFilters?: Function, onSort?: Function,
  *           showFiltersButton?: boolean, showSortButton?: boolean,
- *           results?: { prefix: string, count: number, suffix: string },
+ *           results?: { prefix: string, count?: number, suffix: string },
  *           filters?: Array<{ label: string, onRemove: Function }>,
  *           renderIcon?: (svg: string, color: string, size: number) => React.ReactNode,
  *           style?: object }} props
@@ -97,11 +97,15 @@ export default function SearchResultsTitle({
               />
             ) : null}
           </View>
-          <View style={styles.found}>
-            <Text style={regular}>{results.prefix}</Text>
-            <Text style={strong}>{String(results.count)}</Text>
-            <Text style={strong}>{results.suffix}</Text>
-          </View>
+          {/* Число ещё неизвестно (выдача грузится) — кнопки на месте, «Найдено 0» не рисуется. */}
+          {results.count != null ? (
+            <View style={styles.found}>
+              {/* Пустое слово не рисуется: иначе перед числом остаётся отступ (у категории — «N products»). */}
+              {results.prefix ? <Text style={regular}>{results.prefix}</Text> : null}
+              <Text style={strong}>{String(results.count)}</Text>
+              {results.suffix ? <Text style={strong}>{results.suffix}</Text> : null}
+            </View>
+          ) : null}
         </View>
       ) : null}
 

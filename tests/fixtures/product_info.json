@@ -1,0 +1,126 @@
+{
+ "name": "Гарнитура Накладная Logitech H150, White, 981-000350",
+ "is_available": true,
+ "description": "",
+ "price": "14990.0",
+ "price_full": 14990.0,
+ "currency": "₽",
+ "url": "https://www.technodom.kz/p/garnitura-nakladnaa-logitech-h-white-868",
+ "url_handle": "/p/garnitura-nakladnaa-logitech-h-white-868",
+ "picture": "https://api.technodom.kz/f3/api/v1/images/garnitura_nakladnaa_logitech_h_white_868_1.jpg",
+ "image_url": "https://api.technodom.kz/f3/api/v1/images/garnitura_nakladnaa_logitech_h_white_868_1.jpg",
+ "image_url_handle": "/f3/api/v1/images/garnitura_nakladnaa_logitech_h_white_868_1.jpg",
+ "image_url_resized": {
+  "120": "https://pictures.personaClick.ru/resize-images/120/c1140c8254976de297c3caf971701a/131887.jpg",
+  "140": "https://pictures.personaClick.ru/resize-images/140/c1140c8254976de297c3caf971701a/131887.jpg",
+  "160": "https://pictures.personaClick.ru/resize-images/160/c1140c8254976de297c3caf971701a/131887.jpg",
+  "180": "https://pictures.personaClick.ru/resize-images/180/c1140c8254976de297c3caf971701a/131887.jpg",
+  "200": "https://pictures.personaClick.ru/resize-images/200/c1140c8254976de297c3caf971701a/131887.jpg",
+  "220": "https://pictures.personaClick.ru/resize-images/220/c1140c8254976de297c3caf971701a/131887.jpg",
+  "310": "https://pictures.personaClick.ru/resize-images/310/c1140c8254976de297c3caf971701a/131887.jpg",
+  "520": "https://pictures.personaClick.ru/resize-images/520/c1140c8254976de297c3caf971701a/131887.jpg"
+ },
+ "category_ids": [
+  "smartfony-i-gadzhety",
+  "naushniki",
+  "vse-naushniki"
+ ],
+ "brand": "Logitech",
+ "sales_rate": null,
+ "relative_sales_rate": null,
+ "price_formatted": "14 990 ₽",
+ "price_full_formatted": "14 990.00 ₽",
+ "categories": [
+  {
+   "id": "smartfony-i-gadzhety",
+   "name": "Смартфоны и гаджеты",
+   "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety",
+   "branch": 1,
+   "level": 1,
+   "name_with_parent": "Смартфоны и гаджеты",
+   "url_handle": "/catalog/smartfony-i-gadzhety"
+  },
+  {
+   "parent_id": "smartfony-i-gadzhety",
+   "id": "naushniki",
+   "name": "Наушники",
+   "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety/naushniki",
+   "branch": 1,
+   "level": 2,
+   "name_with_parent": "Смартфоны и гаджеты - Наушники",
+   "url_handle": "/catalog/smartfony-i-gadzhety/naushniki"
+  },
+  {
+   "parent_id": "naushniki",
+   "id": "vse-naushniki",
+   "name": "Все наушники",
+   "url": "https://www.technodom.kz/catalog/smartfony-i-gadzhety/naushniki/vse-naushniki",
+   "branch": 1,
+   "level": 3,
+   "name_with_parent": "Наушники - Все наушники",
+   "url_handle": "/catalog/smartfony-i-gadzhety/naushniki/vse-naushniki"
+  }
+ ],
+ "group_id": null,
+ "id": "868",
+ "uniqid": "868",
+ "widgetable": true,
+ "ignored": false,
+ "locations": {
+  "7": {
+   "price": 14990,
+   "stock_quantity": 9999
+  },
+  "10": {
+   "price": 14990,
+   "stock_quantity": 9999
+  },
+  "30": {
+   "price": 14990,
+   "stock_quantity": 1
+  },
+  "39": {
+   "price": 14990,
+   "stock_quantity": 9999
+  },
+  "47": {
+   "price": 14990,
+   "stock_quantity": 9999
+  },
+  "58": {
+   "price": 14990,
+   "stock_quantity": 9999
+  },
+  "None": {
+   "price": 14990,
+   "stock_quantity": 9999
+  }
+ },
+ "type_prefix": "все наушники барлық құлаққап ақ",
+ "vendor_code": "981-000350",
+ "model": "981-000350",
+ "barcode": "868",
+ "location_ids": [
+  "39",
+  "47",
+  "None",
+  "7",
+  "30",
+  "58",
+  "10"
+ ],
+ "price_margin": 2,
+ "brand_downcase": "logitech",
+ "discount": false,
+ "tags": [
+  "все",
+  "наушники",
+  "барлық",
+  "құлаққап",
+  "ақ"
+ ],
+ "image_download_start_at": "2026-10-18T15:28:29.000Z",
+ "stock_quantity": 999999,
+ "deeplink_android": "https://www.technodom.kz/p/garnitura-nakladnaa-logitech-h-white-868",
+ "deeplink_ios": "https://www.technodom.kz/p/garnitura-nakladnaa-logitech-h-white-868"
+}

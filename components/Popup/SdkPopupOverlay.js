@@ -21,6 +21,32 @@ class SdkPopupOverlaySingleton {
     // track against the shop that triggered the popup, not whichever instance registered last.
     this.currentSdk = null
     this.updateCallback = null
+    // Another overlay's modal (popups v3) holds the screen: popups wait in the queue until it closes.
+    this.gate = null
+  }
+
+  /** True while another overlay's modal holds the screen. */
+  isBlocked() {
+    try {
+      return typeof this.gate === 'function' && this.gate() === true
+    } catch (error) {
+      return false
+    }
+  }
+
+  /**
+   * Shows the next queued popup once the other overlay's modal is gone (nothing is shown or
+   * closing, the queue is not empty).
+   */
+  resume() {
+    if (this.isVisible || this.currentPopup || this.popupQueue.length === 0 || this.isBlocked()) return
+    const next = this.popupQueue.shift()
+    this.currentPopup = next.popupData
+    this.currentSdk = next.sdk
+    this.isVisible = true
+    if (this.updateCallback) {
+      this.updateCallback()
+    }
   }
 
   /**
@@ -73,8 +99,9 @@ class SdkPopupOverlaySingleton {
       return
     }
 
-    // If there's already a popup showing, queue this one together with its owning SDK.
-    if (this.isVisible && this.currentPopup) {
+    // If there's already a popup showing (or another overlay's modal), queue this one together with
+    // its owning SDK.
+    if ((this.isVisible && this.currentPopup) || this.isBlocked()) {
       this.popupQueue.push({ popupData, sdk })
       return
     }
@@ -104,7 +131,7 @@ class SdkPopupOverlaySingleton {
 
     // Show next popup from queue if any
     setTimeout(() => {
-      if (this.popupQueue.length > 0) {
+      if (this.popupQueue.length > 0 && !this.isBlocked()) {
         const next = this.popupQueue.shift()
         this.currentPopup = next.popupData
         this.currentSdk = next.sdk
@@ -218,6 +245,22 @@ export default function SdkPopupOverlay({ sdk }) {
  */
 export function showPopup(popupData, sdk = null) {
   sdkPopupOverlayInstance.showPopup(popupData, sdk)
+}
+
+/**
+ * Shared modal slot with popups v3: whether an in-app popup is on screen, the gate that holds
+ * in-app popups while a v3 modal is open, and the resume once it closes. Internal.
+ */
+export function isSdkPopupVisible() {
+  return sdkPopupOverlayInstance.isVisible && !!sdkPopupOverlayInstance.currentPopup
+}
+
+export function setSdkPopupGate(gate) {
+  sdkPopupOverlayInstance.gate = gate
+}
+
+export function resumeSdkPopups() {
+  sdkPopupOverlayInstance.resume()
 }
 
 /**
