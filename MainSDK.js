@@ -795,6 +795,7 @@ class MainSDK extends Performer {
           params: {
             shop_id: this.shop_id,
             stream: this.stream,
+            segment: this.segment,
             ...queryParams,
           },
         })
@@ -833,6 +834,7 @@ class MainSDK extends Performer {
           params: {
             shop_id: this.shop_id,
             stream: this.stream,
+            segment: this.segment,
             ...queryParams,
           },
         })
@@ -873,6 +875,7 @@ class MainSDK extends Performer {
           params: {
             shop_id: this.shop_id,
             stream: this.stream,
+            segment: this.segment,
             ...queryParams,
           },
         })
@@ -966,6 +969,8 @@ class MainSDK extends Performer {
             params: {
               shop_id: this.shop_id,
               stream: this.stream,
+              // A block under an A/B test answers an error without it.
+              segment: this.segment,
               recommender_code,
               ...options,
             },
@@ -1656,6 +1661,7 @@ class MainSDK extends Performer {
             params: {
               shop_id: this.shop_id,
               stream: this.stream,
+              segment: this.segment,
               ...options,
             },
           })
