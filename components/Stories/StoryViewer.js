@@ -14,6 +14,7 @@ import {
 import StorySlide from './StorySlide'
 import StoryTimeline from './StoryTimeline.js'
 import ProductsCarousel from './ProductsCarousel'
+import { trackFromStory, trackStoryProductView } from './storyTracking'
 import { styles, getDuration, getStartSlideIndex, extractNumericId, extractSlideIdForTracking, getColorFromSettings, DEFAULT_COLORS } from './styles'
 import { markSlideAsViewed, getStartSlideIndex as getStorageStartIndex, setLastSeenSlide } from '../../lib/stories/storage'
 import { awaitInstance } from '../../lib/facade/facade'
@@ -332,7 +333,7 @@ export default function StoryViewer({
         // If slide.id is string, use slideIndex; if number, use slide.id as is
         const slideIdToUse = extractSlideIdForTracking(currentSlide.id, currentSlideIndex)
         
-        sdk.trackStoryView(storyIdToUse, slideIdToUse, code, currentSlideIndex)
+        trackFromStory(() => sdk.trackStoryView(storyIdToUse, slideIdToUse, code, currentSlideIndex))
       }
       
       // Don't mark slide as viewed immediately - wait for it to complete or be navigated away
@@ -793,7 +794,7 @@ export default function StoryViewer({
       if (story && slide) {
         const storyIdToUse = extractNumericId(story.id, story.ids)
         const slideIdToUse = extractSlideIdForTracking(slide.id, slideIndex)
-        sdk.trackStoryClick(storyIdToUse, slideIdToUse, code)
+        trackFromStory(() => sdk.trackStoryClick(storyIdToUse, slideIdToUse, code))
       }
     }
     
@@ -801,15 +802,7 @@ export default function StoryViewer({
     if (element.type === 'product' && sdk && code) {
       const productData = element.item || element.product
       if (productData && productData.id) {
-        sdk.track('view', {
-          id: productData.id,
-          recommended_by: 'stories',
-          recommended_code: code,
-        }).catch((err) => {
-          if (__DEV__) {
-            console.warn('Failed to track product view from slide:', err)
-          }
-        })
+        trackStoryProductView(sdk, productData.id, code)
       }
     }
     
@@ -890,15 +883,7 @@ export default function StoryViewer({
   const handleCarouselProductPress = useCallback((product) => {
     // Track product view from carousel
     if (sdk && product.id && code) {
-      sdk.track('view', {
-        id: product.id,
-        recommended_by: 'stories',
-        recommended_code: code,
-      }).catch((err) => {
-        if (__DEV__) {
-          console.warn('Failed to track product view from carousel:', err)
-        }
-      })
+      trackStoryProductView(sdk, product.id, code)
     }
     
     // Determine which URL to use based on platform
