@@ -3,6 +3,13 @@ import { sdkResult } from './sdkResult'
 import { createResultsPagesLoader } from './resultsSupport'
 
 /**
+ * Ключ истории недавних запросов магазина в AsyncStorage. `deleteUserCredentials` стирает её вместе
+ * с остальными данными покупателя.
+ * @param {string} shopKey
+ */
+export const recentSearchesKey = (shopKey) => `personalization.ui.recentSearches.${shopKey}`
+
+/**
  * Недавние запросы пользователя — локальная история виджета поиска, по магазину.
  *
  * Сервер тоже помнит последние запросы (`last_queries` в `search/blank`), но не умеет
@@ -11,7 +18,7 @@ import { createResultsPagesLoader } from './resultsSupport'
  */
 export class RecentSearches {
   constructor(shopKey, limit) {
-    this.key = `personalization.ui.recentSearches.${shopKey}`
+    this.key = recentSearchesKey(shopKey)
     this.limit = limit
   }
 

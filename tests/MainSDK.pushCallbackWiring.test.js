@@ -108,6 +108,8 @@ const mockSetInitLocker = jest.fn().mockResolvedValue(undefined)
 const mockRequest = jest.fn().mockResolvedValue({ status: 'success' })
 
 jest.mock('../lib/client.js', () => ({
+  setShopHosts: jest.fn(),
+  appHostOf: jest.fn(() => 'app.personaClick.ru'),
   initLocker: (...args) => mockInitLocker(...args),
   request: (...args) => mockRequest(...args),
   setInitLocker: (...args) => mockSetInitLocker(...args),
@@ -576,7 +578,7 @@ describe('initPush callback wiring — edge-case reproductions', () => {
   // B2: permission denied — initPush returns null without ensureTracking-
   // Subscriptions. Callback is stored but no handlers exist.
   // -------------------------------------------------------------------------
-  test('B2: when push permission is denied, initPush returns null and registers no handlers', async () => {
+  test('B2: when push permission is denied, initPush returns null, and the handlers are in all the same', async () => {
     const sdk = createSdkWithRealOrchestrator()
     sdk.getPushPermission.mockResolvedValue(false)
 
@@ -585,8 +587,8 @@ describe('initPush callback wiring — edge-case reproductions', () => {
 
     expect(result).toBeNull()
     expect(sdk.pushClickListener).toBe(customClick)
-    // No subscriptions installed because the permission gate short-circuits.
-    expect(capturedOnNotifOpenedHandler).toBeNull()
+    // The handlers go in before the permission is asked for: a push that comes meanwhile is not lost.
+    expect(typeof capturedOnNotifOpenedHandler).toBe('function')
   })
 
   // -------------------------------------------------------------------------

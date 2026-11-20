@@ -61,6 +61,28 @@ describe('SdkPopupOverlay — per-shop routing', () => {
   })
 })
 
+// A server popup waits its `delay`; one the native SDK hands over waited it there already.
+describe('PopupLogic.prepare — the delay', () => {
+  const delayed = (id) => ({ id, html: `<div>${id}</div>`, delay: 5 })
+  const nativeSdk = () => ({ shop_id: 'shop-delay', _native: {}, tracking: { popupShown: jest.fn(() => Promise.resolve()) } })
+
+  test('a popup is shown once its delay passed; one whose delay the native SDK waited, at once', async () => {
+    jest.useFakeTimers()
+    const show = jest.fn()
+    await PopupLogic.prepare(nativeSdk(), delayed(31), true, show)
+    jest.advanceTimersByTime(4999)
+    expect(show).not.toHaveBeenCalled()
+    jest.advanceTimersByTime(1)
+    expect(show).toHaveBeenCalledTimes(1)
+
+    const waited = jest.fn()
+    await PopupLogic.prepare(nativeSdk(), delayed(32), true, waited, { delayWaited: true })
+    jest.advanceTimersByTime(0)
+    expect(waited).toHaveBeenCalledTimes(1)
+    jest.useRealTimers()
+  })
+})
+
 // The popup UI lays out the positions it knows; anything else comes out fullscreen, as on Android
 // (it used to fall back to fixed_bottom).
 describe('Popup — position routing', () => {

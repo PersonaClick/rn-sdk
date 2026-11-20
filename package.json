@@ -1,6 +1,6 @@
 {
   "name": "@personaclick/rn-sdk",
-  "version": "4.0.26",
+  "version": "5.0.0",
   "description": "PersonaClick React Native SDK",
   "type": "module",
   "types": "./index.d.ts",
@@ -20,7 +20,8 @@
     "./internal/v3": {
       "types": "./internal/v3.d.ts",
       "default": "./internal/v3.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "main": "index.js",
   "author": "PersonaClick",
@@ -65,6 +66,7 @@
     "@react-native-community/netinfo": ">=5.0.0",
     "@react-native-firebase/app": ">=23 <27",
     "@react-native-firebase/messaging": ">=23 <27",
+    "react-native": ">=0.76.0",
     "react-native-fs": "^2.20.0",
     "react-native-vector-icons": "^10.3.0",
     "react-native-video": "^6.4.5",
@@ -92,6 +94,19 @@
   },
   "directories": {
     "lib": "lib"
+  },
+  "codegenConfig": {
+    "name": "PersonaClickNativeSpec",
+    "type": "modules",
+    "jsSrcsDir": "specs",
+    "android": {
+      "javaPackageName": "com.personaclick.reactnative"
+    },
+    "ios": {
+      "modulesProvider": {
+        "PersonaClickNative": "PersonaClickNative"
+      }
+    }
   },
   "scripts": {
     "test": "yarn exec jest --config jest.config.cjs",

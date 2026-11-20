@@ -3,3 +3,8 @@
 .eslintrc
 .idea
 tests/fixtures/
+android/build
+android/.gradle
+android/.cxx
+ios/build
+android/src/test

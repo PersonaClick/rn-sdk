@@ -1,4 +1,4 @@
-import router from '../lib/push/PushRouter.js'
+import router, { PENDING_EVENTS_WAIT_MS } from '../lib/push/PushRouter.js'
 import registry from '../lib/registry/SdkRegistry.js'
 import { registerShops, reset as resetFacade } from '../lib/facade/facade.js'
 import { trackPush } from '../lib/push/trackPush.js'
@@ -85,6 +85,7 @@ beforeEach(() => {
 describe('PushRouter.ensureInstalled — install once', () => {
   test('installs the global handlers exactly once, even across instances', async () => {
     const { deps } = makeGlobalDeps()
+    const notifeeRegistration = deps.notifee.onBackgroundEvent
     registerShop('shop-a')
 
     expect(await router.ensureInstalled(deps)).toBe(true)
@@ -97,7 +98,8 @@ describe('PushRouter.ensureInstalled — install once', () => {
     expect(deps.onNotificationOpenedApp).toHaveBeenCalledTimes(1)
     expect(deps.onTokenRefresh).toHaveBeenCalledTimes(1)
     expect(deps.notifee.onForegroundEvent).toHaveBeenCalledTimes(1)
-    expect(deps.notifee.onBackgroundEvent).toHaveBeenCalledTimes(1)
+    // Notifee's own registration: the SDK wraps the property to keep an app's handler beside its own.
+    expect(notifeeRegistration).toHaveBeenCalledTimes(1)
     expect(deps2.onMessage).not.toHaveBeenCalled()
   })
 
@@ -273,6 +275,55 @@ describe('PushRouter — a registered-but-pending shop is handled without init (
     )
   })
 
+  test('a pending shop\'s push is drawn at once, before its delivered event is answered; opened follows delivered', async () => {
+    registerShops([{ shopId: 'shop-lazy', stream: 'android' }])
+    const { deps, captured } = makeGlobalDeps()
+    registerShop('shop-a')
+    await router.ensureInstalled(deps)
+    let answerDelivered
+    trackPush.mockImplementation((shopId, event) => (event === 'delivered'
+      ? new Promise((resolve) => { answerDelivered = resolve })
+      : Promise.resolve({ status: 'success' })))
+    const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve() }
+
+    const handled = captured.bg(fcm('shop-lazy'))
+    await flush()
+
+    expect(displayPush).toHaveBeenCalledTimes(1)
+    expect(trackPush.mock.calls.map(([, event]) => event)).toEqual(['delivered'])
+
+    answerDelivered({ status: 'success' })
+    await handled
+    expect(trackPush.mock.calls.map(([, event]) => event)).toEqual(['delivered', 'opened'])
+    trackPush.mockReset()
+  })
+
+  test('a delivered event that hangs holds the headless task at most PENDING_EVENTS_WAIT_MS', async () => {
+    jest.useFakeTimers()
+    try {
+      registerShops([{ shopId: 'shop-lazy', stream: 'android' }])
+      const { deps, captured } = makeGlobalDeps()
+      registerShop('shop-a')
+      await router.ensureInstalled(deps)
+      trackPush.mockImplementation(() => new Promise(() => {}))
+      let done = false
+
+      const handled = captured.bg(fcm('shop-lazy')).then(() => { done = true })
+      for (let i = 0; i < 20; i++) await Promise.resolve()
+      expect(displayPush).toHaveBeenCalledTimes(1)
+      expect(done).toBe(false)
+
+      jest.advanceTimersByTime(PENDING_EVENTS_WAIT_MS)
+      await handled
+      expect(done).toBe(true)
+      // Opened waits for delivered: it has not gone.
+      expect(trackPush.mock.calls.map(([, event]) => event)).toEqual(['delivered'])
+    } finally {
+      trackPush.mockReset()
+      jest.useRealTimers()
+    }
+  })
+
   test('a background message for a pending shop is also tracked and displayed', async () => {
     registerShops([{ shopId: 'shop-lazy', stream: 'android' }])
     const { deps, captured } = makeGlobalDeps()
@@ -298,6 +349,107 @@ describe('PushRouter — a registered-but-pending shop is handled without init (
       'clicked',
       expect.objectContaining({ code: '10', type: 'web', stream: 'android' }),
     )
+  })
+})
+
+describe('PushRouter — a dismissed notification is closed', () => {
+  const dismissed = (shopId) => ({ type: 'dismissed', detail: { notification: { data: { shop_id: shopId, id: '11', type: 'bulk' } } } })
+
+  test('a live shop hears it through its orchestrator, in the foreground and the background', async () => {
+    const { deps, captured } = makeGlobalDeps()
+    deps.EventType = { PRESS: 'press', DISMISSED: 'dismissed' }
+    const a = { ...fakeOrchestrator(), _handleNotifeeDismissed: jest.fn() }
+    registry.register('shop-a', { shop_id: 'shop-a', _pushOrchestrator: a })
+    await router.ensureInstalled(deps)
+
+    await captured.notifeeFg(dismissed('shop-a'))
+    await captured.notifeeBg(dismissed('shop-a'))
+
+    expect(a._handleNotifeeDismissed).toHaveBeenCalledTimes(2)
+    expect(a._handleNotifeeForeground).not.toHaveBeenCalled()
+  })
+
+  test('a pending shop gets closed without an instance', async () => {
+    registerShops([{ shopId: 'shop-lazy', stream: 'android' }])
+    const { deps, captured } = makeGlobalDeps()
+    deps.EventType = { PRESS: 'press', DISMISSED: 'dismissed' }
+    registerShop('shop-a')
+    await router.ensureInstalled(deps)
+
+    await captured.notifeeBg(dismissed('shop-lazy'))
+
+    expect(trackPush).toHaveBeenCalledWith('shop-lazy', 'closed', expect.objectContaining({ code: '11', type: 'bulk', stream: 'android' }))
+  })
+})
+
+describe('PushRouter — the SDK\'s own background handler, set at import', () => {
+  test('a push that starts the process is drawn and tracked for a shop registered at module scope', async () => {
+    registerShops([{ shopId: 'shop-lazy', stream: 'android' }])
+    const { deps, captured } = makeGlobalDeps()
+
+    expect(router.installBackgroundHandler(deps)).toBe(true)
+    await captured.bg(fcm('shop-lazy'))
+
+    expect(trackPush).toHaveBeenCalledWith('shop-lazy', 'delivered', expect.objectContaining({ code: '10', type: 'web' }))
+    expect(trackPush).toHaveBeenCalledWith('shop-lazy', 'opened', expect.objectContaining({ code: '10', type: 'web' }))
+    expect(displayPush).toHaveBeenCalled()
+  })
+
+  test("an app's Notifee background handler set after the SDK's runs beside it: both hear each event", async () => {
+    registerShops([{ shopId: 'shop-lazy', stream: 'android' }])
+    const { deps, captured } = makeGlobalDeps()
+    deps.EventType = { PRESS: 'press', DISMISSED: 'dismissed' }
+    router.installBackgroundHandler(deps)
+    const appHandler = jest.fn(async () => 'handled by the app')
+
+    // What the app writes after importing the SDK.
+    deps.notifee.onBackgroundEvent(appHandler)
+    const press = { type: 'press', detail: { notification: { data: { shop_id: 'shop-lazy', id: '11', type: 'bulk' } } } }
+    const result = await captured.notifeeBg(press)
+
+    expect(appHandler).toHaveBeenCalledWith(press)
+    expect(trackPush).toHaveBeenCalledWith('shop-lazy', 'clicked', expect.objectContaining({ code: '11', type: 'bulk' }))
+    // The event's result is the app's, as without the SDK.
+    expect(result).toBe('handled by the app')
+
+    // A later handler of the app takes its place; the SDK's stays.
+    const nextHandler = jest.fn()
+    deps.notifee.onBackgroundEvent(nextHandler)
+    await captured.notifeeBg(press)
+    expect(nextHandler).toHaveBeenCalledTimes(1)
+    expect(appHandler).toHaveBeenCalledTimes(1)
+    expect(trackPush.mock.calls.filter(([, event]) => event === 'clicked')).toHaveLength(2)
+  })
+
+  test("an app's handler that fails fails its event, as without the SDK; the SDK's handling still runs", async () => {
+    registerShops([{ shopId: 'shop-lazy', stream: 'android' }])
+    const { deps, captured } = makeGlobalDeps()
+    deps.EventType = { PRESS: 'press', DISMISSED: 'dismissed' }
+    router.installBackgroundHandler(deps)
+    deps.notifee.onBackgroundEvent(() => { throw new Error('the app failed') })
+    const press = { type: 'press', detail: { notification: { data: { shop_id: 'shop-lazy', id: '12', type: 'bulk' } } } }
+
+    await expect(captured.notifeeBg(press)).rejects.toThrow('the app failed')
+    expect(trackPush).toHaveBeenCalledWith('shop-lazy', 'clicked', expect.objectContaining({ code: '12' }))
+  })
+
+  test('without Firebase it sets nothing and does not throw', () => {
+    const { deps } = makeGlobalDeps()
+    deps.getMessaging.mockImplementation(() => {
+      throw new Error('No Firebase App')
+    })
+
+    expect(router.installBackgroundHandler(deps)).toBe(false)
+  })
+
+  test('an instance installing later replaces the global functions it had', async () => {
+    const { deps: early } = makeGlobalDeps()
+    router.installBackgroundHandler({ getMessaging: early.getMessaging, setBackgroundMessageHandler: early.setBackgroundMessageHandler, notifee: early.notifee, isDebug: early.isDebug })
+    const { deps } = makeGlobalDeps()
+    registerShop('shop-a')
+
+    expect(await router.ensureInstalled(deps)).toBe(true)
+    expect(deps.onMessage).toHaveBeenCalledTimes(1)
   })
 })
 

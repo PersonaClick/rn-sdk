@@ -81,4 +81,24 @@ describe('Review', () => {
     )
     expect(mockRequest.mock.calls.filter((c) => c[0] === 'nps/create')).toHaveLength(0)
   })
+
+  describe('without a channel, the channel of the app\'s platform', () => {
+    const { Platform } = require('react-native')
+    const platform = Platform.OS
+    afterEach(() => {
+      Platform.OS = platform
+    })
+
+    const channelSent = () => mockRequest.mock.calls.find((c) => c[0] === 'nps/create')[2].params.channel
+
+    test.each([
+      ['android', 'android_app'],
+      ['ios', 'ios_app'],
+    ])('on %s it is %s, whatever the stream', async (os, channel) => {
+      Platform.OS = os
+      sdk.stream = 'react-native'
+      await sdk.review(7, '', 'order')
+      expect(channelSent()).toBe(channel)
+    })
+  })
 })

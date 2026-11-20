@@ -46,6 +46,8 @@ const mockRemovePushMessage = jest.fn().mockResolvedValue(undefined)
 const mockRequest = jest.fn().mockResolvedValue({})
 
 jest.mock('../lib/client.js', () => ({
+  setShopHosts: jest.fn(),
+  appHostOf: jest.fn(() => 'app.personaClick.ru'),
   initLocker: jest.fn().mockResolvedValue(null),
   request: (...args) => mockRequest(...args),
   setInitLocker: jest.fn().mockResolvedValue(undefined),
@@ -99,9 +101,7 @@ describe('MainSDK onClickPush', () => {
 
   test('returns false when event is missing but still tracks click', async () => {
     const sdk = createSdk()
-    const notificationClickedSpy = jest
-      .spyOn(sdk, 'notificationClicked')
-      .mockResolvedValue(undefined)
+    const pushSeenSpy = jest.spyOn(sdk, '_pushSeen').mockImplementation(() => {})
     mockGetPushData.mockResolvedValue([{ data: { event: '' } }])
 
     const result = await sdk.onClickPush({
@@ -110,15 +110,15 @@ describe('MainSDK onClickPush', () => {
 
     expect(result).toBe(false)
     expect(mockRemovePushMessage).toHaveBeenCalledWith('m-2', 'shop-id')
-    expect(notificationClickedSpy).toHaveBeenCalledWith({
-      code: 'n-2',
-      type: 'web_push',
+    // The SDK's own handling of the tap: `clicked`, and the app's onClicked once it was accepted.
+    expect(pushSeenSpy).toHaveBeenCalledWith('clicked', {
+      data: { message_id: 'm-2', id: 'n-2', type: 'web_push' },
     })
   })
 
   test('opens web url when event type is web', async () => {
     const sdk = createSdk()
-    jest.spyOn(sdk, 'notificationClicked').mockResolvedValue(undefined)
+    jest.spyOn(sdk, '_pushSeen').mockImplementation(() => {})
     mockGetPushData.mockResolvedValue([
       { data: { event: JSON.stringify({ type: 'web', uri: 'https://example.com' }) } },
     ])
@@ -133,7 +133,7 @@ describe('MainSDK onClickPush', () => {
 
   test('resolves product url via API and opens it', async () => {
     const sdk = createSdk()
-    jest.spyOn(sdk, 'notificationClicked').mockResolvedValue(undefined)
+    jest.spyOn(sdk, '_pushSeen').mockImplementation(() => {})
     mockGetPushData.mockResolvedValue([
       { data: { event: JSON.stringify({ type: 'product', uri: 'sku-123' }) } },
     ])
@@ -157,7 +157,7 @@ describe('MainSDK onClickPush', () => {
 
   test('resolves category url via API and opens it', async () => {
     const sdk = createSdk()
-    jest.spyOn(sdk, 'notificationClicked').mockResolvedValue(undefined)
+    jest.spyOn(sdk, '_pushSeen').mockImplementation(() => {})
     mockGetPushData.mockResolvedValue([
       { data: { event: JSON.stringify({ type: 'category', uri: 'cat-22' }) } },
     ])
@@ -184,7 +184,7 @@ describe('MainSDK onClickPush', () => {
 
   test('returns error when product API request fails', async () => {
     const sdk = createSdk()
-    jest.spyOn(sdk, 'notificationClicked').mockResolvedValue(undefined)
+    jest.spyOn(sdk, '_pushSeen').mockImplementation(() => {})
     const apiError = new Error('product lookup failed')
     mockGetPushData.mockResolvedValue([
       { data: { event: JSON.stringify({ type: 'product', uri: 'sku-fail' }) } },
@@ -219,5 +219,45 @@ describe('MainSDK onClickPush', () => {
     })
 
     expect(mockGetPushData).toHaveBeenCalledWith('gcm-mid-88', 'shop-id')
+  })
+
+  test('a kept push whose event is an object (APNs) opens it, without parsing it as JSON', async () => {
+    const sdk = createSdk()
+    const pushSeenSpy = jest.spyOn(sdk, '_pushSeen').mockImplementation(() => {})
+    mockGetPushData.mockResolvedValue([
+      { messageId: 'm-apns', data: { event: { type: 'web', uri: 'https://example.com/apns' }, src: { id: 5, type: 'bulk' } } },
+    ])
+    const tap = { data: { message_id: 'm-apns', src: { id: 5, type: 'bulk' } } }
+
+    await sdk.onClickPush(tap)
+
+    expect(mockOpenURL).toHaveBeenCalledWith('https://example.com/apns')
+    expect(pushSeenSpy).toHaveBeenCalledWith('clicked', tap)
+  })
+
+  test('a direct APNs push without a message id is its own push: it is tracked by its src and opens its event, no kept push is read', async () => {
+    const sdk = createSdk()
+    const pushSeenSpy = jest.spyOn(sdk, '_pushSeen').mockImplementation(() => {})
+    mockGetPushData.mockResolvedValue([{ data: { event: JSON.stringify({ type: 'web', uri: 'https://example.com/other' }) } }])
+    const tap = { data: { shop_id: 'shop-id', src: { id: 9, type: 'chain' }, event: { type: 'web', uri: 'https://example.com/own' } } }
+
+    await sdk.onClickPush(tap)
+
+    expect(mockGetPushData).not.toHaveBeenCalled()
+    expect(mockRemovePushMessage).not.toHaveBeenCalled()
+    expect(pushSeenSpy).toHaveBeenCalledWith('clicked', tap)
+    expect(mockOpenURL).toHaveBeenCalledWith('https://example.com/own')
+    expect(mockOpenURL).not.toHaveBeenCalledWith('https://example.com/other')
+  })
+
+  test('a tap without a message id that is not the SDK\'s push does nothing', async () => {
+    const sdk = createSdk()
+    const pushSeenSpy = jest.spyOn(sdk, '_pushSeen').mockImplementation(() => {})
+
+    await expect(sdk.onClickPush({ data: { title: 'Not ours' } })).resolves.toBe(false)
+
+    expect(mockGetPushData).not.toHaveBeenCalled()
+    expect(pushSeenSpy).not.toHaveBeenCalled()
+    expect(mockOpenURL).not.toHaveBeenCalled()
   })
 })

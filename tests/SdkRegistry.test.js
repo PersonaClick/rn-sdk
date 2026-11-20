@@ -153,3 +153,42 @@ describe('SdkRegistry.unregister / reset', () => {
     expect(registry.shopIds()).toEqual(new Set())
   })
 })
+
+describe('SdkRegistry.unregister of the current default', () => {
+  test('the instance registered last before it becomes the default, and none once all are gone', () => {
+    const a = sdk('a')
+    const b = sdk('b')
+    registry.register('shop-a', a)
+    registry.register('shop-b', b)
+
+    registry.unregister(b)
+    expect(registry.current()).toBe(a)
+
+    registry.unregister(a)
+    expect(registry.current()).toBeNull()
+  })
+
+  test('a waiter of the default is not handed a released instance: it waits for the next one', () => {
+    const a = sdk('a')
+    registry.register('shop-a', a)
+    registry.unregister(a)
+    const onReady = jest.fn()
+
+    registry.onNextRegister(null, onReady)
+    expect(onReady).not.toHaveBeenCalled()
+
+    const next = sdk('next')
+    registry.register('shop-a', next)
+    expect(onReady).toHaveBeenCalledWith(next)
+  })
+
+  test('unregistering another instance keeps the default', () => {
+    const a = sdk('a')
+    const b = sdk('b')
+    registry.register('shop-a', a)
+    registry.register('shop-b', b)
+
+    registry.unregister(a)
+    expect(registry.current()).toBe(b)
+  })
+})

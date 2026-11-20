@@ -85,6 +85,8 @@ const mockGetLastPushTokenSentDate = jest.fn().mockResolvedValue(null)
 const mockSaveLastPushTokenSentDate = jest.fn().mockResolvedValue(undefined)
 
 jest.mock('../lib/client.js', () => ({
+  setShopHosts: jest.fn(),
+  appHostOf: jest.fn(() => 'app.personaClick.ru'),
   initLocker: (...args) => mockInitLocker(...args),
   request: (...args) => mockRequest(...args),
   setInitLocker: (...args) => mockSetInitLocker(...args),

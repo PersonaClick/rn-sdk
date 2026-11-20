@@ -1,0 +1,376 @@
+{
+  "contract": "0",
+  "cases": [
+    {
+      "name": "blank",
+      "call": { "namespace": "search", "method": "blank", "args": {} },
+      "request": { "method": "GET", "path": "search/blank", "query": {} }
+    },
+    {
+      "name": "instant",
+      "call": { "namespace": "search", "method": "instant", "args": { "query": "iphone" } },
+      "request": { "method": "GET", "path": "search", "query": { "type": "instant_search", "search_query": "iphone" } }
+    },
+    {
+      "name": "instant со списками через запятую без пробелов",
+      "call": { "namespace": "search", "method": "instant",
+                "args": { "query": "iphone", "locations": [ "msk", "spb" ], "excludedMerchants": [ "m1", "m2" ], "excludedBrands": [ "b1", "b2" ] } },
+      "request": { "method": "GET", "path": "search",
+                   "query": { "type": "instant_search", "search_query": "iphone", "locations": "msk,spb",
+                              "excluded_merchants": "m1,m2", "excluded_brands": "b1,b2" } }
+    },
+    {
+      "name": "instant: excludedMerchants без locations не уходит",
+      "call": { "namespace": "search", "method": "instant", "args": { "query": "iphone", "excludedMerchants": [ "m1" ] } },
+      "request": { "method": "GET", "path": "search", "query": { "type": "instant_search", "search_query": "iphone" } }
+    },
+    {
+      "name": "instant с пустым запросом",
+      "call": { "namespace": "search", "method": "instant", "args": { "query": "" } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "full без запроса",
+      "call": { "namespace": "search", "method": "full", "args": { "query": "iphone" } },
+      "request": { "method": "GET", "path": "search", "query": { "type": "full_search", "search_query": "iphone" } }
+    },
+    {
+      "name": "full со всеми полями: направление сортировки — order, уточнение — no_clarification",
+      "call": { "namespace": "search", "method": "full",
+                "args": { "query": "iphone",
+                          "request": { "categoryIds": [ "1", "2" ], "brands": [ "Apple" ], "excludedBrands": [ "Noname" ],
+                                       "merchants": [ "m1" ], "excludedMerchants": [ "m2" ], "locations": [ "msk" ],
+                                       "priceMin": 1000, "priceMax": 99999.99, "colors": [ "black", "white" ], "fashionSizes": [ "42" ],
+                                       "excludedItemIds": [ "37" ], "filters": { "memory": [ "128", "256" ] },
+                                       "sortBy": "relevance", "sortDir": "desc", "disableClarification": true,
+                                       "categoryLimit": 5, "brandLimit": 50, "limit": 24, "page": 3 } } },
+      "request": { "method": "GET", "path": "search",
+                   "query": { "type": "full_search", "search_query": "iphone", "categories": "1,2", "brands": "Apple",
+                              "excluded_brands": "Noname", "merchants": "m1", "excluded_merchants": "m2", "locations": "msk",
+                              "price_min": "1000", "price_max": "99999.99", "colors": "black,white", "fashion_sizes": "42",
+                              "exclude": "37", "filters": "{\"memory\":[\"128\",\"256\"]}", "sort_by": "relevance", "order": "desc",
+                              "no_clarification": "true", "category_limit": "5", "brand_limit": "50", "limit": "24", "page": "3" } }
+    },
+    {
+      "name": "full: excludedMerchants без locations не уходит, disableClarification false не уходит",
+      "call": { "namespace": "search", "method": "full",
+                "args": { "query": "iphone", "request": { "excludedMerchants": [ "m2" ], "disableClarification": false } } },
+      "request": { "method": "GET", "path": "search", "query": { "type": "full_search", "search_query": "iphone" } }
+    },
+    {
+      "name": "full с пустым запросом",
+      "call": { "namespace": "search", "method": "full", "args": { "query": "" } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "full с limit 0",
+      "call": { "namespace": "search", "method": "full", "args": { "query": "iphone", "request": { "limit": 0 } } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "full с page 0",
+      "call": { "namespace": "search", "method": "full", "args": { "query": "iphone", "request": { "page": 0 } } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "full с categoryLimit 0",
+      "call": { "namespace": "search", "method": "full", "args": { "query": "iphone", "request": { "categoryLimit": 0 } } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "full с brandLimit 0",
+      "call": { "namespace": "search", "method": "full", "args": { "query": "iphone", "request": { "brandLimit": 0 } } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "full с отрицательной ценой",
+      "call": { "namespace": "search", "method": "full", "args": { "query": "iphone", "request": { "priceMax": -5 } } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "full с priceMin больше priceMax",
+      "call": { "namespace": "search", "method": "full", "args": { "query": "iphone", "request": { "priceMin": 500, "priceMax": 100 } } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "blank: недавние запросы и товары покупателя, подсказки, популярное; html не попадает в результат",
+      "call": { "namespace": "search", "method": "blank", "args": {} },
+      "response": { "status": 200,
+                    "body": { "last_queries": [ { "name": "iphone", "url": "https://shop.example/search?q=iphone" } ],
+                              "suggests": [ { "name": "iphone 15", "url": "https://shop.example/search?q=iphone+15" } ],
+                              "last_products": true,
+                              "products": [ { "id": "37", "name": "iPhone 15", "url": "https://shop.example/p/37", "price": 79990, "currency": "₽" } ],
+                              "popular_categories": [ { "name": "Смартфоны", "url": "https://shop.example/c/1" } ],
+                              "popular_brands": [ { "name": "Apple", "url": "https://shop.example/b/apple" } ],
+                              "popular_links": [ { "name": "Распродажа", "url": "https://shop.example/sale" }, { "name": "Без ссылки" } ],
+                              "html": "<div></div>" } },
+      "expect": { "result": { "lastQueries": [ { "name": "iphone", "url": "https://shop.example/search?q=iphone" } ],
+                              "suggests": [ { "name": "iphone 15", "url": "https://shop.example/search?q=iphone+15" } ],
+                              "lastProducts": true,
+                              "products": [ { "id": "37", "name": "iPhone 15", "url": "https://shop.example/p/37", "price": 79990, "currency": "₽", "isNew": false } ],
+                              "popularCategories": [ { "name": "Смартфоны", "url": "https://shop.example/c/1" } ],
+                              "popularBrands": [ { "name": "Apple", "url": "https://shop.example/b/apple" } ],
+                              "popularLinks": [ { "name": "Распродажа", "url": "https://shop.example/sale" } ] } }
+    },
+    {
+      "name": "blank: без last_products — популярные товары",
+      "call": { "namespace": "search", "method": "blank", "args": {} },
+      "response": { "status": 200,
+                    "body": { "products": [ { "id": "37", "name": "iPhone 15", "url": "https://shop.example/p/37", "price": 79990, "currency": "₽" } ] } },
+      "expect": { "result": { "lastProducts": false,
+                              "products": [ { "id": "37", "name": "iPhone 15", "url": "https://shop.example/p/37", "price": 79990, "currency": "₽", "isNew": false } ] } }
+    },
+    {
+      "name": "blank: совсем пустой ответ — []",
+      "call": { "namespace": "search", "method": "blank", "args": {} },
+      "response": { "status": 200, "body": [] },
+      "expect": { "result": { "products": [], "lastProducts": false } }
+    },
+    {
+      "name": "instant: результаты, категории-фасеты, подсказки с оценкой, локации, переход вместо результатов",
+      "call": { "namespace": "search", "method": "instant", "args": { "query": "ifone" } },
+      "response": { "status": 200,
+                    "body": { "search_query": "iphone", "search_query_original": "ifone", "clarification": false, "products_total": 1,
+                              "products": [ { "id": "37", "name": "iPhone 15", "url": "https://shop.example/p/37", "price": 79990, "currency": "₽",
+                                              "discount_percent": 10, "discount_formatted": "10%" } ],
+                              "categories": [ { "id": "1", "name": "Смартфоны", "url": "https://shop.example/c/1", "parent": null, "count": 1, "alias": "phones" } ],
+                              "queries": [ { "name": "iphone 15", "url": "https://shop.example/search?q=iphone+15", "score": "0.9" } ],
+                              "locations": [ { "id": "msk", "name": "Москва", "type": null } ],
+                              "search_query_redirects": { "query": "iphone", "redirect_link": "https://shop.example/apple", "deep_link": null },
+                              "html": "<div></div>", "requests_count": 3, "book_author": [], "collections": [] } },
+      "expect": { "result": { "searchQuery": "iphone", "searchQueryOriginal": "ifone", "clarification": false, "productsTotal": 1,
+                              "products": [ { "id": "37", "name": "iPhone 15", "url": "https://shop.example/p/37", "price": 79990, "currency": "₽",
+                                              "discountPercent": 10, "discountFormatted": "10%", "isNew": false } ],
+                              "categories": [ { "id": "1", "name": "Смартфоны", "url": "https://shop.example/c/1", "count": 1, "alias": "phones" } ],
+                              "queries": [ { "name": "iphone 15", "url": "https://shop.example/search?q=iphone+15", "score": 0.9 } ],
+                              "locations": [ { "id": "msk", "name": "Москва" } ],
+                              "redirect": { "query": "iphone", "url": "https://shop.example/apple" } } }
+    },
+    {
+      "name": "instant: ничего не найдено",
+      "call": { "namespace": "search", "method": "instant", "args": { "query": "zzz" } },
+      "response": { "status": 200, "body": { "search_query": "zzz", "products_total": 0, "products": [] } },
+      "expect": { "result": { "searchQuery": "zzz", "productsTotal": 0, "products": [] } }
+    },
+    {
+      "name": "full: результаты с фасетами",
+      "call": { "namespace": "search", "method": "full", "args": { "query": "кроссовки" } },
+      "response": { "status": 200,
+                    "body": { "search_query": "кроссовки", "clarification": true, "products_total": 120,
+                              "products": [ { "id": "37", "name": "Кроссовки", "url": "https://shop.example/p/37", "price": 4990, "currency": "₽" } ],
+                              "categories": [ { "id": "5", "name": "Обувь", "url": "https://shop.example/c/5", "parent": "1", "count": 120 } ],
+                              "brands": [ { "name": "Nike", "count": 80 }, { "name": "Adidas", "count": "40" } ],
+                              "locations": [ { "id": "msk", "name": "Москва", "type": "city" } ],
+                              "filters": { "Размер": { "count": 120, "priority": 2, "values": { "42": 30, "43": 25 } } },
+                              "industrial_filters": { "colors": [ { "color": "black", "count": 70 } ], "fashion_sizes": [ { "size": "42", "count": 30 }, { "count": 1 } ] },
+                              "price_range": { "min": 1990, "max": 19990 },
+                              "price_ranges": [ { "from": 0, "to": 5000, "count": 90 }, { "from": 5000, "count": 30 } ],
+                              "price_median": 4990, "html": "", "requests_count": 1, "collections": [] } },
+      "expect": { "result": { "searchQuery": "кроссовки", "clarification": true, "productsTotal": 120,
+                              "products": [ { "id": "37", "name": "Кроссовки", "url": "https://shop.example/p/37", "price": 4990, "currency": "₽", "isNew": false } ],
+                              "categories": [ { "id": "5", "name": "Обувь", "url": "https://shop.example/c/5", "parentId": "1", "count": 120 } ],
+                              "brands": [ { "name": "Nike", "count": 80 }, { "name": "Adidas", "count": 40 } ],
+                              "locations": [ { "id": "msk", "name": "Москва", "type": "city" } ],
+                              "filters": { "Размер": { "count": 120, "priority": 2, "values": { "42": 30, "43": 25 } } },
+                              "industrialFilters": { "colors": [ { "color": "black", "count": 70 } ], "fashionSizes": [ { "size": "42", "count": 30 } ] },
+                              "priceRange": { "min": 1990, "max": 19990 },
+                              "priceRanges": [ { "from": 0, "to": 5000, "count": 90 }, { "from": 5000, "count": 30 } ],
+                              "priceMedian": 4990 } }
+    },
+    {
+      "name": "instant: ответ без products",
+      "call": { "namespace": "search", "method": "instant", "args": { "query": "iphone" } },
+      "response": { "status": 200, "body": { "queries": [] } },
+      "expect": { "error": { "type": "decoding" } }
+    },
+    {
+      "name": "full: ответ без products",
+      "call": { "namespace": "search", "method": "full", "args": { "query": "iphone" } },
+      "response": { "status": 200, "body": { "products_total": 0 } },
+      "expect": { "error": { "type": "decoding" } }
+    },
+    {
+      "name": "full: ответ не объект",
+      "call": { "namespace": "search", "method": "full", "args": { "query": "iphone" } },
+      "response": { "status": 200, "body": [] },
+      "expect": { "error": { "type": "decoding" } }
+    },
+    {
+      "name": "instant: 2xx со status error",
+      "call": { "namespace": "search", "method": "instant", "args": { "query": "iphone" } },
+      "response": { "status": 200, "body": { "status": "error", "message": "Something went wrong" } },
+      "expect": { "error": { "type": "decoding" } }
+    },
+    {
+      "name": "full: 500",
+      "call": { "namespace": "search", "method": "full", "args": { "query": "iphone" } },
+      "response": { "status": 500, "body": null },
+      "expect": { "error": { "type": "http", "code": 500 } }
+    },
+    {
+      "name": "blank: нет ответа",
+      "call": { "namespace": "search", "method": "blank", "args": {} },
+      "response": { "status": null },
+      "expect": { "error": { "type": "network" } }
+    },
+    {
+      "name": "agentDialog без параметров — последняя сессия, локация из профиля",
+      "call": {"namespace": "search", "method": "agentDialog", "args": {}},
+      "request": {"method": "GET", "path": "api/v3/storefront/search/agent", "query": {}}
+    },
+    {
+      "name": "agentDialog с сессией и локациями: location через запятую",
+      "call": {"namespace": "search", "method": "agentDialog", "args": {"sessionId": 12, "locations": ["msk", "spb"]}},
+      "request": {"method": "GET", "path": "api/v3/storefront/search/agent", "query": {"session_id": "12", "location": "msk,spb"}}
+    },
+    {
+      "name": "agent: новая сессия, тело — JSON",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "нужна флешка на 1тб"}},
+      "request": {"method": "POST", "path": "api/v3/storefront/search/agent", "body": {"message": "нужна флешка на 1тб"}}
+    },
+    {
+      "name": "agent в сессии с локацией",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "а есть подешевле?", "sessionId": 12, "locations": ["msk"]}},
+      "request": {"method": "POST", "path": "api/v3/storefront/search/agent", "body": {"message": "а есть подешевле?", "session_id": 12, "location": "msk"}}
+    },
+    {
+      "name": "agent: id сессии больше 2^31",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "ещё", "sessionId": 3000000012}},
+      "request": {"method": "POST", "path": "api/v3/storefront/search/agent", "body": {"message": "ещё", "session_id": 3000000012}}
+    },
+    {
+      "name": "agentDialog: id сессии больше 2^31 уходит строкой",
+      "call": {"namespace": "search", "method": "agentDialog", "args": {"sessionId": 3000000012}},
+      "request": {"method": "GET", "path": "api/v3/storefront/search/agent", "query": {"session_id": "3000000012"}}
+    },
+    {
+      "name": "agent: сообщение в 500 символов",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "яяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяя"}},
+      "request": {"method": "POST", "path": "api/v3/storefront/search/agent", "body": {"message": "яяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяя"}}
+    },
+    {
+      "name": "agent с пустым сообщением",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": ""}},
+      "error": {"type": "invalidArgument"}
+    },
+    {
+      "name": "agent: сообщение длиннее 500 символов",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
+      "error": {"type": "invalidArgument"}
+    },
+    {
+      "name": "agentDialog: сессии и сообщения выбранной; товар без id пропускается",
+      "call": {"namespace": "search", "method": "agentDialog", "args": {}},
+      "response": {"status": 200, "body": {"sessions": [{"id": 12, "title": "Флешка на 1 ТБ", "updated_at": "2026-11-01T12:00:00Z"}, {"id": 9, "title": "Наушники", "updated_at": "2026-10-30T08:15:00Z"}], "session": {"id": 12, "title": "Флешка на 1 ТБ", "updated_at": "2026-11-01T12:00:00Z", "messages": [{"id": 1, "role": "user", "content": "нужна флешка на 1тб", "products": [], "created_at": "2026-11-01T11:59:40Z"}, {"id": 2, "role": "assistant", "content": "Нашёл три флешки на 1 ТБ с USB 3.2...", "created_at": "2026-11-01T12:00:00Z", "products": [{"id": "123", "name": "Флешка Example 1 ТБ", "price": 1990.0, "oldprice": 2490.0, "price_formatted": "1 990 ₽", "oldprice_formatted": "2 490 ₽", "picture": "https://example.com/images/123.jpg", "url": "https://example.com/p/123?recommended_by=agent_search&recommended_code=12", "reason": "Объём 1 ТБ, USB 3.2"}, {"name": "Без id", "price": 100.0}]}]}}},
+      "expect": {"result": {"sessions": [{"id": 12, "title": "Флешка на 1 ТБ", "updatedAt": "2026-11-01T12:00:00Z", "messages": []}, {"id": 9, "title": "Наушники", "updatedAt": "2026-10-30T08:15:00Z", "messages": []}], "session": {"id": 12, "title": "Флешка на 1 ТБ", "updatedAt": "2026-11-01T12:00:00Z", "messages": [{"id": 1, "role": "user", "content": "нужна флешка на 1тб", "createdAt": "2026-11-01T11:59:40Z", "products": []}, {"id": 2, "role": "assistant", "content": "Нашёл три флешки на 1 ТБ с USB 3.2...", "createdAt": "2026-11-01T12:00:00Z", "products": [{"id": "123", "name": "Флешка Example 1 ТБ", "price": 1990, "oldPrice": 2490, "priceFormatted": "1 990 ₽", "oldPriceFormatted": "2 490 ₽", "picture": "https://example.com/images/123.jpg", "url": "https://example.com/p/123?recommended_by=agent_search&recommended_code=12", "reason": "Объём 1 ТБ, USB 3.2"}]}]}}}
+    },
+    {
+      "name": "agentDialog: сессий ещё нет",
+      "call": {"namespace": "search", "method": "agentDialog", "args": {}},
+      "response": {"status": 200, "body": {"sessions": [], "session": null}},
+      "expect": {"result": {"sessions": []}}
+    },
+    {
+      "name": "agent: ответ агента; старая цена 0.0 — пусто",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "а есть подешевле?", "sessionId": 12}},
+      "response": {"status": 200, "body": {"session": {"id": 12, "title": "Флешка на 1 ТБ", "updated_at": "2026-11-01T12:01:10Z"}, "message": {"id": 4, "role": "assistant", "content": "Вот варианты дешевле 1 500 ₽...", "created_at": "2026-11-01T12:01:10Z", "products": [{"id": "456", "name": "Флешка Example Lite 1 ТБ", "price": 1390.0, "oldprice": 0.0, "price_formatted": "1 390 ₽", "oldprice_formatted": null, "picture": null, "url": null, "reason": ""}]}}},
+      "expect": {"result": {"session": {"id": 12, "title": "Флешка на 1 ТБ", "updatedAt": "2026-11-01T12:01:10Z", "messages": []}, "message": {"id": 4, "role": "assistant", "content": "Вот варианты дешевле 1 500 ₽...", "createdAt": "2026-11-01T12:01:10Z", "products": [{"id": "456", "name": "Флешка Example Lite 1 ТБ", "price": 1390, "priceFormatted": "1 390 ₽", "reason": ""}]}}}
+    },
+    {
+      "name": "agent: незнакомая роль читается как есть — открытый набор",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "привет"}},
+      "response": {"status": 200, "body": {"session": {"id": 13}, "message": {"id": 1, "role": "system", "content": "Агент обновлён"}}},
+      "expect": {"result": {"session": {"id": 13, "messages": []}, "message": {"id": 1, "role": "system", "content": "Агент обновлён", "products": []}}}
+    },
+    {
+      "name": "agent: id сессии и сообщения больше 2^31",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "ещё", "sessionId": 3000000012}},
+      "response": {"status": 200, "body": {"session": {"id": 3000000012, "title": "Флешка"}, "message": {"id": 3000000099, "role": "assistant", "content": "Вот ещё", "products": []}}},
+      "expect": {"result": {"session": {"id": 3000000012, "title": "Флешка", "messages": []}, "message": {"id": 3000000099, "role": "assistant", "content": "Вот ещё", "products": []}}}
+    },
+    {
+      "name": "agent: ответ без message",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "привет"}},
+      "response": {"status": 200, "body": {"session": {"id": 13}}},
+      "expect": {"error": {"type": "decoding"}}
+    },
+    {
+      "name": "agentDialog: ответ не объект",
+      "call": {"namespace": "search", "method": "agentDialog", "args": {}},
+      "response": {"status": 200, "body": []},
+      "expect": {"error": {"type": "decoding"}}
+    },
+    {
+      "name": "agent: 400 — нет did",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "привет"}},
+      "response": {"status": 400, "body": {"error": "did is required"}},
+      "expect": {"error": {"type": "http", "code": 400}}
+    },
+    {
+      "name": "agent: 402 — услуга поиска не подключена",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "привет"}},
+      "response": {"status": 402, "body": {"status": "fail", "message": "Search is not paid"}},
+      "expect": {"error": {"type": "http", "code": 402}}
+    },
+    {
+      "name": "agent: 403 — магазин неактивен или неверный секрет",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "привет"}},
+      "response": {"status": 403, "body": {"status": "fail", "message": "Access denied"}},
+      "expect": {"error": {"type": "http", "code": 403}}
+    },
+    {
+      "name": "agentDialog: 403 — магазин неактивен",
+      "call": {"namespace": "search", "method": "agentDialog", "args": {}},
+      "response": {"status": 403, "body": {"status": "fail", "message": "Access denied"}},
+      "expect": {"error": {"type": "http", "code": 403}}
+    },
+    {
+      "name": "agentDialog: 404 — сессия не найдена или чужая",
+      "call": {"namespace": "search", "method": "agentDialog", "args": {"sessionId": 99}},
+      "response": {"status": 404, "body": {"error": "Session not found"}},
+      "expect": {"error": {"type": "http", "code": 404}}
+    },
+    {
+      "name": "agent: 422 — сообщение длиннее 500 символов по счёту сервера",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "привет"}},
+      "response": {"status": 422, "body": {"error": "Message is too long"}},
+      "expect": {"error": {"type": "http", "code": 422}}
+    },
+    {
+      "name": "agent: 429 — превышен лимит",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "привет"}},
+      "response": {"status": 429, "body": {"error": "Too many requests"}},
+      "expect": {"error": {"type": "http", "code": 429}}
+    },
+    {
+      "name": "agentDialog: 503 — агент недоступен, показать blank",
+      "call": {"namespace": "search", "method": "agentDialog", "args": {}},
+      "response": {"status": 503, "body": {"error": "Agent is unavailable"}},
+      "expect": {"error": {"type": "http", "code": 503}}
+    },
+    {
+      "name": "agent: 503 — агент не ответил",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "привет"}},
+      "response": {"status": 503, "body": {"error": "Agent is unavailable"}},
+      "expect": {"error": {"type": "http", "code": 503}}
+    },
+    {
+      "name": "agent: 503 — посетитель в контрольной группе поиска, показать blank",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "привет"}},
+      "response": {"status": 503, "body": {"error": "agent is unavailable"}},
+      "expect": {"error": {"type": "http", "code": 503}}
+    },
+    {
+      "name": "agentDialog: 503 — посетитель в контрольной группе поиска, показать blank",
+      "call": {"namespace": "search", "method": "agentDialog", "args": {"sessionId": 3000000012}},
+      "response": {"status": 503, "body": {"error": "agent is unavailable"}},
+      "expect": {"error": {"type": "http", "code": 503}}
+    },
+    {
+      "name": "agent: нет ответа",
+      "call": {"namespace": "search", "method": "agent", "args": {"message": "привет"}},
+      "response": {"status": null},
+      "expect": {"error": {"type": "network"}}
+    }
+  ]
+}

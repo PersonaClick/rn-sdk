@@ -202,6 +202,7 @@ describe('PushOrchestrator.fetchToken', () => {
 describe('PushOrchestrator.installSubscriptions — subscription setup', () => {
   test('sets up all Firebase + Notifee listeners on first call', async () => {
     const { orchestrator, deps } = makeOrchestrator()
+    const notifeeRegistration = deps.notifee.onBackgroundEvent
     const result = await orchestrator.installSubscriptions()
     expect(result).toBe(true)
     expect(deps.onMessage).toHaveBeenCalledTimes(1)
@@ -209,7 +210,8 @@ describe('PushOrchestrator.installSubscriptions — subscription setup', () => {
     expect(deps.onNotificationOpenedApp).toHaveBeenCalledTimes(1)
     expect(deps.onTokenRefresh).toHaveBeenCalledTimes(1)
     expect(deps.notifee.onForegroundEvent).toHaveBeenCalledTimes(1)
-    expect(deps.notifee.onBackgroundEvent).toHaveBeenCalledTimes(1)
+    // Notifee's own registration: the SDK wraps the property to keep an app's handler beside its own.
+    expect(notifeeRegistration).toHaveBeenCalledTimes(1)
   })
 
   test('is idempotent — second call returns true without re-subscribing', async () => {
@@ -296,7 +298,7 @@ describe('PushOrchestrator — onMessage handler', () => {
     await orchestrator.installSubscriptions()
     const msg = { messageId: 'msg-1', data: { id: 'n1', type: 'web_push' } }
     await getHandler()(msg)
-    expect(deps.notificationDelivered).toHaveBeenCalledWith({ code: 'n1', type: 'web_push' })
+    expect(deps.notificationDelivered).toHaveBeenCalledWith({ code: 'n1', type: 'web_push' }, expect.anything())
     expect(deps.defaultReceiveListener).toHaveBeenCalledWith(msg)
   })
 
@@ -361,7 +363,7 @@ describe('PushOrchestrator — setBackgroundMessageHandler callback', () => {
 
     await getHandler()(msg)
 
-    expect(deps.notificationDelivered).toHaveBeenCalledWith({ code: 'n1', type: 'web_push' })
+    expect(deps.notificationDelivered).toHaveBeenCalledWith({ code: 'n1', type: 'web_push' }, expect.anything())
     expect(deps.updPushData).toHaveBeenCalledWith(msg, 'shop-1')
     expect(deps.defaultBgReceiveListener).toHaveBeenCalledWith(msg)
   })
@@ -944,5 +946,50 @@ describe('PushOrchestrator.setListeners', () => {
     await orchestrator.installSubscriptions()
     // Cold-start went directly to customClick; no replay
     expect(customClick).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('PushOrchestrator — the click and the dismissal are tracked whoever handles them', () => {
+  test("with the app's click callback the click is tracked first, then the callback runs", async () => {
+    const notificationClicked = jest.fn().mockResolvedValue(undefined)
+    const { orchestrator, deps } = makeOrchestrator({ notificationClicked })
+    const click = jest.fn()
+    orchestrator.setListeners({ click })
+
+    await orchestrator._handleClickEvent({ messageId: 'm-1', data: { id: 'c1', type: 'bulk' } }, 'shop-1')
+
+    expect(notificationClicked).toHaveBeenCalledWith({ code: 'c1', type: 'bulk' }, expect.anything())
+    expect(click).toHaveBeenCalledTimes(1)
+    expect(notificationClicked.mock.invocationCallOrder[0]).toBeLessThan(click.mock.invocationCallOrder[0])
+    // The SDK's own handling tracks the click itself: with a callback it does not run.
+    expect(deps.defaultClickListener).not.toHaveBeenCalled()
+  })
+
+  test('without a callback the SDK handles the click itself, which tracks it, once', async () => {
+    const notificationClicked = jest.fn()
+    const { orchestrator, deps } = makeOrchestrator({ notificationClicked })
+
+    await orchestrator._handleClickEvent({ messageId: 'm-2', data: { id: 'c2', type: 'bulk' } }, 'shop-1')
+
+    expect(deps.defaultClickListener).toHaveBeenCalledTimes(1)
+    expect(notificationClicked).not.toHaveBeenCalled()
+  })
+
+  test('a dismissed notification of the SDK is closed', async () => {
+    const notificationClosed = jest.fn().mockResolvedValue(undefined)
+    const { orchestrator } = makeOrchestrator({ notificationClosed })
+
+    await orchestrator._handleNotifeeDismissed({ type: 'dismissed', detail: { notification: { data: { id: 'c3', type: 'chain', shop_id: 's' } } } })
+
+    expect(notificationClosed).toHaveBeenCalledWith({ code: 'c3', type: 'chain' }, expect.anything())
+  })
+
+  test('the code and type of a direct APNs push come from its src', async () => {
+    const notificationDelivered = jest.fn().mockResolvedValue(undefined)
+    const { orchestrator } = makeOrchestrator({ notificationDelivered })
+
+    await orchestrator._handleForegroundMessage({ messageId: 'm-4', data: { src: '{"id":"c4","type":"bulk"}' } }, 'shop-1')
+
+    expect(notificationDelivered).toHaveBeenCalledWith({ code: 'c4', type: 'bulk' }, expect.anything())
   })
 })

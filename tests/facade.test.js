@@ -8,8 +8,10 @@ import {
   pendingShopIds,
   setSdkFactory,
   isAmbiguousDefault,
+  instance,
+  register,
 } from '../lib/facade/facade.js'
-import { UnknownShopIdError, AmbiguousShopError } from '../lib/facade/errors.js'
+import { PersonaClickError, UnknownShopIdError, AmbiguousShopError } from '../lib/facade/errors.js'
 import registry from '../lib/registry/SdkRegistry.js'
 
 // Facade resolution behind the public PersonaClick.* API (Release 3). The fake factory mimics what the
@@ -63,13 +65,47 @@ describe('facade.initialize / getInstance', () => {
     expect(() => getInstance()).toThrow(UnknownShopIdError)
   })
 
-  test('re-initialize builds a new instance (last-writer-wins)', () => {
+  test('initialize of a shop initialized already returns its live instance; another configuration is not applied', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const first = initialize({ shopId: 'shop-a', stream: 'ios' })
+    const same = initialize({ shopId: 'shop-a', stream: 'ios' })
+    expect(warn).not.toHaveBeenCalled()
+    const other = initialize({ shopId: 'shop-a', stream: 'android' })
+
+    expect(same).toBe(first)
+    expect(other).toBe(first)
+    expect(getInstance('shop-a')).toBe(first)
+    expect(registry.count()).toBe(1)
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/already_initialized/))
+    warn.mockRestore()
+  })
+
+  test('a released instance gives way: initialize makes a fresh one', () => {
     const first = initialize({ shopId: 'shop-a' })
+    first._released = true
+    registry.unregister(first)
+
     const second = initialize({ shopId: 'shop-a' })
 
     expect(second).not.toBe(first)
-    expect(getInstance('shop-a')).toBe(second)
-    expect(registry.count()).toBe(1)
+    expect(instance('shop-a')).toBe(second)
+  })
+
+  test('instance and register are the contract\'s names; the errors are PersonaClickError with their type', () => {
+    register([{ shopId: 'shop-a' }, { shopId: 'shop-b' }])
+
+    expect(() => instance()).toThrow(AmbiguousShopError)
+    expect(() => instance()).toThrow(expect.objectContaining({ name: 'AmbiguousShopError', type: 'ambiguousShop' }))
+    let unknown
+    try {
+      instance('nope')
+    } catch (error) {
+      unknown = error
+    }
+    expect(unknown).toBeInstanceOf(PersonaClickError)
+    expect(unknown).toBeInstanceOf(UnknownShopIdError)
+    expect(unknown.type).toBe('unknownShop')
+    expect(instance('shop-a')).toBe(getInstance('shop-a'))
   })
 })
 
