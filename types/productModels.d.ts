@@ -7,8 +7,11 @@
  * (`null`, an empty or non-numeric string) is passed through as is, so those types are wider.
  */
 
-/** Category of a product (`products/get`). */
-export interface ProductCategory {
+/**
+ * Category of a product (`products/get`), as the deprecated `getProductInfo` gives it.
+ * @deprecated The namespaces' `ProductCategory` is the contract's; this is 4.x's.
+ */
+export interface LegacyProductCategory {
   id: string
   name: string
   url?: string | null
@@ -29,8 +32,11 @@ export interface ProductPriceRange {
   max: number
 }
 
-/** Product in list responses. */
-export interface Product {
+/**
+ * Product in list responses, as the deprecated catalog methods give it.
+ * @deprecated The namespaces' `Product` is the contract's; this is 4.x's.
+ */
+export interface LegacyProduct {
   id: string
   barcode?: string
   name: string
@@ -74,17 +80,20 @@ export interface Product {
 }
 
 /** Full product details (`products/get`). `id` comes from the API `uniqid`. */
-export interface ProductInfo extends Product {
-  categories: ProductCategory[]
+export interface ProductInfo extends LegacyProduct {
+  categories: LegacyProductCategory[]
 }
 
-/** Products list (`products`). */
-export interface ProductsListResponse {
+/**
+ * Products list (`products`), as the deprecated `getProductsList` gives it.
+ * @deprecated The namespaces' `ProductsListResponse` is the contract's; this is 4.x's.
+ */
+export interface LegacyProductsListResponse {
   brands?: string[]
   filters?: Record<string, ProductFilter>
   priceRange?: ProductPriceRange
-  products: Product[]
+  products: LegacyProduct[]
   productsTotal: number
   /** API `categories`: the categories of the listed products; top-level ones have no `parentId`. */
-  categories?: ProductCategory[]
+  categories?: LegacyProductCategory[]
 }

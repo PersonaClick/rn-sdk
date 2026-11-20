@@ -1,0 +1,1069 @@
+{
+ "getProductInfo": {
+  "requests": [
+   {
+    "url": "/products/get",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "item_id": "37",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "id": "37",
+    "name": "Shoes",
+    "brand": "Nike",
+    "model": "",
+    "description": "",
+    "imageUrl": "",
+    "resizedImageUrl": "https://shop/37.jpg",
+    "resizedImages": {},
+    "url": "https://shop/37",
+    "deeplinkIos": "",
+    "categories": [
+     {
+      "id": "5",
+      "name": "Shoes"
+     }
+    ],
+    "price": 990,
+    "priceFormatted": "",
+    "priceFull": 1100,
+    "oldPrice": 1100,
+    "currency": "",
+    "salesRate": 0,
+    "discount": 15,
+    "relativeSalesRate": 0,
+    "barcode": "",
+    "deeplinkAndroid": "",
+    "picture": "https://shop/37.jpg"
+   }
+  }
+ },
+ "getProductsList": {
+  "requests": [
+   {
+    "url": "/products",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "brands": "Nike",
+     "categories": "5",
+     "limit": "2",
+     "page": "1",
+     "filters": "{\"Size\":[\"42\"]}",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "brands": [
+     "Nike"
+    ],
+    "products": [
+     {
+      "id": "37",
+      "barcode": "",
+      "name": "Shoes",
+      "brand": "Nike",
+      "model": "",
+      "description": "",
+      "imageUrl": "",
+      "resizedImageUrl": "https://shop/37.jpg",
+      "resizedImages": {},
+      "url": "https://shop/37",
+      "deeplinkIos": "",
+      "price": 990,
+      "priceFormatted": "",
+      "priceFull": 1100,
+      "oldPrice": 1100,
+      "currency": "",
+      "salesRate": 0,
+      "discount": 15,
+      "relativeSalesRate": 0,
+      "deeplinkAndroid": "",
+      "picture": "https://shop/37.jpg"
+     }
+    ],
+    "productsTotal": 1
+   }
+  }
+ },
+ "getCategory": {
+  "requests": [
+   {
+    "url": "/category/5",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "limit": "2",
+     "page": "1",
+     "brands": "Nike,Puma",
+     "sort_by": "price",
+     "extra_param": "y",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "productsTotal": 1,
+    "products": [
+     {
+      "id": "37",
+      "name": "Shoes",
+      "price": 990,
+      "price_full": 1100,
+      "discount": 15,
+      "oldprice": 1100,
+      "url": "https://shop/37",
+      "picture": "https://shop/37.jpg",
+      "brand": "Nike",
+      "categories": [
+       {
+        "id": "5",
+        "name": "Shoes"
+       }
+      ],
+      "x_extra": "kept"
+     }
+    ],
+    "brands": [],
+    "raw": {
+     "products": [
+      {
+       "id": "37",
+       "name": "Shoes",
+       "price": 990,
+       "price_full": 1100,
+       "discount": 15,
+       "oldprice": 1100,
+       "url": "https://shop/37",
+       "picture": "https://shop/37.jpg",
+       "brand": "Nike",
+       "categories": [
+        {
+         "id": "5",
+         "name": "Shoes"
+        }
+       ],
+       "x_extra": "kept"
+      }
+     ],
+     "products_total": 1,
+     "categories": [
+      {
+       "id": "5",
+       "name": "Shoes",
+       "parent": null
+      }
+     ],
+     "x_extra": "kept"
+    }
+   }
+  }
+ },
+ "getCollection": {
+  "requests": [
+   {
+    "url": "/collection/12",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "location": "msk",
+     "email": "jane@example.com",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "products": [
+     {
+      "id": "37",
+      "name": "Shoes",
+      "price": 990,
+      "price_full": 1100,
+      "discount": 15,
+      "oldprice": 1100,
+      "url": "https://shop/37",
+      "picture": "https://shop/37.jpg",
+      "brand": "Nike",
+      "categories": [
+       {
+        "id": "5",
+        "name": "Shoes"
+       }
+      ],
+      "x_extra": "kept"
+     }
+    ],
+    "raw": {
+     "products": [
+      {
+       "id": "37",
+       "name": "Shoes",
+       "price": 990,
+       "price_full": 1100,
+       "discount": 15,
+       "oldprice": 1100,
+       "url": "https://shop/37",
+       "picture": "https://shop/37.jpg",
+       "brand": "Nike",
+       "categories": [
+        {
+         "id": "5",
+         "name": "Shoes"
+        }
+       ],
+       "x_extra": "kept"
+      }
+     ],
+     "x_extra": "kept"
+    }
+   }
+  }
+ },
+ "getProductCounters": {
+  "requests": [
+   {
+    "url": "/products/counters",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "item": "37",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "daily": null,
+    "now": null,
+    "triggers": {
+     "backInStock": 0,
+     "priceDrop": 0
+    }
+   }
+  }
+ },
+ "getLastOrderProducts": {
+  "requests": [
+   {
+    "url": "/orders/last_for_user",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "segment": "B",
+     "email": "jane@example.com",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": []
+  }
+ },
+ "getUserOrders": {
+  "requests": [
+   {
+    "url": "/orders/by_user",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "shop_secret": "test-secret",
+     "email": "jane@example.com",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": []
+  }
+ },
+ "cart": {
+  "requests": [
+   {
+    "url": "/products/cart",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "status": "success",
+    "data": {
+     "items": [
+      {
+       "uniqid": "37",
+       "quantity": 2,
+       "x_extra": "kept"
+      }
+     ]
+    },
+    "x_extra": "kept"
+   }
+  }
+ },
+ "getProductsFromCart": {
+  "requests": [
+   {
+    "url": "/products/cart",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": [
+    {
+     "productId": "37",
+     "quantity": 2
+    }
+   ]
+  }
+ },
+ "recommend": {
+  "requests": [
+   {
+    "url": "/recommend/block-1",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "segment": "B",
+     "recommender_code": "block-1",
+     "item": "37",
+     "extended": "1",
+     "limit": "4",
+     "custom_param": "z",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "recommends": [
+     "37"
+    ],
+    "title": "For you",
+    "products": [
+     {
+      "id": "37",
+      "name": "Shoes",
+      "price": 990,
+      "price_full": 1100,
+      "discount": 15,
+      "oldprice": 1100,
+      "url": "https://shop/37",
+      "picture": "https://shop/37.jpg",
+      "brand": "Nike",
+      "categories": [
+       {
+        "id": "5",
+        "name": "Shoes"
+       }
+      ],
+      "x_extra": "kept"
+     }
+    ],
+    "x_extra": "kept"
+   }
+  }
+ },
+ "searchFull": {
+  "requests": [
+   {
+    "url": "/search",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "segment": "B",
+     "type": "full_search",
+     "search_query": "boots",
+     "limit": "2",
+     "page": "1",
+     "unknown_param": "1",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "products": [
+     {
+      "id": "37",
+      "name": "Shoes",
+      "price": 990,
+      "price_full": 1100,
+      "discount": 15,
+      "oldprice": 1100,
+      "url": "https://shop/37",
+      "picture": "https://shop/37.jpg",
+      "brand": "Nike",
+      "categories": [
+       {
+        "id": "5",
+        "name": "Shoes"
+       }
+      ],
+      "x_extra": "kept"
+     }
+    ],
+    "products_total": 1,
+    "categories": [],
+    "filters": {},
+    "x_extra": "kept"
+   }
+  }
+ },
+ "searchInstant": {
+  "requests": [
+   {
+    "url": "/search",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "segment": "B",
+     "type": "instant_search",
+     "search_query": "bo",
+     "locations": "msk",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "products": [
+     {
+      "id": "37",
+      "name": "Shoes",
+      "price": 990,
+      "price_full": 1100,
+      "discount": 15,
+      "oldprice": 1100,
+      "url": "https://shop/37",
+      "picture": "https://shop/37.jpg",
+      "brand": "Nike",
+      "categories": [
+       {
+        "id": "5",
+        "name": "Shoes"
+       }
+      ],
+      "x_extra": "kept"
+     }
+    ],
+    "products_total": 1,
+    "categories": [],
+    "filters": {},
+    "x_extra": "kept"
+   }
+  }
+ },
+ "searchBlank": {
+  "requests": [
+   {
+    "url": "/search/blank",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "suggests": [
+     {
+      "name": "boots"
+     }
+    ],
+    "products": [
+     {
+      "id": "37",
+      "name": "Shoes",
+      "price": 990,
+      "price_full": 1100,
+      "discount": 15,
+      "oldprice": 1100,
+      "url": "https://shop/37",
+      "picture": "https://shop/37.jpg",
+      "brand": "Nike",
+      "categories": [
+       {
+        "id": "5",
+        "name": "Shoes"
+       }
+      ],
+      "x_extra": "kept"
+     }
+    ],
+    "last_queries": [
+     {
+      "name": "hat"
+     }
+    ],
+    "x_extra": "kept"
+   }
+  }
+ },
+ "getProfile": {
+  "requests": [
+   {
+    "url": "/profile",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "id": null,
+    "email": "jane@example.com",
+    "phone": null,
+    "firstName": "Jane",
+    "lastName": null,
+    "hasEmail": null,
+    "emailRegisteredAt": null,
+    "gender": "f",
+    "computedGender": null,
+    "boughtSomething": null,
+    "customProperties": {},
+    "raw": {
+     "email": "jane@example.com",
+     "first_name": "Jane",
+     "gender": "f",
+     "birthday": "1990-05-31",
+     "x_extra": "kept"
+    }
+   }
+  }
+ },
+ "setProfile": {
+  "requests": [
+   {
+    "url": "/profile/set",
+    "method": "POST",
+    "params": "",
+    "data": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "email": "jane@example.com",
+     "first_name": "Jane",
+     "birthday": "1990-05-31",
+     "custom_key": "v",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "contentType": "application/json"
+   }
+  ],
+  "result": {
+   "resolved": "<undefined>"
+  }
+ },
+ "segmentsAdd": {
+  "requests": [
+   {
+    "url": "/segments/add",
+    "method": "POST",
+    "params": "",
+    "data": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "segment": "B",
+     "segment_id": 3,
+     "email": "jane@example.com",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "contentType": "application/json"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "status": "success",
+    "x_extra": "kept"
+   }
+  }
+ },
+ "segmentsRemove": {
+  "requests": [
+   {
+    "url": "/segments/remove",
+    "method": "POST",
+    "params": "",
+    "data": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "segment": "B",
+     "segment_id": 3,
+     "phone": "+70000000000",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "contentType": "application/json"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "status": "success",
+    "x_extra": "kept"
+   }
+  }
+ },
+ "segmentsGet": {
+  "requests": [
+   {
+    "url": "/segments/get",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "segment": "B",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "segment": "B",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "contentType": "application/json"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "segments": [
+     {
+      "id": 3,
+      "type": "static"
+     }
+    ],
+    "x_extra": "kept"
+   }
+  }
+ },
+ "triggersPriceDrop": {
+  "requests": [
+   {
+    "url": "/subscriptions/subscribe_for_product_price",
+    "method": "POST",
+    "params": "",
+    "data": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "item": "37",
+     "price": 100,
+     "email": "jane@example.com",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "contentType": "application/json"
+   }
+  ],
+  "result": {
+   "resolved": "<undefined>"
+  }
+ },
+ "subscriptionsManage": {
+  "requests": [
+   {
+    "url": "/subscriptions/manage",
+    "method": "POST",
+    "params": "",
+    "data": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "email": "jane@example.com",
+     "email_bulk": true,
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "contentType": "application/json"
+   }
+  ],
+  "result": {
+   "resolved": "<undefined>"
+  }
+ },
+ "loyaltyJoin": {
+  "requests": [
+   {
+    "url": "/loyalty/members/join",
+    "method": "POST",
+    "params": "",
+    "data": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "phone": "+70000000000",
+     "first_name": "Jane",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "contentType": "application/json"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "status": "success",
+    "payload": {}
+   }
+  }
+ },
+ "getLoyaltyStatus": {
+  "requests": [
+   {
+    "url": "/loyalty/members/status",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "identifier": "+70000000000",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "status": "success",
+    "member": null,
+    "level": null
+   }
+  }
+ },
+ "review": {
+  "requests": [
+   {
+    "url": "/nps/create",
+    "method": "POST",
+    "params": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "rate": 9,
+     "channel": "app",
+     "category": "order",
+     "order_id": "o1",
+     "comment": "Fast",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": "<undefined>"
+  }
+ },
+ "getNpsChannels": {
+  "requests": [
+   {
+    "url": "/nps/channels",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": [
+    {
+     "id": 1,
+     "code": "app",
+     "name": "App",
+     "x_extra": "kept"
+    }
+   ]
+  }
+ },
+ "getNpsCategories": {
+  "requests": [
+   {
+    "url": "/nps/categories",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": [
+    {
+     "id": 2,
+     "code": "order",
+     "name": "Order",
+     "x_extra": "kept"
+    }
+   ]
+  }
+ },
+ "getStories": {
+  "requests": [
+   {
+    "url": "/stories/block-s",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "id": "block-s",
+    "stories": [
+     {
+      "id": 1,
+      "slides": [
+       {
+        "id": 10,
+        "background_color": "#fff",
+        "duration": 7,
+        "elements": [
+         {
+          "text_input": "a",
+          "text_color": "#000",
+          "textInput": "a",
+          "textColor": "#000"
+         }
+        ],
+        "backgroundColor": "#fff"
+       }
+      ]
+     }
+    ],
+    "x_extra": "kept"
+   }
+  }
+ },
+ "getProductInfoHttpError": {
+  "requests": [
+   {
+    "url": "/products/get",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "item_id": "37",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "rejected": {
+    "error": true,
+    "name": "Error",
+    "message": "Request failed with status code 500",
+    "status": 500,
+    "data": {
+     "status": "error",
+     "message": "boom"
+    },
+    "code": null
+   }
+  }
+ },
+ "recommendNetworkError": {
+  "requests": [
+   {
+    "url": "/recommend/block-1",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "segment": "B",
+     "recommender_code": "block-1",
+     "item": "37",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "error": true,
+    "name": "Error",
+    "message": "Network Error",
+    "status": null,
+    "data": null,
+    "code": "ERR_NETWORK"
+   }
+  }
+ },
+ "searchHttpError": {
+  "requests": [
+   {
+    "url": "/search",
+    "method": "GET",
+    "params": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "segment": "B",
+     "type": "full_search",
+     "search_query": "boots",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "data": null,
+    "contentType": "application/x-www-form-urlencoded"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "error": true,
+    "name": "Error",
+    "message": "Request failed with status code 400",
+    "status": 400,
+    "data": {
+     "status": "error",
+     "message": "boom"
+    },
+    "code": null
+   }
+  }
+ },
+ "segmentsAddHttpError": {
+  "requests": [
+   {
+    "url": "/segments/add",
+    "method": "POST",
+    "params": "",
+    "data": {
+     "shop_id": "parity-shop",
+     "stream": "android",
+     "segment": "B",
+     "segment_id": 3,
+     "email": "jane@example.com",
+     "did": "<did>",
+     "seance": "<seance>",
+     "sid": "<sid>"
+    },
+    "contentType": "application/json"
+   }
+  ],
+  "result": {
+   "resolved": {
+    "error": true,
+    "name": "Error",
+    "message": "Request failed with status code 400",
+    "status": 400,
+    "data": {
+     "status": "error",
+     "message": "boom"
+    },
+    "code": null
+   }
+  }
+ }
+}

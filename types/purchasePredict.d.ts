@@ -9,8 +9,8 @@ export type PurchasePredictParams = {
   loyalty_id?: string
 }
 
-/** Successful JSON body from GET predict/probability-to-purchase */
+/** The prediction (`payload` of GET api/v3/cdp/users/probability-to-purchase). `client_id` comes as a number (null for a visitor the shop does not know). */
 export type PurchasePredictResponse = {
   probability: number
-  client_id: string
+  client_id: number | string | null
 }

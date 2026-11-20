@@ -1,0 +1,276 @@
+{
+  "contract": "0",
+  "cases": [
+    {
+      "name": "getInfo",
+      "call": { "namespace": "products", "method": "getInfo", "args": { "itemId": "37" } },
+      "request": { "method": "GET", "path": "products/get", "query": { "item_id": "37" } }
+    },
+    {
+      "name": "getInfo с пустым itemId",
+      "call": { "namespace": "products", "method": "getInfo", "args": { "itemId": "" } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "getList без запроса — первая страница всего каталога",
+      "call": { "namespace": "products", "method": "getList", "args": {} },
+      "request": { "method": "GET", "path": "products", "query": {} }
+    },
+    {
+      "name": "getList со всеми полями: списки через запятую без пробелов, числа без лишних нулей, filters JSON-строкой",
+      "call": { "namespace": "products", "method": "getList",
+                "args": { "request": { "categoryIds": [ "1", "2" ], "brands": [ "Nike", "Adidas" ], "merchants": [ "m1" ],
+                                       "locations": [ "msk", "spb" ], "priceMin": 100, "priceMax": 999.5,
+                                       "filters": { "color": [ "red", "blue" ] },
+                                       "sortBy": "price", "sortDir": "asc", "limit": 20, "page": 2 } } },
+      "request": { "method": "GET", "path": "products",
+                   "query": { "categories": "1,2", "brands": "Nike,Adidas", "merchants": "m1", "locations": "msk,spb",
+                              "price_min": "100", "price_max": "999.5", "filters": "{\"color\":[\"red\",\"blue\"]}",
+                              "sort_by": "price", "sort_dir": "asc", "limit": "20", "page": "2" } }
+    },
+    {
+      "name": "getList: пустые списки и словарь не уходят",
+      "call": { "namespace": "products", "method": "getList",
+                "args": { "request": { "categoryIds": [], "brands": [], "filters": {} } } },
+      "request": { "method": "GET", "path": "products", "query": {} }
+    },
+    {
+      "name": "getList: ключ сортировки не из списка констант уходит как есть",
+      "call": { "namespace": "products", "method": "getList", "args": { "request": { "sortBy": "popular" } } },
+      "request": { "method": "GET", "path": "products", "query": { "sort_by": "popular" } }
+    },
+    {
+      "name": "getList с limit 0",
+      "call": { "namespace": "products", "method": "getList", "args": { "request": { "limit": 0 } } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "getList с page 0",
+      "call": { "namespace": "products", "method": "getList", "args": { "request": { "page": 0 } } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "getList с отрицательной ценой",
+      "call": { "namespace": "products", "method": "getList", "args": { "request": { "priceMin": -1 } } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "getList с priceMin больше priceMax",
+      "call": { "namespace": "products", "method": "getList", "args": { "request": { "priceMin": 500, "priceMax": 100 } } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "getList с сортировкой relevance — только для search.full",
+      "call": { "namespace": "products", "method": "getList", "args": { "request": { "sortBy": "relevance" } } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "getCounters",
+      "call": { "namespace": "products", "method": "getCounters", "args": { "itemId": "37" } },
+      "request": { "method": "GET", "path": "products/counters", "query": { "item": "37" } }
+    },
+    {
+      "name": "getCounters с пустым itemId",
+      "call": { "namespace": "products", "method": "getCounters", "args": { "itemId": "" } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "getCategory — делегат getList с categories",
+      "call": { "namespace": "products", "method": "getCategory", "args": { "categoryId": "12" } },
+      "request": { "method": "GET", "path": "products", "query": { "categories": "12" } }
+    },
+    {
+      "name": "getCategory с запросом",
+      "call": { "namespace": "products", "method": "getCategory",
+                "args": { "categoryId": "12",
+                          "request": { "brands": [ "Nike" ], "locations": [ "msk" ], "filters": { "size": [ "42" ] },
+                                       "priceMin": 0, "priceMax": 5000, "sortBy": "sales_rate", "sortDir": "desc",
+                                       "limit": 30, "page": 1 } } },
+      "request": { "method": "GET", "path": "products",
+                   "query": { "categories": "12", "brands": "Nike", "locations": "msk", "filters": "{\"size\":[\"42\"]}",
+                              "price_min": "0", "price_max": "5000", "sort_by": "sales_rate", "sort_dir": "desc",
+                              "limit": "30", "page": "1" } }
+    },
+    {
+      "name": "getCategory с пустым categoryId",
+      "call": { "namespace": "products", "method": "getCategory", "args": { "categoryId": "" } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "getCategory с сортировкой relevance",
+      "call": { "namespace": "products", "method": "getCategory", "args": { "categoryId": "12", "request": { "sortBy": "relevance" } } },
+      "error": { "type": "invalidArgument" }
+    },
+    {
+      "name": "getInfo: карточка товара — id из uniqid, цены строками, discount логическое, level строкой и числом, пустое описание — null, params словарём в порядке ответа",
+      "call": { "namespace": "products", "method": "getInfo", "args": { "itemId": "9922" } },
+      "response": { "status": 200,
+                    "body": { "name": "Скамья Жасмин", "is_available": true, "description": "",
+                              "price": "10760", "price_full": 10760, "price_formatted": "10 760 ₽", "price_full_formatted": "10 760.00 ₽",
+                              "currency": "₽", "url": "https://shop.example/p/9922", "url_handle": "/p/9922",
+                              "picture": "https://shop.example/i/9922-180.webp", "image_url": "https://shop.example/i/9922.webp",
+                              "image_url_handle": "/i/9922.webp", "image_url_resized": {}, "category_ids": [], "brand": "БРВ Мебель",
+                              "sales_rate": null, "relative_sales_rate": null,
+                              "categories": [ { "id": "23", "name": "Прихожие", "url": "https://shop.example/c/23", "branch": 1, "level": 1 },
+                                              { "parent_id": "23", "id": "12023", "name": "Скамьи", "url": "https://shop.example/c/12023", "level": "2" } ],
+                              "params": { "Цвет": { "value": [ "графит" ], "searchable": true }, "Ширина": { "value": [ 100, 120.5 ], "searchable": false } },
+                              "group_id": "9921", "id": "9922", "uniqid": "9922", "widgetable": true, "ignored": false, "locations": {},
+                              "model": "LAK", "barcode": "УТ-70041501", "oldprice": "13450", "discount": true, "discount_percent": 20 } },
+      "expect": { "result": { "id": "9922", "groupId": "9921", "name": "Скамья Жасмин", "brand": "БРВ Мебель", "model": "LAK",
+                              "barcode": "УТ-70041501", "url": "https://shop.example/p/9922",
+                              "imageUrl": "https://shop.example/i/9922.webp", "picture": "https://shop.example/i/9922-180.webp",
+                              "resizedImages": {}, "price": 10760, "priceFormatted": "10 760 ₽", "priceFull": 10760,
+                              "priceFullFormatted": "10 760.00 ₽", "oldPrice": 13450, "currency": "₽", "discountPercent": 20,
+                              "isNew": false, "categoryIds": [],
+                              "categories": [ { "id": "23", "name": "Прихожие", "url": "https://shop.example/c/23", "level": 1 },
+                                              { "id": "12023", "name": "Скамьи", "url": "https://shop.example/c/12023", "parentId": "23", "level": 2 } ],
+                              "params": [ { "key": "Цвет", "values": [ "графит" ] }, { "key": "Ширина", "values": [ "100", "120.5" ] } ] } }
+    },
+    {
+      "name": "getInfo: id только в uniqid",
+      "call": { "namespace": "products", "method": "getInfo", "args": { "itemId": "37" } },
+      "response": { "status": 200,
+                    "body": { "uniqid": "37", "name": "Кроссовки", "url": "https://shop.example/p/37", "price": 4990, "currency": "₽" } },
+      "expect": { "result": { "id": "37", "name": "Кроссовки", "url": "https://shop.example/p/37", "price": 4990, "currency": "₽", "isNew": false } }
+    },
+    {
+      "name": "getInfo: неизвестный товар — 200 {}, результат пустой",
+      "call": { "namespace": "products", "method": "getInfo", "args": { "itemId": "404" } },
+      "response": { "status": 200, "body": {} },
+      "expect": { "result": null }
+    },
+    {
+      "name": "getInfo: непустой ответ без uniqid и id",
+      "call": { "namespace": "products", "method": "getInfo", "args": { "itemId": "37" } },
+      "response": { "status": 200, "body": { "name": "Кроссовки", "url": "https://shop.example/p/37", "price": 4990, "currency": "₽" } },
+      "expect": { "error": { "type": "decoding" } }
+    },
+    {
+      "name": "getInfo: 2xx со status error",
+      "call": { "namespace": "products", "method": "getInfo", "args": { "itemId": "37" } },
+      "response": { "status": 200, "body": { "status": "error", "message": "Something went wrong" } },
+      "expect": { "error": { "type": "decoding" } }
+    },
+    {
+      "name": "getInfo: 500",
+      "call": { "namespace": "products", "method": "getInfo", "args": { "itemId": "37" } },
+      "response": { "status": 500, "body": null },
+      "expect": { "error": { "type": "http", "code": 500 } }
+    },
+    {
+      "name": "getInfo: нет ответа",
+      "call": { "namespace": "products", "method": "getInfo", "args": { "itemId": "37" } },
+      "response": { "status": null },
+      "expect": { "error": { "type": "network" } }
+    },
+    {
+      "name": "getList: страница с фасетами; params списком; товар без обязательного поля пропускается, бренд без количества пропускается",
+      "call": { "namespace": "products", "method": "getList", "args": {} },
+      "response": { "status": 200,
+                    "body": { "products_total": "2",
+                              "products": [ { "id": "37", "group_id": "_37_", "name": "Кроссовки", "url": "https://shop.example/p/37",
+                                              "price": 4990, "price_formatted": "4 990 ₽", "oldprice": 0, "oldprice_full": 0,
+                                              "currency": "₽", "discount": 15, "is_new": true, "rating": 4, "stock_quantity": "7",
+                                              "deeplink_android": "shop://p/37", "deeplink_ios": "shop://p/37",
+                                              "image_url_resized": { "120": "https://shop.example/i/37-120.webp", "original": "https://shop.example/i/37.webp" },
+                                              "sales_rate": 120, "relative_sales_rate": 0.5,
+                                              "category_ids": [ "5", 6 ], "params": [ { "key": "Размер", "values": [ 42, "43" ] } ] },
+                                            { "id": "38", "name": "Без валюты", "url": "https://shop.example/p/38", "price": 100 } ],
+                              "categories": [ { "id": "5", "name": "Обувь", "url": "https://shop.example/c/5", "parent": "1", "count": 2, "alias": "obuv" } ],
+                              "brands": [ { "name": "Nike", "count": 3, "picture": "https://shop.example/b/nike.png" }, { "name": "Без количества" } ],
+                              "locations": [ { "id": "msk", "name": "Москва", "type": "city" } ],
+                              "filters": { "Цвет": { "count": 3, "priority": 1, "values": { "красный": 2, "синий": "1" } },
+                                           "Вес": { "count": 2, "ranges": { "min": 0.5, "max": "10" } } },
+                              "price_range": { "min": 100, "max": "9990" },
+                              "price_ranges": [ { "to": 1000, "count": 2 }, { "from": 1000, "count": 1 } ],
+                              "price_median": "1500" } },
+      "expect": { "result": { "productsTotal": 2,
+                              "products": [ { "id": "37", "groupId": "_37_", "name": "Кроссовки", "url": "https://shop.example/p/37",
+                                              "price": 4990, "priceFormatted": "4 990 ₽", "currency": "₽", "discountPercent": 15,
+                                              "isNew": true, "rating": 4, "stockQuantity": 7,
+                                              "deeplinkAndroid": "shop://p/37", "deeplinkIos": "shop://p/37",
+                                              "resizedImages": { "120": "https://shop.example/i/37-120.webp", "original": "https://shop.example/i/37.webp" },
+                                              "salesRate": 120, "relativeSalesRate": 0.5, "categoryIds": [ "5", "6" ],
+                                              "params": [ { "key": "Размер", "values": [ "42", "43" ] } ] } ],
+                              "categories": [ { "id": "5", "name": "Обувь", "url": "https://shop.example/c/5", "parentId": "1", "count": 2, "alias": "obuv" } ],
+                              "brands": [ { "name": "Nike", "count": 3 } ],
+                              "locations": [ { "id": "msk", "name": "Москва", "type": "city" } ],
+                              "filters": { "Цвет": { "count": 3, "priority": 1, "values": { "красный": 2, "синий": 1 } },
+                                           "Вес": { "count": 2, "min": 0.5, "max": 10 } },
+                              "priceRange": { "min": 100, "max": 9990 },
+                              "priceRanges": [ { "from": 0, "to": 1000, "count": 2 }, { "from": 1000, "count": 1 } ],
+                              "priceMedian": 1500 } }
+    },
+    {
+      "name": "getList: пустая страница",
+      "call": { "namespace": "products", "method": "getList", "args": {} },
+      "response": { "status": 200, "body": { "products_total": 0, "products": [] } },
+      "expect": { "result": { "productsTotal": 0, "products": [] } }
+    },
+    {
+      "name": "getList: ответ без products",
+      "call": { "namespace": "products", "method": "getList", "args": {} },
+      "response": { "status": 200, "body": { "products_total": 0 } },
+      "expect": { "error": { "type": "decoding" } }
+    },
+    {
+      "name": "getList: 403",
+      "call": { "namespace": "products", "method": "getList", "args": {} },
+      "response": { "status": 403, "body": null },
+      "expect": { "error": { "type": "http", "code": 403 } }
+    },
+    {
+      "name": "getCounters: числа строкой",
+      "call": { "namespace": "products", "method": "getCounters", "args": { "itemId": "37" } },
+      "response": { "status": 200,
+                    "body": { "daily": { "view": 10, "cart": "2", "purchase": 1 }, "now": { "view": 1, "cart": 0, "purchase": 0 },
+                              "triggers": { "back_in_stock": 3, "price_drop": 4 } } },
+      "expect": { "result": { "daily": { "view": 10, "cart": 2, "purchase": 1 }, "now": { "view": 1, "cart": 0, "purchase": 0 },
+                              "triggers": { "backInStock": 3, "priceDrop": 4 } } }
+    },
+    {
+      "name": "getCounters: пустой ответ",
+      "call": { "namespace": "products", "method": "getCounters", "args": { "itemId": "37" } },
+      "response": { "status": 200, "body": {} },
+      "expect": { "result": {} }
+    },
+    {
+      "name": "getCounters: ответ не объект",
+      "call": { "namespace": "products", "method": "getCounters", "args": { "itemId": "37" } },
+      "response": { "status": 200, "body": [] },
+      "expect": { "error": { "type": "decoding" } }
+    },
+    {
+      "name": "getCategory: товары и фасеты категории; поля вне CategoryResponse не попадают в результат",
+      "call": { "namespace": "products", "method": "getCategory", "args": { "categoryId": "5" } },
+      "response": { "status": 200,
+                    "body": { "products_total": 1,
+                              "products": [ { "id": "37", "name": "Кроссовки", "url": "https://shop.example/p/37", "price": "4990.50", "currency": "₽",
+                                              "oldprice": 5990, "oldprice_formatted": "5 990 ₽", "oldprice_full": 5990.5, "oldprice_full_formatted": "5 990.50 ₽" } ],
+                              "categories": [ { "id": "5", "name": "Обувь", "url": "https://shop.example/c/5", "count": 1 } ],
+                              "brands": [ { "name": "Nike", "count": 1 } ],
+                              "locations": [ { "id": "msk", "name": "Москва" } ],
+                              "industrial_filters": { "colors": [ { "color": "red", "count": 1 } ] },
+                              "filters": [],
+                              "price_range": { "min": 4990, "max": 4990 },
+                              "price_ranges": [],
+                              "price_median": 4990 } },
+      "expect": { "result": { "productsTotal": 1,
+                              "products": [ { "id": "37", "name": "Кроссовки", "url": "https://shop.example/p/37", "price": 4990.5, "currency": "₽",
+                                              "oldPrice": 5990, "oldPriceFormatted": "5 990 ₽", "oldPriceFull": 5990.5,
+                                              "oldPriceFullFormatted": "5 990.50 ₽", "isNew": false } ],
+                              "categories": [ { "id": "5", "name": "Обувь", "url": "https://shop.example/c/5", "count": 1 } ],
+                              "brands": [ { "name": "Nike", "count": 1 } ],
+                              "filters": {},
+                              "priceRange": { "min": 4990, "max": 4990 },
+                              "priceRanges": [],
+                              "priceMedian": 4990 } }
+    },
+    {
+      "name": "getCategory: ответ без products",
+      "call": { "namespace": "products", "method": "getCategory", "args": { "categoryId": "5" } },
+      "response": { "status": 200, "body": { "status": "success" } },
+      "expect": { "error": { "type": "decoding" } }
+    }
+  ]
+}

@@ -112,7 +112,7 @@ describe('handlePush — a pending shop is tracked without init', () => {
       code: '10',
       type: 'web',
       stream: 'android',
-    })
+    }, push('shop-lazy'))
     expect(registry.byShopId('shop-lazy')).toBeFalsy()
   })
 
@@ -135,5 +135,56 @@ describe('handlePush — a pending shop is tracked without init', () => {
     handlePush(push('shop-x'), PushEvent.DELIVERED)
 
     expect(tracker).not.toHaveBeenCalled()
+  })
+})
+
+describe('handlePush — its result', () => {
+  test('resolves with the shop the push went to, live or pending, and null when it went nowhere', async () => {
+    setPushTracker(jest.fn())
+    initialize({ shopId: 'shop-a' })
+    registerShops([{ shopId: 'shop-lazy', stream: 'android' }])
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await expect(handlePush(push('shop-a'), PushEvent.CLICKED)).resolves.toBe('shop-a')
+    await expect(handlePush(push('shop-lazy'), PushEvent.CLOSED)).resolves.toBe('shop-lazy')
+    await expect(handlePush(push('shop-x'), PushEvent.CLICKED)).resolves.toBeNull()
+    await expect(handlePush(push('shop-a'), 'nonsense')).resolves.toBeNull()
+    warn.mockRestore()
+  })
+
+  test('a push without its id or type is not the SDK\'s: nothing is tracked, the result is null', async () => {
+    const tracker = jest.fn()
+    setPushTracker(tracker)
+    const a = initialize({ shopId: 'shop-a' })
+    registerShops([{ shopId: 'shop-lazy', stream: 'android' }])
+
+    await expect(handlePush({ data: { shop_id: 'shop-a', title: 'Sale' } }, PushEvent.DELIVERED)).resolves.toBeNull()
+    await expect(handlePush({ data: { shop_id: 'shop-a', id: '10' } }, PushEvent.CLICKED)).resolves.toBeNull()
+    await expect(handlePush({ data: { shop_id: 'shop-lazy', type: 'bulk' } }, PushEvent.DELIVERED)).resolves.toBeNull()
+
+    expect(a.notificationDelivered).not.toHaveBeenCalled()
+    expect(a.notificationClicked).not.toHaveBeenCalled()
+    expect(tracker).not.toHaveBeenCalled()
+  })
+
+  test('a direct APNs push is read from its src', async () => {
+    const a = initialize({ shopId: 'shop-a' })
+
+    await expect(handlePush({ shop_id: 'shop-a', src: { id: '11', type: 'chain' } }, PushEvent.OPENED)).resolves.toBe('shop-a')
+
+    expect(a.notificationOpened).toHaveBeenCalledWith({ code: '11', type: 'chain' })
+  })
+
+  test('a push whose id is a number goes with it as a string, to a live and to a pending shop', async () => {
+    const tracker = jest.fn()
+    setPushTracker(tracker)
+    const a = initialize({ shopId: 'shop-a' })
+    registerShops([{ shopId: 'shop-lazy', stream: 'android' }])
+
+    await expect(handlePush({ shop_id: 'shop-a', src: { id: 11, type: 'chain' } }, PushEvent.CLICKED)).resolves.toBe('shop-a')
+    await expect(handlePush({ data: { shop_id: 'shop-lazy', id: 12, type: 'bulk' } }, PushEvent.DELIVERED)).resolves.toBe('shop-lazy')
+
+    expect(a.notificationClicked).toHaveBeenCalledWith({ code: '11', type: 'chain' })
+    expect(tracker).toHaveBeenCalledWith('shop-lazy', 'delivered', { code: '12', type: 'bulk', stream: 'android' }, expect.anything())
   })
 })

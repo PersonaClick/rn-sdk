@@ -1,0 +1,60 @@
+// The SDK's native module: a bridge to the PersonaClick Android SDK. It runs on the app's React Native
+// (react-android) and the app's Kotlin; codegen makes its spec from ../specs.
+
+def safeExtGet(name, fallback) {
+    rootProject.ext.has(name) ? rootProject.ext.get(name) : fallback
+}
+
+apply plugin: "com.android.library"
+apply plugin: "kotlin-android"
+apply plugin: "com.facebook.react"
+
+android {
+    namespace "com.personaclick.reactnative"
+    compileSdkVersion safeExtGet("compileSdkVersion", 35)
+
+    defaultConfig {
+        // The PersonaClick Android SDK needs 23; React Native 0.76 and later need 24.
+        minSdkVersion safeExtGet("minSdkVersion", 24)
+        targetSdkVersion safeExtGet("targetSdkVersion", 35)
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+        // The bridge's own part of the native SDK: errors, the event queue, sessions.
+        freeCompilerArgs += ["-opt-in=com.personalization.core.BridgeApi"]
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs += ["src/main/kotlin", "${project.buildDir}/generated/source/codegen/java"]
+        }
+        test {
+            java.srcDirs += ["src/test/kotlin"]
+        }
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+    // The PersonaClick Android SDK. React Native adds JitPack to an app's repositories itself, unless the
+    // app turned it off (includeJitpackRepository=false); then the app adds it.
+    maven { url "https://jitpack.io" }
+}
+
+dependencies {
+    implementation "com.facebook.react:react-android"
+    // 2.55.0: the bridges' TrackingSource.fromWire — slider and agent_search go as their wire values.
+    implementation "com.github.personaclick:android-sdk:v2.55.0"
+
+    // The module's own JVM tests: the arguments JavaScript hands and the maps it gets back. No network.
+    testImplementation "junit:junit:4.13.2"
+    // org.json of android.jar is a stub on the JVM.
+    testImplementation "org.json:json:20240303"
+}

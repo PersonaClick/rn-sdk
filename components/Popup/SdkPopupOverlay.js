@@ -276,9 +276,10 @@ export function registerSDK(sdkInstance) {
  * @param {Object} sdkInstance
  * @param {Object} popupData
  * @param {boolean} manual
+ * @param {{ delayWaited?: boolean }} [options] see `PopupLogic.prepare`
  */
-export async function prepareAndShow(sdkInstance, popupData, manual = false) {
-  await PopupLogic.prepare(sdkInstance, popupData, manual, showPopup)
+export async function prepareAndShow(sdkInstance, popupData, manual = false, options = {}) {
+  await PopupLogic.prepare(sdkInstance, popupData, manual, showPopup, options)
 }
 
 // Exposed for tests only — lets the per-shop popup routing (Release 2, RN-6) be exercised on a fresh

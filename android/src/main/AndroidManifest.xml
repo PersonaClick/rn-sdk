@@ -1,0 +1,23 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- React Native Firebase takes the app's FCM messages and the SDK's JavaScript handles them, so
+         the native SDK's own receivers (FCM and HMS) and default notification channel go: a second
+         service for the same messages, and a channel that clashes with React Native Firebase's own when
+         the manifests merge. The channel is removed from the native SDK only (package
+         com.personalization), so React Native Firebase keeps its own. -->
+    <application>
+        <service
+            android:name="com.personalization.MessagingService"
+            tools:node="remove" />
+
+        <service
+            android:name="com.personalization.HmsMessagingService"
+            tools:node="remove" />
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            tools:node="remove"
+            tools:selector="com.personalization" />
+    </application>
+</manifest>

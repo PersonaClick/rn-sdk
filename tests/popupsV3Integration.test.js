@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { Linking } from 'react-native'
-import PersonaClick from '../index.js'
+import PersonaClick, { SDK_APP_HOST } from '../index.js'
 import live from './fixtures/popups-v3/live-list-181-182.json'
 import { PersonalizationPopups } from '../internal/v3'
 import { popupsV3Entries, resetPopupsV3Presenter } from '../lib/popupsV3/presenter'
@@ -21,7 +21,8 @@ jest.mock('../components/Popup/overlayLayers', () => {
   }
 })
 
-const APP = 'https://app.personaClick.ru/api/v3/storefront/popups'
+// The default account host, as the SDK builds it from the API's address.
+const APP = `https://${SDK_APP_HOST}/api/v3/storefront/popups`
 
 function backend({ flag = true, popups = live.payload.popups } = {}) {
   axios.mockImplementation((config) => {
