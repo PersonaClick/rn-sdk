@@ -24,7 +24,17 @@ const COMMON_V3_PROPS = {
   pollErrorText: 'Failed',
 }
 const STORIES_V3_PROPS = { ...COMMON_V3_PROPS, apiV3Domain: 'app.personaClick.ru' }
-const VIEWER_V3_PROPS = { ...COMMON_V3_PROPS, onShare: () => {}, pollShopId: 'shop' }
+const VIEWER_V3_PROPS = {
+  ...COMMON_V3_PROPS,
+  onShare: () => {},
+  pollShopId: 'shop',
+  pollDeviceId: 'did',
+  v3: true,
+  positions: { 1: 2 },
+  onSlideRestart: () => {},
+  onStoryLeave: () => {},
+  onHeaderPress: () => {},
+}
 
 /** Имена v3, которых нет нигде в типах корня и кита (`onShare` / `shareLabel` есть у шапки кита). */
 const TYPED_V3_NAMES = [
@@ -35,11 +45,17 @@ const TYPED_V3_NAMES = [
   'shareUrlTransform',
   'pollTransport',
   'pollShopId',
+  'pollDeviceId',
   'pollReanswerText',
   'pollSubmitText',
   'pollErrorText',
   'share_url',
   'shareable',
+  'positions',
+  'onSlideRestart',
+  'onStoryLeave',
+  'onHeaderPress',
+  'PersonalizationStoryHeaderElement',
 ]
 
 /** Тело `export interface <name> … { … }` из d.ts. */
@@ -87,6 +103,14 @@ describe('v3 gate — exports', () => {
     })
     const typings = read('internal/v3.d.ts')
     ;[...TYPED_V3_NAMES, 'onShare', 'shareLabel'].forEach((name) => expect(typings).toContain(name))
+  })
+
+  test('typings: every v3 prop of the viewer is typed, and the kit drops each of them', () => {
+    const typings = read('internal/v3.d.ts')
+    const typed = block(typings, 'PersonalizationStoryViewerV3Props') + block(typings, 'PersonalizationStoriesV3Texts')
+    const { STORY_VIEWER_V3_PROPS } = require('../components/design-system/StoryViewer')
+    STORY_VIEWER_V3_PROPS.forEach((name) => expect({ name, typed: typed.includes(`  ${name}?:`) }).toEqual({ name, typed: true }))
+    expect(Object.keys(VIEWER_V3_PROPS).sort()).toEqual([...STORY_VIEWER_V3_PROPS].sort())
   })
 
   test('typings: the kit viewer and texts have no share, the header keeps its share slot', () => {

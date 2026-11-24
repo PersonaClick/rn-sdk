@@ -18,6 +18,7 @@ import {
   isMediaSlide,
   isVideoSlide,
   slideButtons,
+  slideHeaderElement,
   slideProduct,
   slideProductElement,
   slideProductsElement,
@@ -27,7 +28,11 @@ import {
   slidePromocode,
   storyPromoCaption,
   storySlideLetterbox,
+  storySlideScheme,
   storySlideScrim,
+  storySoundButtonShown,
+  storyTextRegion,
+  storyVideoHasAudio,
 } from './storySupport'
 
 /**
@@ -52,12 +57,19 @@ import {
  *   Primary)»; кнопок нет — одна с `productButtonText`, она открывает товар. Подпись над промокодом — `title` элемента `product`,
  *   иначе `promoCaption` (C9). Текст-блоки на товарном слайде не рисуются;
  * - медиа: непустые текст-блоки на `y_offset` % всей высоты слайда, сдвинутые целиком в область
- *   между шапкой и кнопками / «товарами» — по правилу карточек опросов; блок с промокодом копирует
+ *   тела слайда (по замеру: под шапкой и строкой `header`) над кнопками / «товарами»; блок с промокодом копирует
  *   его по тапу (C12); кнопки `button` — Button LG Primary внизу стопкой.
  * Внизу — «Used products» (элемент `products`) и кнопка звука у видео (C7), на любом слайде.
  * В шапке слева от крестика — «Поделиться», если у слайда есть ссылка (`onShare` просмотрщика).
  * Опросы (элемент `poll`, API v3) — карточками StoryPoll поверх слайда, если просмотрщику дали
- * транспорт опросов: между шапкой и кнопками / «товарами», под лоадером и «Повторить».
+ * транспорт опросов: на `y_offset` % всей высоты слайда, низом не ниже 16 над нижним рядом (звук,
+ * «товары»); шапка (прогресс, крестик, «Поделиться») — слоем над карточками, её пустые места касание
+ * пропускают, а кнопки нажимаются, даже если карточка зашла под неё.
+ *
+ * Сторис v3 (`v3`), как JS SDK: у товарного слайда без кнопок нет кнопки `productButtonText`; медиа по `type` (R6); `background_color` красит и слайд без медиа
+ * (R2), схема токенов тогда — та, чей текст контрастнее с цветом по WCAG; текст-блоки по R4; элемент `header` — строка над телом
+ * слайда: иконка, заголовок и подзаголовок токенами кита, нажатие — `onHeaderPress` (R1); кнопка звука
+ * — когда видео загрузилось и звук у него есть или плеер не знает, есть ли (R9, `storySoundButtonShown`).
  *
  * Медиа (C4, C5): картинка готова, когда декодирована; видео — когда пошли кадры. Видео идёт без
  * повтора, о позиции, подгрузке и конце сообщает просмотрщику. Пока медиа грузится — лоадер кита;
@@ -66,11 +78,12 @@ import {
  * `shouldCache`, если хост собрал плеер с кэшем (`$RNVideoUseVideoCaching` в Podfile).
  */
 export default function StorySlide(props) {
-  const { slide } = props
-  const media = isMediaSlide(slide)
-  // Навязанная тёмная схема — только для фото и видео; `null` оставляет схему приложения.
+  const { slide, v3 } = props
+  const media = isMediaSlide(slide, v3)
+  // Навязанная схема — тёмная у фото и видео, у слайда v3 со своим цветом — по его яркости; `null`
+  // оставляет схему приложения.
   return (
-    <PersonalizationColorSchemeProvider scheme={media ? 'dark' : null}>
+    <PersonalizationColorSchemeProvider scheme={storySlideScheme(slide, v3)}>
       <SlideFrame {...props} media={media} />
     </PersonalizationColorSchemeProvider>
   )
@@ -106,8 +119,10 @@ function SlideFrame({
   renderIcon,
   media,
   storyId,
+  v3 = false,
+  onHeaderPress,
   pollTransport,
-  pollShopId,
+  pollStorage,
   onPollHold,
   onPollFocus,
 }) {
@@ -115,14 +130,22 @@ function SlideFrame({
   const { colors } = theme
   const icon = storyIconRenderer(renderIcon)
   const [height, setHeight] = useState(0)
+  // Высота шапки (прогресс, крестик) — по замеру её слоя; верх нижнего ряда (звук, «товары») — от
+  // верха слайда: по нему низ карточки опроса.
+  const [navigationHeight, setNavigationHeight] = useState(NAVIGATION_HEIGHT)
+  const [bottomTop, setBottomTop] = useState(null)
   const productElement = slideProductElement(slide)
   const product = slideProduct(slide)
   const buttons = slideButtons(slide)
   const productsElement = slideProductsElement(slide)
   const Video = storyVideoComponent()
-  const video = isVideoSlide(slide) && !!Video
+  const video = isVideoSlide(slide, v3) && !!Video
+  // Есть ли у видео звук (R9, сторис v3): `undefined` — видео ещё не загрузилось, `null` — плеер не
+  // знает (кнопка есть), `false` — звука точно нет (кнопки нет).
+  const [audio, setAudio] = useState(undefined)
+  const header = v3 ? slideHeaderElement(slide) : null
 
-  const sound = video ? (
+  const sound = video && storySoundButtonShown(audio, v3) ? (
     <Pressable
       onPress={onToggleMute}
       hitSlop={8}
@@ -164,21 +187,23 @@ function SlideFrame({
     onPromoCopied(code, element)
   }
 
-  // Верх тела слайда под шапкой: поле 16 + шапка 46 + шаг 16 от верха безопасной зоны.
-  const minTop = (insets.top || 0) + 16 + NAVIGATION_HEIGHT + 16
+  // Верх тела слайда от верха слайда — по замеру, а не по расчёту: под шапкой и под строкой элемента
+  // `header`, если она есть (R1), — текст-блоки под неё не заходят.
+  const [contentTop, setContentTop] = useState(null)
+  const [bodyTop, setBodyTop] = useState(null)
 
-  // Область текст-блоков и опросов (опросы — только с транспортом): от верха тела слайда (`minTop`)
-  // до кнопок; у медиа — распорка над кнопками, у товарного — до блока цены и кнопок.
+  // Область текст-блоков: от верха тела слайда до кнопок; у медиа — распорка над кнопками,
+  // у товарного — до блока цены и кнопок. Опросы (только с транспортом) кладутся по своему правилу.
   const polls = useMemo(() => (pollTransport ? slidePolls(slide) : []), [slide, pollTransport])
-  const blocks = useMemo(() => slideTextBlocks(slide), [slide])
+  const blocks = useMemo(() => slideTextBlocks(slide, v3), [slide, v3])
   const [free, setFree] = useState(null)
-  const measureFree = polls.length || blocks.length
+  const measureFree = blocks.length
     ? (event) => {
         const { y, height: h } = event.nativeEvent.layout
         setFree((value) => (value && value.y === y && value.height === h ? value : { y, height: h }))
       }
     : undefined
-  const region = free ? { top: minTop + free.y, bottom: minTop + free.y + Math.max(0, free.height) } : null
+  const region = storyTextRegion(contentTop, bodyTop, free)
   const textBlocks =
     height && region
       ? blocks.map((block, index) => (
@@ -219,9 +244,10 @@ function SlideFrame({
             onPromoCopied={(code) => onPromoCopied(code, productElement)}
             renderIcon={renderIcon}
           />
+          {/* Своей кнопки товара у сторис v3 нет, как в JS SDK: только кнопки слайда. */}
           {buttons.length ? (
             buttonsColumn(buttons)
-          ) : (
+          ) : v3 ? null : (
             <Button
               label={texts.productButtonText}
               size="lg"
@@ -241,7 +267,7 @@ function SlideFrame({
     )
   }
 
-  const letterbox = storySlideLetterbox(slide)
+  const letterbox = storySlideLetterbox(slide, v3)
   // Открыта шторка (B5, F2): тап мимо неё только закрывает её — кнопки, карточка товара, промокоды
   // и «Повторить» касания не берут, их ловит просмотрщик. Крестик закрывает просмотр и со шторкой.
   const touches = sheetOpen ? 'none' : 'box-none'
@@ -254,6 +280,8 @@ function SlideFrame({
     >
       <Backdrop
         slide={slide}
+        v3={v3}
+        onAudio={setAudio}
         epoch={epoch}
         video={video ? Video : null}
         playing={playing}
@@ -265,7 +293,7 @@ function SlideFrame({
         onProgress={onVideoProgress}
         onEnd={onVideoEnd}
       />
-      <Scrim strength={storySlideScrim(slide)} />
+      <Scrim strength={storySlideScrim(slide, v3)} />
       {textBlocks ? (
         <View style={StyleSheet.absoluteFill} pointerEvents={touches}>
           {textBlocks}
@@ -275,37 +303,59 @@ function SlideFrame({
         style={[styles.safe, { paddingTop: insets.top || 0, paddingBottom: insets.bottom || 0 }]}
         pointerEvents="box-none"
       >
-        <View style={styles.content} pointerEvents="box-none">
-          <StoryNavigation
-            count={count}
-            current={current}
-            progress={progress}
-            onClose={onClose}
-            closeLabel={texts.closeLabel}
-            onShare={onShare}
-            shareLabel={texts.shareLabel}
-            renderIcon={renderIcon}
-          />
-          <View style={styles.body} pointerEvents={touches}>
+        <View style={styles.content} pointerEvents="box-none" onLayout={(event) => setContentTop(event.nativeEvent.layout.y)}>
+          {/* Место шапки: сама она — в верхнем слое, над карточками опросов. */}
+          <View style={{ height: navigationHeight }} pointerEvents="none" />
+          {header ? (
+            <View pointerEvents={touches}>
+              <SlideHeader element={header} theme={theme} onPress={onHeaderPress} />
+            </View>
+          ) : null}
+          <View style={styles.body} pointerEvents={touches} onLayout={(event) => setBodyTop(event.nativeEvent.layout.y)}>
             {body}
           </View>
         </View>
-        {bottomRow}
+        {bottomRow ? (
+          <View pointerEvents="box-none" onLayout={(event) => setBottomTop(event.nativeEvent.layout.y)}>
+            {bottomRow}
+          </View>
+        ) : null}
       </View>
       <StoryPollLayer
         polls={polls}
         storyId={storyId}
         slideId={slide.id}
         transport={pollTransport}
-        shopId={pollShopId}
+        storage={pollStorage}
         texts={texts}
         slideHeight={height}
-        region={region}
-        topLimit={insets.top || 0}
+        insets={insets}
+        bottom={bottomRow && bottomTop !== null ? bottomTop : null}
         onHold={onPollHold}
         onFocus={onPollFocus}
         pointerEvents={touches}
       />
+      {/* Шапка поверх карточек опросов (P8): карточка может зайти под неё, а прогресс, крестик и
+          «Поделиться» видны и нажимаются; пустые места шапки касание пропускают. */}
+      <View
+        style={[styles.navigation, { top: (insets.top || 0) + CONTENT_PADDING }]}
+        pointerEvents="box-none"
+        onLayout={(event) => {
+          const measured = event.nativeEvent.layout.height
+          if (measured > 0) setNavigationHeight(measured)
+        }}
+      >
+        <StoryNavigation
+          count={count}
+          current={current}
+          progress={progress}
+          onClose={onClose}
+          closeLabel={texts.closeLabel}
+          onShare={onShare}
+          shareLabel={texts.shareLabel}
+          renderIcon={renderIcon}
+        />
+      </View>
       {mediaState === 'loading' ? (
         <View style={styles.center} pointerEvents="none">
           <Loader />
@@ -364,6 +414,42 @@ function TextBlockSlot({ block, slideHeight, region, onCopy }) {
   )
 }
 
+/**
+ * Шапка слайда (элемент `header`, сторис v3, R1) — что у JS SDK: иконка, заголовок, подзаголовок;
+ * вид — токены кита, одинаковый на всех платформах: круглая иконка 40, зазор 12, заголовок SM
+ * Emphasized (body small), подзаголовок XS (caption) цвета Text/Secondary; строка — под шапкой
+ * просмотра. Нажатие — хосту (`click` и ссылка, без ссылки — только `click`), без обработчика шапка не
+ * нажимается.
+ */
+function SlideHeader({ element, theme, onPress }) {
+  const { colors } = theme
+  const title = hasText(element.title) ? element.title : null
+  const subtitle = hasText(element.subtitle) ? element.subtitle : null
+  const content = (
+    <>
+      {hasText(element.icon) ? <Image source={{ uri: element.icon.trim() }} style={styles.headerIcon} /> : null}
+      <View style={styles.headerTexts}>
+        {title ? (
+          <Text style={[theme.typography[STORY_HEADER_STYLE.title], styles.headerText, { fontFamily: fontFor(theme, '600'), color: colors.textPrimary }]} numberOfLines={1}>
+            {title}
+          </Text>
+        ) : null}
+        {subtitle ? (
+          <Text style={[theme.typography[STORY_HEADER_STYLE.subtitle], styles.headerText, { fontFamily: fontFor(theme, '400'), color: colors.textSecondary }]} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+    </>
+  )
+  if (!onPress) return <View style={styles.headerRow}>{content}</View>
+  return (
+    <Pressable onPress={() => onPress(element)} style={styles.headerRow} accessibilityRole="link" accessibilityLabel={title || subtitle || undefined}>
+      {content}
+    </Pressable>
+  )
+}
+
 /** Бренд и название товарного слайда. */
 function ProductHeader({ product, theme }) {
   const { colors } = theme
@@ -398,7 +484,7 @@ function ProductHeader({ product, theme }) {
  * включаясь в беззвучном режиме (iOS); со звуком — фокус и обычное воспроизведение. Сессию после
  * закрытия возвращает сам react-native-video.
  */
-function Backdrop({ slide, epoch, video: Video, playing, muted, onReady, onAnimationLoop, onFailed, onBuffering, onProgress, onEnd }) {
+function Backdrop({ slide, v3, onAudio, epoch, video: Video, playing, muted, onReady, onAnimationLoop, onFailed, onBuffering, onProgress, onEnd }) {
   const [shown, setShown] = useState(false)
   const reported = useRef(false)
   const duration = useRef(null)
@@ -414,13 +500,13 @@ function Backdrop({ slide, epoch, video: Video, playing, muted, onReady, onAnima
       // Перемотка — удобство: не вышло — видео продолжит с места, часы всё равно с нуля.
     }
   }, [epoch])
-  // Картинка: у видео — превью под роликом, у фото — сам `background`; без медиа (F9) — ничего.
-  const imageUri = isVideoSlide(slide) ? slide.preview : isMediaSlide(slide) ? slide.background : null
+  // Картинка: у видео — превью под роликом, у фото — сам `background`; без медиа (F9, R6) — ничего.
+  const imageUri = isVideoSlide(slide, v3) ? slide.preview : isMediaSlide(slide, v3) ? slide.background : null
   const hasImage = hasText(imageUri)
 
   // GIF фона: слайд идёт по большему из прохода и времени админки (G2). Байты качаются, только
   // если это GIF; ответ после ухода со слайда не нужен.
-  const animatedUri = isVideoSlide(slide) ? null : imageUri
+  const animatedUri = isVideoSlide(slide, v3) ? null : imageUri
   const loopReport = useRef(onAnimationLoop)
   loopReport.current = onAnimationLoop
   useEffect(() => {
@@ -479,6 +565,8 @@ function Backdrop({ slide, epoch, video: Video, playing, muted, onReady, onAnima
           ignoreSilentSwitch={muted ? 'obey' : 'ignore'}
           progressUpdateInterval={100}
           onLoad={(data) => {
+            // Звук (R9): по дорожкам плеера; пустой список на iOS — неизвестно, кнопка остаётся.
+            if (onAudio) onAudio(storyVideoHasAudio(data?.audioTracks, Platform.OS))
             const seconds = Number(data?.duration)
             if (Number.isFinite(seconds) && seconds > 0) duration.current = Math.round(seconds * 1000)
             if (reported.current && duration.current) onReady && onReady(duration.current)
@@ -556,8 +644,12 @@ function fontForType(type) {
   return undefined
 }
 
-/** Высота шапки: полоски 2 + шаг 12 + строка крестика 32. */
+/** Высота шапки до замера: полоски 2 + шаг 12 + строка крестика 32. */
 const NAVIGATION_HEIGHT = 46
+/** Поля содержимого слайда (Figma: content padding 16). */
+const CONTENT_PADDING = 16
+/** Шапка `header` сторис v3 (R1): иконка 40, зазор до текстов 12; кегли — SM Emphasized и XS кита. */
+export const STORY_HEADER_STYLE = Object.freeze({ icon: 40, gap: 12, title: 'smEmphasized', subtitle: 'xsDefault' })
 /** Размер дискового кэша видео react-native-video на Android, МБ (C6). */
 const VIDEO_CACHE_MB = 50
 
@@ -568,8 +660,9 @@ const styles = StyleSheet.create({
   scrimTop: { position: 'absolute', top: 0, left: 0, width: '100%', height: '21%' },
   scrimBottom: { position: 'absolute', bottom: 0, left: 0, width: '100%', height: '14%', transform: [{ scaleY: -1 }] },
   textBlock: { position: 'absolute', left: 16, right: 16 },
+  navigation: { position: 'absolute', left: CONTENT_PADDING, right: CONTENT_PADDING },
   safe: { flex: 1 },
-  content: { flex: 1, padding: 16, gap: 16 },
+  content: { flex: 1, padding: CONTENT_PADDING, gap: 16 },
   body: { flex: 1, gap: 16 },
   spacer: { flex: 1 },
   productColumn: { flex: 1, justifyContent: 'space-between' },
@@ -577,6 +670,10 @@ const styles = StyleSheet.create({
   brand: { fontSize: 20, lineHeight: 28, fontWeight: '600' },
   name: { fontSize: 16, lineHeight: 22, fontWeight: '600' },
   pictureSlot: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 16 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: STORY_HEADER_STYLE.gap },
+  headerIcon: { width: STORY_HEADER_STYLE.icon, height: STORY_HEADER_STYLE.icon, borderRadius: STORY_HEADER_STYLE.icon / 2 },
+  headerTexts: { flex: 1, minWidth: 0 },
+  headerText: { textAlign: 'left' },
   // Карточка картинки в макете всегда белая (#FFFFFF), в обеих схемах: фото товаров — на белом.
   pictureCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16 },
   picture: { flex: 1, width: '100%' },

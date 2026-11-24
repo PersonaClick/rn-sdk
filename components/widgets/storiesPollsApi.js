@@ -1,13 +1,14 @@
 import { isStoryPollScale, storyPollDebug } from '../design-system/storyPollSupport'
-import { postStoriesV3, storiesDeviceId } from './storiesApiV3'
+import { postStoriesV3, storiesDeviceId, storiesIdentity } from './storiesApiV3'
 
 /**
  * Клиент опросов API v3 для сторис V2 — транспорт опросов по умолчанию: `answerMiniPoll(code,
  * body)` и `review(kind, body)`. Хост — `apiV3Domain`, с которого пришла лента; запрос — общий
  * POST storiesApiV3 (JSON, без cookie, таймаут 15 с).
  *
- * Личность: `shop_id`; `did` — после init SDK, как у ленты v3 (не дождались — ошибка, запрос не
- * уходит); `sid` — сеанс SDK, уходит всегда, как в JS SDK (нет сеанса — пустая строка).
+ * Личность — как у ленты v3 (`storiesIdentity`), но без `segment`, как в JS SDK: `shop_id`, `did` —
+ * после init SDK (не дождались — ошибка, запрос не уходит), `sid` — сеанс SDK, уходит всегда (нет
+ * сеанса — пустая строка), `stream` и `testmode: true` в тестовом режиме.
  *
  * Успех — `{ answer, results }` из `payload` (у оценки шкалы оба `null`: карточка знает свою
  * оценку). Ошибка — `Error` с `code` (HTTP-код; `-1` — нет сети, таймаут, нет did) и `message`:
@@ -26,9 +27,9 @@ const DID_TIMEOUT = 15000
 
 const pollError = (message, code) => Object.assign(new Error(message), { code })
 
-/** Тело запроса: `shop_id`, `did`, `sid` (нет сеанса — `""`) и параметры без `null` / `undefined`. */
-export function storiesPollBody({ shopId, did, sid }, params) {
-  const body = { shop_id: shopId, did, sid: typeof sid === 'string' ? sid : '' }
+/** Тело запроса: личность (`storiesIdentity` без `segment`) и параметры без `null` / `undefined`. */
+export function storiesPollBody(identity, params) {
+  const body = { ...identity, sid: typeof identity.sid === 'string' ? identity.sid : '' }
   Object.keys(params || {}).forEach((key) => {
     const value = params[key]
     if (value !== undefined && value !== null) body[key] = value
@@ -82,8 +83,7 @@ export function createStoriesPollsApi(sdk, host) {
   const post = async (url, params, what) => {
     try {
       const did = await deviceId(sdk)
-      const sid = typeof sdk.userSeance === 'string' ? sdk.userSeance : ''
-      const body = storiesPollBody({ shopId: sdk.shop_id, did, sid }, params)
+      const body = storiesPollBody(storiesIdentity(sdk, did, { segment: false }), params)
       let reply
       try {
         reply = await postStoriesV3(url, body)

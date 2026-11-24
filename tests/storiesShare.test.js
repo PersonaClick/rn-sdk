@@ -5,14 +5,15 @@ import {
   storyLinkStartIndex,
   storyShareTarget,
   storyShareUrl,
-  storyShareUrlWithSlide,
 } from '../components/design-system/storySupport'
 import {
   fetchSharedStoryV3,
   fetchStoriesFeedV3,
+  storiesV3ResponseDeviceId,
   resolveStoriesApiV3Domain,
   setStoriesApiV3Domain,
   storiesApiV3Domain,
+  storiesIdentity,
   storiesV3EventBody,
   storiesV3EventsUrl,
   storiesV3FeedUrl,
@@ -78,31 +79,15 @@ describe('Stories V2 share — parse a link (the table of the JS SDK)', () => {
 describe('Stories V2 share — the link of a slide', () => {
   const story = { shareable: true, share_url: 'https://shop.test/?r46_story=5' }
 
-  test('prefers the slide link and falls back to the campaign link with the slide in it', () => {
+  test('the slide link, else the campaign link as is — no r46_slide added (slideShareUrl of the JS SDK)', () => {
     expect(storyShareUrl(story, { id: 1, share_url: 'https://shop.test/?r46_slide=1' })).toBe('https://shop.test/?r46_slide=1')
-    // У товарного слайда своей ссылки нет: ссылка кампании, а в ней — этот слайд.
-    expect(storyShareUrl(story, { id: '5_2' })).toBe('https://shop.test/?r46_story=5&r46_slide=5_2')
-    expect(storyShareUrl(story, { id: '5_0', share_url: '' })).toBe('https://shop.test/?r46_story=5&r46_slide=5_0')
-    expect(storyShareUrl(story, { id: 37, share_url: null })).toBe('https://shop.test/?r46_story=5&r46_slide=37')
+    // У товарного слайда своей ссылки нет: ссылка кампании как есть.
+    expect(storyShareUrl(story, { id: '5_2' })).toBe('https://shop.test/?r46_story=5')
+    expect(storyShareUrl(story, { id: '5_0', share_url: '' })).toBe('https://shop.test/?r46_story=5')
+    expect(storyShareUrl(story, { id: 37, share_url: null })).toBe('https://shop.test/?r46_story=5')
+    expect(storyShareUrl(story, null)).toBe('https://shop.test/?r46_story=5')
     expect(storyShareUrl({ share_url: 'HTTP://shop.test/' }, {})).toBe('HTTP://shop.test/')
     expect(storyShareUrl({ share_url: 'shop://x' }, { id: 37 })).toBeNull()
-  })
-
-  test('the campaign link gets r46_slide at the end of the query, the rest stays as it was', () => {
-    const campaign = 'https://shop.test/?r46_story=5'
-    expect(storyShareUrlWithSlide('https://shop.test/p?q=a%20b&r46_story=5#top', '5_2')).toBe(
-      'https://shop.test/p?q=a%20b&r46_story=5&r46_slide=5_2#top',
-    )
-    expect(storyShareUrlWithSlide('https://shop.test/', 37)).toBe('https://shop.test/?r46_slide=37')
-    expect(storyShareUrlWithSlide('https://shop.test/#top', '37')).toBe('https://shop.test/?r46_slide=37#top')
-    expect(storyShareUrlWithSlide('https://shop.test/?', '37')).toBe('https://shop.test/?r46_slide=37')
-    expect(storyShareUrlWithSlide(campaign, '1234567890_1234')).toBe(`${campaign}&r46_slide=1234567890_1234`)
-    // Слайд в ссылке уже есть — как есть.
-    expect(storyShareUrlWithSlide(`${campaign}&r46_slide=7`, '5_2')).toBe(`${campaign}&r46_slide=7`)
-    // Id, который ссылка не несёт, не добавляется.
-    ;['x', '12345678901', '5_12345', '5_', '_2', '', null, undefined, 1.5].forEach((id) => {
-      expect(storyShareUrlWithSlide(campaign, id)).toBe(campaign)
-    })
   })
 
   test('nothing when sharing is off or the link is not http(s)', () => {
@@ -182,9 +167,11 @@ describe('Stories V2 API v3 — response and event body', () => {
     expect(() => unwrapStoriesV3(null)).toThrow()
   })
 
-  test('event body: story id as in the feed (a number), slide id always a string', () => {
-    expect(storiesV3EventBody('shop', 'did1', 'view', 40, 37)).toEqual({ shop_id: 'shop', did: 'did1', event: 'view', story_id: 40, slide_id: '37' })
-    expect(storiesV3EventBody('shop', 'did1', 'share', '39', '39_0')).toEqual({ shop_id: 'shop', did: 'did1', event: 'share', story_id: 39, slide_id: '39_0' })
+  test('event body: story id a number when numeric, slide id always a string', () => {
+    const who = { shop_id: 'shop', did: 'did1' }
+    expect(storiesV3EventBody(who, 'view', 40, 37)).toEqual({ shop_id: 'shop', did: 'did1', event: 'view', story_id: 40, slide_id: '37' })
+    expect(storiesV3EventBody(who, 'share', '39', '39_0')).toEqual({ shop_id: 'shop', did: 'did1', event: 'share', story_id: 39, slide_id: '39_0' })
+    expect(storiesV3EventBody(who, 'click', 'promo-1', 12)).toMatchObject({ story_id: 'promo-1', slide_id: '12' })
   })
 
   test('URLs and the domain setting', () => {
@@ -240,28 +227,81 @@ describe('Stories V2 API v3 — requests', () => {
     axios.mockReset()
   })
 
-  test('the feed waits for init, then goes with shop_id and did, cookie-less', async () => {
+  test('the feed waits for init, then goes with the identity of the JS SDK, cookie-less', async () => {
     axios.mockResolvedValue({ data: { status: 'success', payload: { id: 1, stories: [] } } })
     const sdk = sdkWithQueue()
     const feed = fetchStoriesFeedV3(sdk, 'code1', 'app.personaClick.ru')
     await Promise.resolve()
     expect(axios).not.toHaveBeenCalled()
     sdk.flush()
-    await expect(feed).resolves.toMatchObject({ id: 1, stories: [] })
+    const loaded = await feed
+    expect(loaded).toMatchObject({ id: 1, stories: [] })
+    // `did` загрузки — в ответе, вместе с копией ответа: лента не ходит за ним в очередь второй раз.
+    expect(storiesV3ResponseDeviceId(loaded)).toBe('did1')
+    expect(storiesV3ResponseDeviceId({ ...loaded, stories: [] })).toBe('did1')
+    expect(Object.keys(loaded)).toEqual(['id', 'stories'])
+    expect(storiesV3ResponseDeviceId({ stories: [] })).toBeNull()
     expect(axios.mock.calls[0][0]).toMatchObject({
       method: 'GET',
       url: 'https://app.personaClick.ru/api/v3/storefront/stories/code1',
-      params: { shop_id: 'shop', did: 'did1' },
       withCredentials: false,
     })
-    expect(axios.mock.calls[0][0].params.sid).toBeUndefined()
+    // Без сеанса и A/B-группы — пустые строки, поток по умолчанию, без тестового режима — без testmode.
+    expect(axios.mock.calls[0][0].params).toEqual({ shop_id: 'shop', did: 'did1', sid: '', segment: '', stream: 'react-native' })
+  })
+
+  test('sid, segment, stream and testmode: the native session, the A/B group, the shop stream, popups v3 test mode', async () => {
+    axios.mockResolvedValue({ data: { status: 'success', payload: { id: 1, stories: [] } } })
+    const sdk = {
+      shop_id: 'shop',
+      getDeviceId: async () => 'did1',
+      userSeance: 'sid-7',
+      stream: 'android',
+      segments: { getAbGroup: () => 'B' },
+      segment: 'A',
+      _popupsV3: { testMode: true },
+    }
+    await fetchStoriesFeedV3(sdk, 'code1', 'h')
+    expect(axios.mock.calls[0][0].params).toEqual({ shop_id: 'shop', did: 'did1', sid: 'sid-7', segment: 'B', stream: 'android', testmode: true })
+    await fetchSharedStoryV3(sdk, { code: 'c', storyId: 40, slideId: '40_1' }, 'h')
+    expect(axios.mock.calls[1][0].params).toEqual({
+      shop_id: 'shop',
+      did: 'did1',
+      sid: 'sid-7',
+      segment: 'B',
+      stream: 'android',
+      testmode: true,
+      slide_id: '40_1',
+    })
+    await trackStoriesV3({ ...sdk, segments: undefined, _popupsV3: { testMode: false } }, 'c', 'view', '40', '40_1', 'h')
+    expect(axios.mock.calls[2][0].data).toEqual({
+      shop_id: 'shop',
+      did: 'did1',
+      sid: 'sid-7',
+      segment: 'A',
+      stream: 'android',
+      event: 'view',
+      story_id: 40,
+      slide_id: '40_1',
+    })
+  })
+
+  test('identity: an A/B group other than A or B is empty; a throwing getter falls back to the copy', () => {
+    const base = { shop_id: 's', userSeance: null, stream: '' }
+    expect(storiesIdentity({ ...base, segment: 'C' }, 'd')).toEqual({ shop_id: 's', did: 'd', sid: '', segment: '', stream: 'react-native' })
+    expect(storiesIdentity({ ...base, segments: { getAbGroup: () => { throw new Error('x') } }, segment: 'A' }, 'd').segment).toBe('A')
+    expect(storiesIdentity({ ...base, segment: 'A' }, 'd', { segment: false })).not.toHaveProperty('segment')
+    expect(storiesIdentity({ ...base, _popupsV3: { testMode: 'yes' } }, 'd')).not.toHaveProperty('testmode')
   })
 
   test('a shared story asks for the slide; events are a JSON POST', async () => {
     axios.mockResolvedValue({ data: { status: 'success', payload: { stories: [] } } })
     const sdk = { shop_id: 'shop', getDeviceId: async () => 'did1' }
     await fetchSharedStoryV3(sdk, { code: 'c', storyId: 40, slideId: '37' }, 'app.personaClick.ru')
-    expect(axios.mock.calls[0][0]).toMatchObject({ url: 'https://app.personaClick.ru/api/v3/storefront/stories/c/story/40', params: { shop_id: 'shop', did: 'did1', slide_id: '37' } })
+    expect(axios.mock.calls[0][0]).toMatchObject({
+      url: 'https://app.personaClick.ru/api/v3/storefront/stories/c/story/40',
+      params: { shop_id: 'shop', did: 'did1', sid: '', segment: '', stream: 'react-native', slide_id: '37' },
+    })
     await fetchSharedStoryV3(sdk, { code: 'c', storyId: 40, slideId: null }, 'app.personaClick.ru')
     expect(axios.mock.calls[1][0].params.slide_id).toBeUndefined()
     await trackStoriesV3(sdk, 'c', 'shared_open', 40, 37, 'app.personaClick.ru')
@@ -269,7 +309,7 @@ describe('Stories V2 API v3 — requests', () => {
       method: 'POST',
       url: 'https://app.personaClick.ru/api/v3/storefront/stories/c/events',
       headers: { 'Content-Type': 'application/json' },
-      data: { shop_id: 'shop', did: 'did1', event: 'shared_open', story_id: 40, slide_id: '37' },
+      data: { shop_id: 'shop', did: 'did1', sid: '', segment: '', stream: 'react-native', event: 'shared_open', story_id: 40, slide_id: '37' },
     })
   })
 

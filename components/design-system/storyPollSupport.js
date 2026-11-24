@@ -1,9 +1,11 @@
-import { slidePollElements, toDecimal } from './storySupport'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { getStorageKey } from '../../utils'
+import { slidePollElements, storyColorScheme, toDecimal } from './storySupport'
 
 /**
  * Опросы на слайдах сторис V2 (элемент `poll`, только API v3): мини-опросы `single_choice`,
  * `multiple_choice`, `text` и шкалы NPS / CSAT / CES. Чистая логика без React — разбор элемента,
- * шкала, тексты, ответы сессии и контроллер карточки (поведение `createPoll` JS SDK). Рисует
+ * шкала, тексты, сохранённые ответы и контроллер карточки (поведение `createPoll` JS SDK). Рисует
  * карточку StoryPoll; в сеть ходит транспорт опросов, который просмотру передаёт виджет.
  *
  * Разбор терпимый: числа строками (`"40"`, `"120"`), `null` в необязательных полях; `code` не
@@ -11,7 +13,11 @@ import { slidePollElements, toDecimal } from './storySupport'
  * битый элемент — `null` (опрос не рисуется, слайд показывается как обычно).
  */
 
-/** Тексты по умолчанию; хост и `labels` элемента (непустые строки) их перекрывают. */
+/**
+ * Встроенные тексты карточки — три английские константы JS SDK (`DEFAULT_POLL_TEXTS`), какой бы ни был
+ * язык устройства или приложения. Тексты хоста и `labels` элемента (непустые строки) их перекрывают; у
+ * кнопки отправки выбора и текста сперва `submit_label` опроса.
+ */
 export const STORY_POLL_DEFAULT_TEXTS = Object.freeze({
   reanswer: 'Answer again',
   error: 'Failed to send the answer. Please try again',
@@ -23,6 +29,15 @@ export const STORY_POLL_SCALE_RANGES = Object.freeze({ nps: [0, 10], csat: [1, 5
 
 /** Больше значений шкала не рисует. */
 export const STORY_POLL_SCALE_LIMIT = 21
+
+/** Длина комментария к вопросу полосы шкалы (`render-scale.ts` JS SDK). */
+export const STORY_POLL_COMMENT_LIMIT = 5000
+
+/** Сколько живёт сохранённый ответ: столько лента помнит ответ (`STORIES_ANSWER_MEMORY_DAYS`), мс. */
+export const STORY_POLL_ANSWER_TTL_MS = 90 * 24 * 60 * 60 * 1000
+
+/** Зазор между карточкой и низом слайда (`POLL_FIT_MARGIN` JS SDK). */
+export const STORY_POLL_FIT_MARGIN = 16
 
 const MINI_KINDS = ['single_choice', 'multiple_choice', 'text']
 const TEXT_KEYS = ['reanswer', 'error', 'submit']
@@ -46,12 +61,27 @@ const integer = (value) => {
 }
 const list = (value) => (Array.isArray(value) ? value.filter((item) => item && typeof item === 'object') : [])
 
-/** Ответ из ленты или сервера: `{ id?, option_ids, text, rate }` или `null`. */
+/**
+ * Ответ из ленты или сервера: `{ id?, option_ids, text, rate, comment }` или `null`. Поля — как их
+ * понимает `hasAnswer` JS SDK, чтобы «отвечен» значило одно и то же: `option_ids` — массив как есть
+ * (целые строкой становятся числами, прочие значения остаются — вариант они не выделят, но ответ
+ * есть), `text` — только строка, `rate` — только число (строка `"9"` — не оценка).
+ */
 export function parseStoryPollAnswer(value) {
   if (!value || typeof value !== 'object') return null
-  const ids = Array.isArray(value.option_ids) ? value.option_ids.map(integer).filter((id) => id !== null) : null
+  const ids = Array.isArray(value.option_ids)
+    ? value.option_ids.map((id) => {
+        const n = integer(id)
+        return n !== null ? n : id
+      })
+    : null
   // Отвечен любым числом `rate`, как в JS SDK (выделится только совпавшая ячейка шкалы).
-  const answer = { option_ids: ids && ids.length ? ids : null, text: str(value.text), rate: toDecimal(value.rate) }
+  const answer = {
+    option_ids: ids && ids.length ? ids : null,
+    text: typeof value.text === 'string' ? value.text : null,
+    rate: typeof value.rate === 'number' && Number.isFinite(value.rate) ? value.rate : null,
+    comment: typeof value.comment === 'string' ? value.comment : null,
+  }
   const id = integer(value.id)
   if (id !== null) answer.id = id
   return answer
@@ -68,7 +98,9 @@ export function parseStoryPollResults(value) {
 
 /**
  * Элемент `poll` → модель карточки или `null` (неизвестный вид, битые данные).
- * `kind` — `single_choice` | `multiple_choice` | `text` | `scale`; `type` — `poll_type`.
+ * `kind` — `single_choice` | `multiple_choice` | `text` | `scale`; `type` — `poll_type`. Сам элемент
+ * ленты — в неперечисляемом `element`: после ответа карточка пишет ответ в него, как JS SDK в
+ * закэшированную ленту, и слайд, показанный снова, рисует опрос уже отвеченным.
  */
 export function parseStoryPoll(element) {
   try {
@@ -90,7 +122,7 @@ export function parseStoryPoll(element) {
         if (filled(element.labels[key])) labels[key] = element.labels[key]
       })
     }
-    return {
+    const poll = {
       type,
       kind,
       code: str(raw.code) ?? '',
@@ -111,13 +143,20 @@ export function parseStoryPoll(element) {
       rateMax: integer(raw.rate_max),
       bands: Array.isArray(raw.bands)
         ? list(raw.bands)
-            .map((band) => ({ from: toDecimal(band.from), to: toDecimal(band.to), success: str(band.success) }))
+            .map((band) => ({
+              from: toDecimal(band.from),
+              to: toDecimal(band.to),
+              question: str(band.question),
+              success: str(band.success),
+            }))
             .filter((band) => band.from !== null && band.to !== null)
         : null,
       answer: parseStoryPollAnswer(element.answer),
       results: parseStoryPollResults(element.results),
       labels,
     }
+    Object.defineProperty(poll, 'element', { value: element, enumerable: false })
+    return poll
   } catch (error) {
     storyPollDebug(`broken poll element: ${error && error.message}`)
     return null
@@ -125,10 +164,9 @@ export function parseStoryPoll(element) {
 }
 
 /**
- * Верх карточки опроса и текст-блока слайда (одно правило): `y_offset` % ВСЕЙ высоты слайда (как
- * `top: y%` в вебе), потом сдвиг внутрь `region` — области между шапкой и кнопками: не выше её верха,
- * низ не ниже её низа, а не влезает целиком — к верху (у карточки дальше прокрутка внутри).
- * `cardHeight` 0 — ещё не измерена.
+ * Верх текст-блока слайда: `y_offset` % ВСЕЙ высоты слайда (как `top: y%` в вебе), потом сдвиг внутрь
+ * `region` — области между шапкой и кнопками: не выше её верха, низ не ниже её низа, а не влезает
+ * целиком — к верху. `cardHeight` 0 — ещё не измерен.
  */
 export function storyPollTop(yOffset, slideHeight, region, cardHeight) {
   let top = Math.max(region.top, ((yOffset || 0) / 100) * slideHeight)
@@ -136,12 +174,50 @@ export function storyPollTop(yOffset, slideHeight, region, cardHeight) {
   return top
 }
 
+/**
+ * Нижний край места карточек опросов: верх нижнего ряда слайда (кнопка звука, «товары»), если он
+ * виден (`bottom` — от верха слайда), иначе низ безопасной зоны; не выше её верха.
+ *
+ * @param {number} slideHeight
+ * @param {{ top?: number, bottom?: number }} [insets]
+ * @param {number|null} [bottom]
+ */
+export function storyPollLowerEdge(slideHeight, insets = {}, bottom = null) {
+  const upper = Math.max(0, (insets && insets.top) || 0)
+  const edge = typeof bottom === 'number' && Number.isFinite(bottom) ? bottom : slideHeight - Math.max(0, (insets && insets.bottom) || 0)
+  return Math.max(upper, edge)
+}
+
+/**
+ * Верх карточки опроса — как `fittedTop` JS SDK (#277): `clamp(y_offset, 0, 100)` % ВСЕЙ высоты слайда
+ * (как у текст-блоков), не выше верха безопасной зоны (под вырезом карточка не рисуется); карточка,
+ * которая не влезает, поднимается так, чтобы её низ был на `margin` выше нижнего ряда слайда (`bottom`
+ * — верх ряда со звуком или «товарами», если он виден) или низа безопасной зоны, но не выше её верха.
+ * Высота карточки 0 — ещё не измерена: как задано.
+ *
+ * @param {number} yOffset
+ * @param {number} slideHeight высота всего слайда
+ * @param {number} cardHeight
+ * @param {{ top?: number, bottom?: number }} [insets]
+ * @param {number} [margin]
+ * @param {number|null} [bottom] верх нижнего ряда от верха слайда; `null` — ряда нет
+ */
+export function storyPollFittedTop(yOffset, slideHeight, cardHeight, insets = {}, margin = STORY_POLL_FIT_MARGIN, bottom = null) {
+  const upper = Math.max(0, insets.top || 0)
+  const lower = storyPollLowerEdge(slideHeight, insets, bottom)
+  const y = Math.max(0, Math.min(100, Number(yOffset) || 0))
+  const configured = Math.max(upper, (y / 100) * slideHeight)
+  if (!(slideHeight > 0) || !(cardHeight > 0)) return configured
+  const max = lower - cardHeight - margin
+  return configured <= max ? configured : Math.max(upper, max)
+}
+
 /** Опросы слайда, которые рисуются, по порядку. */
 export function slidePolls(slide) {
   return slidePollElements(slide).map(parseStoryPoll).filter(Boolean)
 }
 
-/** Отвеченный: непустые `option_ids`, непустой `text` или число `rate`. */
+/** Отвеченный — как `hasAnswer` JS SDK: непустые `option_ids`, непустой `text` или число `rate`. */
 export function hasStoryPollAnswer(answer) {
   if (!answer) return false
   return (
@@ -161,108 +237,58 @@ export function storyPollScaleRange(type, poll) {
   return values
 }
 
-const NPS_COLORS = ['#FCA5A5', '#FCA5A5', '#FCA5A5', '#FDBA74', '#FDBA74', '#FDBA74', '#FCD34D']
-
-/** Цвет ячейки: у NPS 0..10 критики красные/оранжевые, 7–8 жёлтые, 9–10 зелёные; иначе по трети. */
-export function storyPollScaleColor(type, value, min, max) {
-  if (type === 'nps' && min === 0 && max === 10) {
-    return value <= 6 ? NPS_COLORS[value] : value <= 8 ? '#FDE68A' : '#86EFAC'
-  }
-  const position = max > min ? (value - min) / (max - min) : 1
-  return position < 0.34 ? '#FCA5A5' : position < 0.68 ? '#FDE68A' : '#86EFAC'
-}
-
-/** `success` полосы, где `from ≤ rate ≤ to`; нет такой или нет текста — `null`. */
-export function storyPollBandText(poll, rate) {
-  if (typeof rate !== 'number' || !poll || !Array.isArray(poll.bands)) return null
-  const band = poll.bands.find((item) => rate >= item.from && rate <= item.to)
-  return (band && band.success) || null
-}
-
 /**
- * Заливка выбранного значения шкалы — цвет его полосы (`storyPollScaleColor`); значения нет ни в
- * одной полосе (или полос нет) — `null`, тогда карточка берёт цвет выбора.
+ * Тон ячейки шкалы — цвета `scaleColor` JS SDK семантикой кита: `danger` (красный), `warning`
+ * (жёлтый), `success` (зелёный). У NPS 0..10 критики 0–6 — `danger`, нейтралы 7–8 — `warning`,
+ * сторонники 9–10 — `success`; у прочих — по трети шкалы.
+ *
+ * @returns {'danger'|'warning'|'success'}
  */
-export function storyPollScaleFill(poll, value, min, max) {
-  if (!poll || !Array.isArray(poll.bands) || !poll.bands.some((item) => value >= item.from && value <= item.to)) return null
-  return storyPollScaleColor(poll.type, value, min, max)
+export function storyPollScaleTone(type, value, min, max) {
+  if (type === 'nps' && min === 0 && max === 10) return value <= 6 ? 'danger' : value <= 8 ? 'warning' : 'success'
+  const position = max > min ? (value - min) / (max - min) : 1
+  return position < 0.34 ? 'danger' : position < 0.68 ? 'warning' : 'success'
 }
-
-/** Относительная яркость `#RRGGBB` (sRGB, как WCAG); не цвет — `null`. */
-function luminanceOf(color) {
-  const match = /^#([0-9a-f]{6})$/i.exec(typeof color === 'string' ? color : '')
-  if (!match) return null
-  const rgb = parseInt(match[1], 16)
-  const linear = (channel) => {
-    const c = channel / 255
-    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
-  }
-  return 0.2126 * linear((rgb >> 16) & 255) + 0.7152 * linear((rgb >> 8) & 255) + 0.0722 * linear(rgb & 255)
-}
-
-/** Отношение контраста WCAG двух яркостей. */
-const contrastRatio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
 
 /**
- * Текст и значки на заливке `#RRGGBB` (кнопка, галочка, выбранное значение шкалы): из белого и тёмного
- * (`text_dark_primary`, чёрный) — тот, у кого контраст WCAG с заливкой выше: `light` или `dark`. Не цвет —
- * `dark`. На цвете выбора `#22C55E` — тёмный (≈ 9:1 против 2,3:1 у белого).
+ * Текст и значки на заливке (кнопка, галочка, ячейка шкалы): из белого и тёмного — тот, у кого контраст
+ * WCAG с заливкой выше (равно — тёмный): `light` или `dark`. Цвет разбирает тот же `storyColor`, что и
+ * фон слайда; не цвет — `dark`.
  */
 export function storyPollTextOn(color) {
-  const fill = luminanceOf(color)
-  if (fill === null) return 'dark'
-  return contrastRatio(fill, 1) > contrastRatio(fill, 0) ? 'light' : 'dark'
+  return storyColorScheme(color, ON_FILL) === 'dark' ? 'light' : 'dark'
 }
+
+/** Тёмный и белый текст на заливке: схема `dark` — белый. */
+const ON_FILL = Object.freeze({ light: '#000000', dark: '#FFFFFF' })
 
 /** Буква варианта: A, B, C… после Z — номер. */
 export function storyPollOptionLetter(index) {
   return index >= 0 && index < 26 ? String.fromCharCode(65 + index) : String(index + 1)
 }
 
-/**
- * Тексты итогов выбора — русские и английские, по языку устройства: шапка «Результаты», «Спасибо!» с
- * «Голос учтён» (если у опроса нет своего `thanks_text`) и формы числа голосов.
- */
-export const STORY_POLL_RESULT_TEXTS = Object.freeze({
-  ru: Object.freeze({ results: 'Результаты', thanks: 'Спасибо!', counted: 'Голос учтён', votes: ['голос', 'голоса', 'голосов'] }),
-  en: Object.freeze({ results: 'Results', thanks: 'Thanks!', counted: 'Vote counted', votes: ['vote', 'votes'] }),
-})
-
-/** Язык устройства: `ru` для русской локали, иначе `en`. */
-export function storyPollLanguage() {
-  try {
-    const locale = Intl.DateTimeFormat().resolvedOptions().locale || ''
-    return /^ru\b/i.test(locale) ? 'ru' : 'en'
-  } catch (error) {
-    return 'en'
-  }
+/** Полоса, где `from ≤ rate ≤ to`, или `null`. */
+export function storyPollBand(poll, rate) {
+  if (typeof rate !== 'number' || !poll || !Array.isArray(poll.bands)) return null
+  return poll.bands.find((item) => rate >= item.from && rate <= item.to) || null
 }
 
-/** Тексты итогов по языку (`ru` / `en`; другой — английские). */
-export const storyPollResultTexts = (language = storyPollLanguage()) => STORY_POLL_RESULT_TEXTS[language] || STORY_POLL_RESULT_TEXTS.en
+/** `success` полосы оценки; нет такой или нет текста — `null`. */
+export function storyPollBandText(poll, rate) {
+  const band = storyPollBand(poll, rate)
+  return (band && band.success) || null
+}
 
-/**
- * Число голосов `results.total` с формой слова: «1 голос», «3 голоса», «1 248 голосов» / «1 vote»,
- * «1,248 votes». Разряды и пробел перед словом неразрывные. Нет голосов (или не число) — `null`.
- */
-export function storyPollVotes(total, language = storyPollLanguage()) {
-  const n = Math.round(Number(total))
-  if (!Number.isFinite(n) || n <= 0) return null
-  const ru = language === 'ru'
-  const forms = (ru ? STORY_POLL_RESULT_TEXTS.ru : STORY_POLL_RESULT_TEXTS.en).votes
-  const digits = String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ru ? ' ' : ',')
-  let form = n === 1 ? forms[0] : forms[1]
-  if (ru) {
-    const tens = n % 100
-    const ones = n % 10
-    form = ones === 1 && tens !== 11 ? forms[0] : ones >= 2 && ones <= 4 && (tens < 12 || tens > 14) ? forms[1] : forms[2]
-  }
-  return `${digits} ${form}`
+/** Вопрос полосы оценки (`bandQuestion` JS SDK): без пробелов по краям; пустой или нет — `null`. */
+export function storyPollBandQuestion(poll, rate) {
+  const band = storyPollBand(poll, rate)
+  const question = band && typeof band.question === 'string' ? band.question.trim() : ''
+  return question || null
 }
 
 /**
- * Тексты карточки: умолчания < тексты хоста (`{ reanswer, error, submit }`) < `labels` элемента.
- * Пустые строки ничего не перекрывают.
+ * Тексты карточки, как в JS SDK: английские умолчания < тексты хоста (`{ reanswer, error, submit }`) <
+ * `labels` элемента. Пустые строки ничего не перекрывают.
  */
 export function storyPollTexts(host, labels) {
   const texts = { ...STORY_POLL_DEFAULT_TEXTS }
@@ -275,86 +301,217 @@ export function storyPollTexts(host, labels) {
   return texts
 }
 
-/** Ввод поля `text` в пределах `limit` единиц UTF-16 (как `value.length` в вебе), пару суррогатов не режет. */
+/** Ввод поля в пределах `limit` единиц UTF-16 (как `value.length` в вебе), пару суррогатов не режет. */
 export function storyPollCutText(value, limit) {
   if (!limit || value.length <= limit) return value
   const last = value.charCodeAt(limit - 1)
   return value.slice(0, last >= 0xd800 && last <= 0xdbff ? limit - 1 : limit)
 }
 
-// Ответы этой сессии: в памяти на процесс, одни на все виджеты, show() и handleLink. На диск не
-// пишутся. Важнее `answer` / `results` из ленты — новая лента о свежем ответе может не знать.
-const answers = new Map()
-const answerKey = (shopId, poll) => JSON.stringify([String(shopId || ''), String(poll.type), String(poll.code)])
+// --- Сохранённые ответы (P1) -----------------------------------------------------------------------
+//
+// Как `stories-poll/storage.ts` JS SDK: ответ после отправки пишется на устройство на 90 дней (лента не
+// знает ответов анонимов). Ключ — магазин (как у остальных хранилищ SDK), `did`, вид опроса, код,
+// сторис и слайд: `@PersonaClick_<shop>_stories_poll_<did>_<type>_<code>_<story>_<slide>`. Без `did` ничего не
+// читается и не пишется: ответ другого человека не показывается. Запись — `{ answer, results,
+// saved_at }`; битая, без даты или старше 90 дней удаляется при чтении. Что важнее: ответ свежей ленты >
+// ответ, отправленный раньше в этом процессе (он в элементе ленты и в кэше) > запись на устройстве.
+//
+// AsyncStorage асинхронный, а карточка рисуется сразу: записи держит кэш в памяти. Виджет читает их
+// заранее, вместе с лентой (`loadStoryPollAnswers`); карточка без прочитанной записи дочитывает её
+// сама и показывает, если её ещё не трогали.
 
-/** Сохранённый в сессии ответ `{ answer, results }` или `null`. */
-export function storyPollSavedAnswer(shopId, poll) {
-  return answers.get(answerKey(shopId, poll)) || null
+const stored = new Map()
+
+/**
+ * Ключ сохранённого ответа или `null` — нет магазина или `did`.
+ * @param {{ shopId?: string, did?: string } | null | undefined} storage
+ */
+export function storyPollStorageKey(storage, poll, storyId, slideId) {
+  if (!storage || !filled(storage.shopId) || !filled(storage.did) || !poll) return null
+  const name = ['stories_poll', storage.did, poll.type, String(poll.code || ''), String(storyId), String(slideId)].join('_')
+  return getStorageKey(name, storage.shopId)
 }
 
-/** Запомнить ответ опроса до конца процесса. */
-export function saveStoryPollAnswer(shopId, poll, state) {
-  answers.set(answerKey(shopId, poll), { answer: state.answer || null, results: state.results || null })
+const fresh = (record, now = Date.now()) =>
+  !!record && typeof record.saved_at === 'number' && Number.isFinite(record.saved_at) && now - record.saved_at <= STORY_POLL_ANSWER_TTL_MS
+
+/**
+ * Строка хранилища → `{ answer, results, saved_at }`; записи нет — `null`; битая (не JSON, без ответа),
+ * без даты или старая — `{ stale: true }`, её удаляют.
+ */
+function readRecord(raw) {
+  if (typeof raw !== 'string' || !raw) return null
+  try {
+    const value = JSON.parse(raw)
+    if (!value || typeof value !== 'object' || !value.answer || typeof value.answer !== 'object') return { stale: true }
+    if (!fresh(value)) return { stale: true }
+    return {
+      answer: value.answer,
+      results: value.results && typeof value.results === 'object' ? value.results : null,
+      saved_at: value.saved_at,
+    }
+  } catch (error) {
+    return { stale: true }
+  }
 }
 
-/** Для тестов: забыть ответы сессии. */
+/**
+ * Сохранённый ответ из кэша: `{ answer, results }` (ответ и итоги как в ленте), `null` — его нет,
+ * `undefined` — ещё не прочитан.
+ */
+export function storyPollSavedAnswer(key) {
+  if (!key || !stored.has(key)) return undefined
+  const record = stored.get(key)
+  if (!record) return null
+  if (!fresh(record)) {
+    stored.set(key, null)
+    AsyncStorage.removeItem(key).catch(() => {})
+    return null
+  }
+  return { answer: record.answer, results: record.results }
+}
+
+/** Прочитать записи с диска в кэш (уже прочитанные не читаются); старые и без даты удаляются. */
+export async function loadStoryPollAnswers(keys) {
+  const missing = Array.from(new Set((keys || []).filter((key) => key && !stored.has(key))))
+  if (missing.length === 0) return
+  let pairs = []
+  try {
+    pairs = await AsyncStorage.multiGet(missing)
+  } catch (error) {
+    return
+  }
+  const stale = []
+  ;(pairs || []).forEach(([key, raw]) => {
+    if (stored.has(key)) return
+    const record = readRecord(raw)
+    if (record && record.stale) stale.push(key)
+    stored.set(key, record && !record.stale ? record : null)
+  })
+  if (stale.length) AsyncStorage.multiRemove(stale).catch(() => {})
+}
+
+/** Записать ответ (кэш и диск) с отметкой времени. Без ключа — ничего. */
+export function writeStoryPollAnswer(key, state) {
+  if (!key) return
+  const record = { answer: state.answer || null, results: state.results || null, saved_at: Date.now() }
+  stored.set(key, record)
+  try {
+    Promise.resolve(AsyncStorage.setItem(key, JSON.stringify(record))).catch(() => {})
+  } catch (error) {
+    // Нет хранилища — ответ живёт до конца процесса.
+  }
+}
+
+/**
+ * Ключи ответов, которые слайдам нужно прочитать: опросы без ответа ленты.
+ * @param {{ shopId: string, did: string }} storage
+ * @param {object[]} stories
+ */
+export function storyPollStorageKeys(storage, stories) {
+  const keys = []
+  ;(Array.isArray(stories) ? stories : []).forEach((story) => {
+    ;(Array.isArray(story && story.slides) ? story.slides : []).forEach((slide) => {
+      slidePolls(slide).forEach((poll) => {
+        if (poll.answer) return
+        const key = storyPollStorageKey(storage, poll, story.id, slide && slide.id)
+        if (key) keys.push(key)
+      })
+    })
+  })
+  return keys
+}
+
+/** Для тестов: забыть кэш сохранённых ответов. */
 export function resetStoryPollAnswers() {
-  answers.clear()
+  stored.clear()
 }
 
-/** Ответ на мини-опрос для транспорта: `story_id` числом, `slide_id` всегда строкой (`"39_0"`). */
+// --- Тела запросов (P3) ----------------------------------------------------------------------------
+
+/**
+ * Источник ответа для отчётов опросов (`sourceParams` JS SDK): кампания сторис и слайд, строками
+ * (виртуальные слайды товарных кампаний — `12_0`). Нет сторис — нет источника; нет слайда — без
+ * `source_item_id`; пустые значения не уходят.
+ */
+export function storyPollSource(storyId, slideId) {
+  if (storyId === undefined || storyId === null || storyId === '') return {}
+  const source = { source_type: 'stories', source_id: String(storyId) }
+  if (slideId !== undefined && slideId !== null && slideId !== '') source.source_item_id = String(slideId)
+  return source
+}
+
+/** Ответ на мини-опрос для транспорта: `option_ids` или `text` и источник. */
 export function storyPollAnswerBody(params, storyId, slideId) {
   const body = {}
   if (Array.isArray(params.option_ids)) body.option_ids = params.option_ids
   if (typeof params.text === 'string') body.text = params.text
-  body.story_id = typeof storyId === 'string' && /^\d+$/.test(storyId) ? Number(storyId) : storyId
-  body.slide_id = String(slideId)
-  return body
+  return { ...body, ...storyPollSource(storyId, slideId) }
 }
 
-/** Оценка шкалы для транспорта: `channel` (по умолчанию `stories`), NPS — `category`, CSAT / CES — `campaign`. */
-export function storyPollReviewBody(poll, rate) {
+/**
+ * Оценка шкалы для транспорта: `channel` (по умолчанию `stories`), NPS — `category`, CSAT / CES —
+ * `campaign`, `rate`, `comment` (только непустой) и источник.
+ */
+export function storyPollReviewBody(poll, rate, comment, storyId, slideId) {
   const body = { channel: filled(poll.channel) ? poll.channel : 'stories' }
   if (poll.type === 'nps') body.category = poll.code
   else body.campaign = poll.code
   body.rate = rate
-  return body
+  if (filled(comment)) body.comment = comment
+  return { ...body, ...storyPollSource(storyId, slideId) }
 }
 
 const percentOf = (value) => Math.max(0, Math.min(100, Math.round(Number(value) || 0)))
 
 /**
- * Контроллер карточки — поведение `createPoll` JS SDK без отрисовки. Состояния `form` / `answered`
- * (отвеченный — по ответу сессии, иначе по `answer` ленты). Выбор одного и шкала отправляются по
- * нажатию (выделение сразу, при ошибке — назад к прежнему), несколько вариантов и текст — кнопкой.
- * Пока ответ уходит, всё выключено и повторные нажатия не считаются; ошибка — текст под карточкой,
- * можно повторить (автоповтора нет). Успех — в ответы сессии, даже если карточки уже нет.
+ * Контроллер карточки — поведение `createPoll` JS SDK без отрисовки. Состояния `form` / `answered`:
+ * ответ ленты, без него — сохранённый на устройстве (`storage`), без него — форма. Выбор одного и шкала
+ * отправляются по нажатию (выделение сразу, при ошибке — назад к прежнему), несколько вариантов и
+ * текст — кнопкой. Пока ответ уходит, всё выключено и повторные нажатия не считаются; ошибка — текст под
+ * карточкой, можно повторить (автоповтора нет). Успех — ответ в состояние, в элемент ленты (слайд,
+ * показанный снова, рисует его отвеченным) и на устройство, даже если карточки уже нет.
+ *
+ * Шкала с вопросом в полосе оценки (P2): после оценки — вопрос и поле комментария (до 5000 символов,
+ * счётчик), кнопка отправляет ту же оценку с комментарием; потом — `success` полосы. Без вопроса —
+ * `success` сразу. Ушли со слайда без комментария — при следующем показе вопрос снова.
  *
  * Пауза слайда: `onHold(hold)` при смене `hold = pressed || focused || sending`. После `detach()`
  * (карточка ушла со слайда) ни `onChange`, ни `onHold` не зовутся: ответ только сохраняется.
  *
  * @param {{ poll: object, storyId: string|number, slideId: string|number,
- *           transport: { answerMiniPoll: Function, review: Function }, shopId?: string,
+ *           transport: { answerMiniPoll: Function, review: Function },
+ *           storage?: { shopId: string, did: string } | null,
  *           texts?: { reanswer?: string, error?: string, submit?: string },
  *           onChange?: (state: object) => void, onHold?: (hold: boolean) => void }} options
  */
-export function createStoryPollController({ poll, storyId, slideId, transport, shopId = '', texts, onChange, onHold }) {
-  const saved = storyPollSavedAnswer(shopId, poll)
-  const current = { answer: saved ? saved.answer : poll.answer, results: saved ? saved.results : poll.results }
+export function createStoryPollController({ poll, storyId, slideId, transport, storage = null, texts, onChange, onHold }) {
+  const key = storyPollStorageKey(storage, poll, storyId, slideId)
+  const current = { answer: null, results: null }
+  // Ответ ленты важнее сохранённого (JS: `element.answer ? null : readPollAnswer(key)`).
+  const saved = poll.answer ? null : storyPollSavedAnswer(key)
+  if (saved) {
+    current.answer = parseStoryPollAnswer(saved.answer)
+    current.results = parseStoryPollResults(saved.results)
+  } else {
+    current.answer = poll.answer
+    current.results = poll.results
+  }
   const pollTexts = storyPollTexts(texts, poll.labels)
   const optionIds = poll.options.map((option) => option.id)
   const limit = poll.kind === 'text' ? poll.maxLength : null
-  // Запись сессии появляется только после успешной отправки — и карточка из неё всегда отвеченная,
-  // даже если ответ ничего не выделяет (как после успеха в JS).
-  let mode = saved || hasStoryPollAnswer(current.answer) ? 'answered' : 'form'
+  let mode = hasStoryPollAnswer(current.answer) ? 'answered' : 'form'
   let previous = []
   let selected = []
   let previousRate = null
   let marked = null
   let text = ''
+  let comment = ''
   let sending = false
   let error = false
   let reanswered = false
+  let touched = false
   let pressed = false
   let focused = false
   let paused = false
@@ -368,6 +525,7 @@ export function createStoryPollController({ poll, storyId, slideId, transport, s
     previousRate = current.answer && typeof current.answer.rate === 'number' ? current.answer.rate : null
     marked = previousRate
     text = ''
+    comment = ''
     error = false
   }
   resetForm()
@@ -376,6 +534,13 @@ export function createStoryPollController({ poll, storyId, slideId, transport, s
   const answeredIds = () => {
     const ids = current.answer && Array.isArray(current.answer.option_ids) ? current.answer.option_ids : []
     return optionIds.filter((id) => ids.includes(id))
+  }
+  // Вопрос полосы, пока на него нет комментария.
+  const followUp = () => {
+    if (mode !== 'answered' || poll.kind !== 'scale') return null
+    const rate = answeredRate()
+    if (rate === null || (current.answer && filled(current.answer.comment))) return null
+    return storyPollBandQuestion(poll, rate)
   }
   const percents = () => {
     const results = current.results
@@ -389,33 +554,44 @@ export function createStoryPollController({ poll, storyId, slideId, transport, s
   }
   const thanks = () => {
     if (mode !== 'answered') return null
-    if (poll.kind === 'scale') return storyPollBandText(poll, answeredRate())
+    if (poll.kind === 'scale') return followUp() ? null : storyPollBandText(poll, answeredRate())
     return filled(poll.thanksText) ? poll.thanksText : null
   }
 
-  const snapshot = () => ({
-    kind: poll.kind,
-    mode,
-    sending,
-    error,
-    selected: mode === 'answered' ? answeredIds() : [...selected],
-    rate: mode === 'answered' ? answeredRate() : marked,
-    text,
-    limit,
-    counter: limit ? `${text.length}/${limit}` : null,
-    canSubmit:
-      mode === 'form' && !sending && (poll.kind === 'multiple_choice' ? selected.length > 0 : poll.kind === 'text' ? text.trim() !== '' : false),
-    percents: mode === 'answered' ? percents() : null,
-    // Всего голосов из `results` (подвал итогов); результатов нет — `null`.
-    total: mode === 'answered' && current.results ? current.results.total : null,
-    thanks: thanks(),
-    answerText: mode === 'answered' && current.answer && filled(current.answer.text) ? current.answer.text : null,
-    canReanswer: mode === 'answered' && poll.allowReanswer,
-    reanswered,
-    // Кнопка выбора нескольких и текста: `submit_label`, иначе текст `submit`.
-    submitLabel: filled(poll.submitLabel) ? poll.submitLabel : pollTexts.submit,
-    texts: pollTexts,
-  })
+  const snapshot = () => {
+    const question = followUp()
+    return {
+      kind: poll.kind,
+      mode,
+      sending,
+      error,
+      selected: mode === 'answered' ? answeredIds() : [...selected],
+      rate: mode === 'answered' ? answeredRate() : marked,
+      text,
+      limit,
+      counter: limit ? `${text.length}/${limit}` : null,
+      canSubmit:
+        mode === 'form' && !sending && (poll.kind === 'multiple_choice' ? selected.length > 0 : poll.kind === 'text' ? text.trim() !== '' : false),
+      // Итоги выбора — проценты, если сервер прислал `results` (P7).
+      percents: mode === 'answered' ? percents() : null,
+      thanks: thanks(),
+      answerText: mode === 'answered' && current.answer && filled(current.answer.text) ? current.answer.text : null,
+      // Вопрос полосы шкалы и поле комментария к нему.
+      followUp: question,
+      comment,
+      commentCounter: question ? `${comment.length}/${STORY_POLL_COMMENT_LIMIT}` : null,
+      canSubmitComment: !!question && !sending && comment.trim() !== '',
+      // Поле на карточке: `text` — форма текста, `comment` — комментарий шкалы, иначе `null`.
+      field: mode === 'form' && poll.kind === 'text' ? 'text' : question ? 'comment' : null,
+      canReanswer: mode === 'answered' && poll.allowReanswer,
+      reanswered,
+      // Кнопка выбора нескольких и текста: `submit_label`, иначе текст `submit`.
+      submitLabel: filled(poll.submitLabel) ? poll.submitLabel : pollTexts.submit,
+      // Кнопка комментария: у шкалы своей подписи нет — текст `submit` (по умолчанию «Send», как JS).
+      commentSubmitLabel: pollTexts.submit,
+      texts: pollTexts,
+    }
+  }
 
   const emit = () => {
     if (attached && onChange) onChange(snapshot())
@@ -427,8 +603,35 @@ export function createStoryPollController({ poll, storyId, slideId, transport, s
     if (attached && onHold) onHold(hold)
   }
 
-  const send = (request, toState, revert) => {
-    if (sending || mode !== 'form') return Promise.resolve(false)
+  // Сохранённый ответ ещё не прочитан — дочитать и показать, если карточку не трогали.
+  if (!poll.answer && key && saved === undefined) {
+    loadStoryPollAnswers([key]).then(() => {
+      const late = storyPollSavedAnswer(key)
+      if (!late || touched || sending || mode !== 'form') return
+      current.answer = parseStoryPollAnswer(late.answer)
+      current.results = parseStoryPollResults(late.results)
+      if (!hasStoryPollAnswer(current.answer)) return
+      mode = 'answered'
+      resetForm()
+      emit()
+    })
+  }
+
+  // Ответ принят: состояние, элемент ленты и запись на устройстве (`raw` — как в ленте).
+  const accept = (raw) => {
+    const element = poll.element
+    if (element && typeof element === 'object') {
+      element.answer = raw.answer
+      element.results = raw.results
+    }
+    writeStoryPollAnswer(key, raw)
+    current.answer = parseStoryPollAnswer(raw.answer)
+    current.results = parseStoryPollResults(raw.results)
+  }
+
+  const send = (request, toRaw, revert, allowed) => {
+    if (sending || !allowed()) return Promise.resolve(false)
+    touched = true
     sending = true
     error = false
     emit()
@@ -441,12 +644,9 @@ export function createStoryPollController({ poll, storyId, slideId, transport, s
     }
     return result.then(
       (reply) => {
-        const next = toState(reply)
-        saveStoryPollAnswer(shopId, poll, next)
+        accept(toRaw(reply))
         sending = false
         if (!attached) return true
-        current.answer = next.answer
-        current.results = next.results
         mode = 'answered'
         reanswered = false
         // Поля больше нет — фокус ушёл вместе с ним.
@@ -468,27 +668,34 @@ export function createStoryPollController({ poll, storyId, slideId, transport, s
     )
   }
 
+  const inForm = (kind) => mode === 'form' && !sending && (!kind || poll.kind === kind)
+  const formAllowed = () => mode === 'form'
+
   const answer = (params) =>
     send(
       () => transport.answerMiniPoll(poll.code, storyPollAnswerBody(params, storyId, slideId)),
       // Ответ сервера (`payload.answer`), без него — отправленный; результаты — только из ответа.
-      (reply) => {
-        const server = parseStoryPollAnswer(reply && reply.answer)
-        const sent = { option_ids: params.option_ids || null, text: typeof params.text === 'string' ? params.text : null, rate: null }
-        return { answer: server || sent, results: parseStoryPollResults(reply && reply.results) }
-      },
+      (reply) => ({
+        answer:
+          (reply && reply.answer && typeof reply.answer === 'object' ? reply.answer : null) || {
+            option_ids: params.option_ids || null,
+            text: typeof params.text === 'string' ? params.text : null,
+          },
+        results: (reply && reply.results && typeof reply.results === 'object' ? reply.results : null) || null,
+      }),
       () => {
         if (poll.kind === 'single_choice') selected = [...previous]
       },
+      formAllowed,
     )
-
-  const inForm = (kind) => mode === 'form' && !sending && (!kind || poll.kind === kind)
 
   return {
     /** Текущее состояние для отрисовки. */
     state: snapshot,
-    /** Тексты карточки (умолчания < хост < `labels`). */
+    /** Тексты карточки (английские умолчания JS SDK < хост < `labels`). */
     texts: pollTexts,
+    /** Ключ сохранённого ответа (`null` — не сохраняется). */
+    storageKey: key,
     /** Выбор одного: выделение сразу и отправка. */
     choose(id) {
       if (!inForm('single_choice') || !optionIds.includes(id)) return Promise.resolve(false)
@@ -498,12 +705,14 @@ export function createStoryPollController({ poll, storyId, slideId, transport, s
     /** Чип выбора нескольких: включить / выключить. */
     toggle(id) {
       if (!inForm('multiple_choice') || !optionIds.includes(id)) return
+      touched = true
       selected = selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id]
       emit()
     },
     /** Ввод текста: обрезается по `max_length` (пару суррогатов не режет). */
     setText(value) {
       if (!inForm('text')) return
+      touched = true
       text = storyPollCutText(typeof value === 'string' ? value : '', limit)
       emit()
     },
@@ -520,21 +729,42 @@ export function createStoryPollController({ poll, storyId, slideId, transport, s
       }
       return Promise.resolve(false)
     },
-    /** Оценка шкалы: выделение сразу и отправка. */
+    /** Оценка шкалы: выделение сразу и отправка, без комментария. */
     rate(value) {
       if (!inForm('scale')) return Promise.resolve(false)
       marked = value
       return send(
-        () => transport.review(poll.type, storyPollReviewBody(poll, value)),
-        () => ({ answer: { option_ids: null, text: null, rate: value }, results: null }),
+        () => transport.review(poll.type, storyPollReviewBody(poll, value, null, storyId, slideId)),
+        () => ({ answer: { rate: value }, results: null }),
         () => {
           marked = previousRate
         },
+        formAllowed,
       )
     },
-    /** «Ответить заново» (`allow_reanswer`): снова форма, прежний ответ подсвечен. */
+    /** Комментарий к вопросу полосы: не длиннее 5000 (пару суррогатов не режет). */
+    setComment(value) {
+      if (sending || !followUp()) return
+      touched = true
+      comment = storyPollCutText(typeof value === 'string' ? value : '', STORY_POLL_COMMENT_LIMIT)
+      emit()
+    },
+    /** Отправка комментария: та же оценка и обрезанный комментарий. */
+    submitComment() {
+      const rate = answeredRate()
+      const trimmed = comment.trim()
+      if (sending || !followUp() || !trimmed) return Promise.resolve(false)
+      return send(
+        () => transport.review(poll.type, storyPollReviewBody(poll, rate, trimmed, storyId, slideId)),
+        () => ({ answer: { rate, comment: trimmed }, results: null }),
+        null,
+        () => !!followUp(),
+      )
+    },
+    /** «Ответить заново» (`allow_reanswer`): снова форма, прежний ответ подсвечен, поле пустое. */
     reanswer() {
       if (mode !== 'answered' || !poll.allowReanswer || sending) return
+      touched = true
       mode = 'form'
       reanswered = true
       resetForm()
@@ -550,7 +780,7 @@ export function createStoryPollController({ poll, storyId, slideId, transport, s
       focused = !!on
       sync()
     },
-    /** Карточка ушла: дальше только ответы сессии, без UI и паузы. */
+    /** Карточка ушла: дальше только сохранение ответов, без UI и паузы. */
     detach() {
       attached = false
     },

@@ -19,15 +19,15 @@ import { PERSONALIZATION_TYPOGRAPHY } from '../../constants/typography.constants
 import { fontFor, usePersonalizationTheme } from '../../theme/personalization-theme'
 import { STORY_TAP_SLOP } from './storyViewerState'
 import {
+  STORY_POLL_COMMENT_LIMIT,
+  STORY_POLL_FIT_MARGIN,
   createStoryPollController,
-  storyPollLanguage,
+  storyPollFittedTop,
+  storyPollLowerEdge,
   storyPollOptionLetter,
-  storyPollResultTexts,
-  storyPollScaleFill,
+  storyPollScaleTone,
   storyPollScaleRange,
   storyPollTextOn,
-  storyPollTop,
-  storyPollVotes,
 } from './storyPollSupport'
 
 /**
@@ -35,17 +35,26 @@ import {
  * StorySlide: логика — контроллер storyPollSupport (как `createPoll` JS SDK), здесь только вид, касания и
  * клавиатура. Без транспорта опросов (его даёт виджет) слайд их не рисует.
  *
- * Вид — по макету: матовая светлая карточка (и в тёмной теме) по 12 от краёв, не шире 420 по
- * центру, весь текст по левому краю. Размытия под карточкой нет — нативной зависимости для него в SDK
- * нет, вместо него белая подложка 88 %. Варианты — строки с буквой, итоги — шапка «Результаты», полосы
- * долей и подвал с благодарностью и числом голосов; шкала — дорожка-капсула. Положение — одно правило
- * с текст-блоками (storyPollTop): `y_offset` % всей высоты слайда, потом вся карточка между шапкой и
- * нижними кнопками / «товарами» (`region`); не влезает — прокрутка внутри.
+ * Что на карточке — как у JS SDK: вопрос; варианты строками, мой ответ выделен, после ответа — доли и
+ * проценты, если сервер прислал `results`, затем `thanks_text`; текст после ответа — галочка,
+ * `thanks_text` и сам ответ; шкала — все значения от красного к зелёному, после ответа без нажатий с
+ * выделенной оценкой; у шкалы с вопросом полосы — вопрос, поле комментария со счётчиком `n/5000` и
+ * кнопка, потом `success` полосы.
+ *
+ * Как выглядит — по киту: матовая светлая карточка (и в тёмной теме), не шире 420 по центру, весь
+ * текст по левому краю, токены кита. Размытия под карточкой нет — нативной зависимости для него в SDK
+ * нет, вместо него белая подложка 88 %. Варианты — строки с буквой (у выбранного — галочка); шкала —
+ * дорожка-капсула, ячейки — семантические цвета кита: Danger → Warning → успех.
+ *
+ * Положение — как JS (#277, `storyPollFittedTop`): `y_offset` % всей высоты слайда, не выше верха
+ * безопасной зоны; не влезает — карточка поднимается на 16 над нижним рядом слайда (звук, «товары»),
+ * а без него — над низом безопасной зоны, но не выше верха зоны; выше — прокрутка внутри. Поля 16, не
+ * шире 420. Шапка (прогресс, крестик, «Поделиться») рисуется над карточкой (StorySlide).
  *
  * Касание, начатое на карточке, слайду не достаётся: ни тапы-листания, ни удержание, ни свайпы
  * (карточка забирает жест и не отдаёт его корню просмотра). Пока карточку держат, в поле фокус или
- * ответ уходит — `onHold(true)` (пауза `POLL` просмотра). Поле `text`: карточка поднимается над
- * клавиатурой (+16), слайд стоит; фон приложения и уход карточки клавиатуру убирают.
+ * ответ уходит — `onHold(true)` (пауза `POLL` просмотра). Поле (текст или комментарий): карточка
+ * поднимается над клавиатурой (+16), слайд стоит; фон приложения и уход поля клавиатуру убирают.
  */
 
 const ON_LIGHT = PERSONALIZATION_COLORS.light
@@ -56,11 +65,16 @@ export const STORY_POLL_STYLE = Object.freeze({
   cardBorder: 'rgba(255, 255, 255, 0.5)',
   cardBorderWidth: 1,
   maxWidth: 420,
+  /** Поля карточки слева и справа (P8, как у JS). */
+  sideMargin: 16,
   /** Текст карточки: она светлая в обеих темах. */
   text: ON_LIGHT.textDarkPrimary,
   textSecondary: ON_LIGHT.textDarkSecondary,
   hint: ON_LIGHT.textDarkHint,
-  /** Цвет выбора и успеха опроса: выбранный вариант, кнопка, шкала без полосы, точка «Результатов». */
+  /**
+   * Цвет выбора и успеха опроса: выбранный вариант, кнопка, зелёные ячейки шкалы. Семантического
+   * «успеха» в токенах кита нет (есть Danger, Warning, Info) — свой цвет карточки.
+   */
   accent: '#22C55E',
   /** Выбранный вариант до отправки — заливка строки; мой ответ в итогах — полоса доли. */
   accentFill: 'rgba(34, 197, 94, 0.2)',
@@ -73,9 +87,6 @@ export const STORY_POLL_STYLE = Object.freeze({
   /** Квадрат буквы и поле ввода. */
   well: 'rgba(255, 255, 255, 0.85)',
   questionLineHeight: 24,
-  /** Разрядка шапки «Результаты» — доля кегля. */
-  overlineTracking: 0.08,
-  dotSize: 6,
   optionMinHeight: 56,
   selectedBorderWidth: 1.5,
   letterSize: 32,
@@ -84,6 +95,8 @@ export const STORY_POLL_STYLE = Object.freeze({
   checkHeight: 12,
   checkStroke: 2,
   trackHeight: 52,
+  /** Зазор между ячейками шкалы. */
+  scaleGap: 2,
   controlHeight: 52,
   inputMaxHeight: 120,
   answeredOpacity: 0.55,
@@ -102,11 +115,11 @@ export default function StoryPollLayer({
   storyId,
   slideId,
   transport,
-  shopId,
+  storage,
   texts,
   slideHeight,
-  region,
-  topLimit = 0,
+  insets,
+  bottom = null,
   onHold,
   onFocus,
   pointerEvents = 'box-none',
@@ -123,7 +136,7 @@ export default function StoryPollLayer({
     if (before !== after && callbacks.current[name]) callbacks.current[name](after)
   }, [])
 
-  if (!transport || !polls || polls.length === 0 || !(slideHeight > 0) || !region) return null
+  if (!transport || !polls || polls.length === 0 || !(slideHeight > 0)) return null
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents={pointerEvents}>
       {polls.map((poll, index) => {
@@ -135,11 +148,11 @@ export default function StoryPollLayer({
             storyId={storyId}
             slideId={slideId}
             transport={transport}
-            shopId={shopId}
+            storage={storage}
             texts={texts}
             slideHeight={slideHeight}
-            region={region}
-            topLimit={topLimit}
+            insets={insets || EMPTY_INSETS}
+            bottom={bottom}
             onHold={(on) => report(holds.current, key, on, 'onHold')}
             onFocus={(on) => report(focuses.current, key, on, 'onFocus')}
           />
@@ -149,8 +162,10 @@ export default function StoryPollLayer({
   )
 }
 
+const EMPTY_INSETS = Object.freeze({ top: 0, bottom: 0 })
+
 /** Одна карточка: контроллер, положение, касания и клавиатура. */
-function StoryPollCard({ poll, storyId, slideId, transport, shopId, texts, slideHeight, region, topLimit, onHold, onFocus }) {
+function StoryPollCard({ poll, storyId, slideId, transport, storage, texts, slideHeight, insets, bottom, onHold, onFocus }) {
   const theme = usePersonalizationTheme()
   const fonts = { regular: fontFor(theme, '400'), bold: fontFor(theme, '600') }
   const callbacks = useRef({ onHold, onFocus })
@@ -161,22 +176,21 @@ function StoryPollCard({ poll, storyId, slideId, transport, shopId, texts, slide
       storyId,
       slideId,
       transport,
-      shopId,
+      storage,
       texts: texts ? { reanswer: texts.pollReanswerText, error: texts.pollErrorText, submit: texts.pollSubmitText } : null,
       onChange: (next) => setView(next),
       onHold: (on) => callbacks.current.onHold && callbacks.current.onHold(on),
     }),
   )
   const [view, setView] = useState(() => controller.state())
-  // Тексты итогов — по языку устройства (русские или английские).
-  const [language] = useState(() => storyPollLanguage())
-  const results = storyPollResultTexts(language)
 
   // Поле и клавиатура: фокус — в контроллер (пауза) и слою (тап мимо прячет клавиатуру).
   const input = useRef(null)
   const focused = useRef(false)
   const card = useRef(null)
-  const lift = useKeyboardLift(card, focused, topLimit, poll.kind === 'text', input)
+  const topLimit = insets.top || 0
+  // Поле есть у текста и у шкалы (комментарий к вопросу полосы).
+  const lift = useKeyboardLift(card, focused, topLimit, poll.kind === 'text' || poll.kind === 'scale', input)
   const setFocused = useCallback(
     (on) => {
       if (focused.current === on) return
@@ -201,13 +215,13 @@ function StoryPollCard({ poll, storyId, slideId, transport, shopId, texts, slide
     }
   }, [controller])
 
-  // Поле ушло (ответ принят) — клавиатура тоже.
+  // Поле ушло (ответ или комментарий приняты) — клавиатура тоже.
   useEffect(() => {
-    if (view.mode === 'answered' && focused.current) {
+    if (!view.field && focused.current) {
       setFocused(false)
       Keyboard.dismiss()
     }
-  }, [view.mode, setFocused])
+  }, [view.field, setFocused])
 
   // Ошибка — для скринридера.
   useEffect(() => {
@@ -222,11 +236,13 @@ function StoryPollCard({ poll, storyId, slideId, transport, shopId, texts, slide
     return () => subscription?.remove?.()
   }, [])
 
-  // Положение: `y_offset` % всей высоты слайда, потом внутрь области между шапкой и кнопками; не
-  // влезает целиком — прокрутка внутри.
+  // Положение — как JS (#277): `y_offset` % всей высоты слайда, не выше верха безопасной зоны; не
+  // влезает — выше, на 16 над нижним рядом (звук, «товары») или низом безопасной зоны; выше зоны —
+  // прокрутка внутри.
   const [height, setHeight] = useState(0)
-  const space = Math.max(0, region.bottom - region.top)
-  const top = storyPollTop(poll.yOffset, slideHeight, region, height)
+  const lower = storyPollLowerEdge(slideHeight, insets, bottom)
+  const space = Math.max(0, lower - topLimit - STORY_POLL_FIT_MARGIN)
+  const top = storyPollFittedTop(poll.yOffset, slideHeight, height, insets, STORY_POLL_FIT_MARGIN, bottom)
   const [contentHeight, setContentHeight] = useState(0)
   const scrolls = contentHeight > space + 0.5
 
@@ -252,8 +268,6 @@ function StoryPollCard({ poll, storyId, slideId, transport, shopId, texts, slide
 
   const body = renderPollBody(poll, view, controller, {
     fonts,
-    results,
-    language,
     input,
     onFocus: () => setFocused(true),
     onBlur: () => setFocused(false),
@@ -346,21 +360,12 @@ function useKeyboardLift(card, focused, topLimit, enabled, input) {
 }
 
 /**
- * Содержимое карточки по виду и состоянию: у отвеченного выбора шапка «Результаты», вопрос, форма или
- * ответ, у отвеченного выбора подвал с благодарностью и числом голосов.
+ * Содержимое карточки по виду и состоянию — что рисуют рендереры JS SDK: вопрос, затем форма или
+ * ответ; у выбора после ответа — `thanks_text`, у шкалы — вопрос полосы с полем или её `success`.
  */
-function renderPollBody(poll, view, controller, { fonts, results, language, input, onFocus, onBlur }) {
+function renderPollBody(poll, view, controller, { fonts, input, onFocus, onBlur }) {
   const nodes = []
   const answered = view.mode === 'answered'
-  const choice = poll.kind === 'single_choice' || poll.kind === 'multiple_choice'
-  if (answered && choice) {
-    nodes.push(
-      <View key="overline" style={styles.overline}>
-        <View style={styles.dot} />
-        <Text style={[styles.overlineText, { fontFamily: fonts.bold }]}>{results.results}</Text>
-      </View>,
-    )
-  }
   if (poll.question) {
     nodes.push(
       <Text key="question" style={[styles.question, { fontFamily: fonts.bold }]} accessibilityRole="header">
@@ -370,7 +375,27 @@ function renderPollBody(poll, view, controller, { fonts, results, language, inpu
   }
   if (poll.kind === 'scale') {
     nodes.push(<ScaleTrack key="scale" poll={poll} view={view} controller={controller} fonts={fonts} />)
-    if (answered && view.thanks) {
+    if (view.followUp) {
+      nodes.push(
+        <Text key="followup" style={[styles.followUp, { fontFamily: fonts.bold }]}>
+          {view.followUp}
+        </Text>,
+        ...textField(
+          {
+            value: view.comment,
+            onChange: (value) => controller.setComment(value),
+            limit: STORY_POLL_COMMENT_LIMIT,
+            counter: view.commentCounter,
+            label: view.followUp,
+            submitLabel: view.commentSubmitLabel,
+            canSubmit: view.canSubmitComment,
+            onSubmit: () => controller.submitComment(),
+          },
+          view,
+          { fonts, input, onFocus, onBlur },
+        ),
+      )
+    } else if (answered && view.thanks) {
       nodes.push(
         <Text key="thanks" style={[styles.band, { fontFamily: fonts.regular }]}>
           {view.thanks}
@@ -379,7 +404,25 @@ function renderPollBody(poll, view, controller, { fonts, results, language, inpu
     }
   } else if (poll.kind === 'text') {
     if (answered) nodes.push(<TextDone key="done" view={view} fonts={fonts} />)
-    else nodes.push(...textForm(poll, view, controller, { fonts, input, onFocus, onBlur }))
+    else
+      nodes.push(
+        ...textField(
+          {
+            value: view.text,
+            onChange: (value) => controller.setText(value),
+            placeholder: poll.placeholder,
+            limit: view.limit,
+            counter: view.counter,
+            label: poll.question || poll.placeholder,
+            autoFocus: view.reanswered,
+            submitLabel: view.submitLabel,
+            canSubmit: view.canSubmit,
+            onSubmit: () => controller.submit(),
+          },
+          view,
+          { fonts, input, onFocus, onBlur },
+        ),
+      )
   } else if (answered) {
     nodes.push(
       <View key="options" style={styles.options}>
@@ -394,8 +437,14 @@ function renderPollBody(poll, view, controller, { fonts, results, language, inpu
           />
         ))}
       </View>,
-      <ResultsFooter key="footer" thanks={view.thanks} votes={storyPollVotes(view.total, language)} results={results} fonts={fonts} />,
     )
+    if (view.thanks) {
+      nodes.push(
+        <Text key="thanks" style={[styles.band, styles.thanks, { fontFamily: fonts.bold }]}>
+          {view.thanks}
+        </Text>,
+      )
+    }
   } else {
     const single = poll.kind === 'single_choice'
     nodes.push(
@@ -451,57 +500,43 @@ function CheckMark({ color }) {
   return <View style={[styles.check, { borderColor: color }]} />
 }
 
-/** Подвал итогов: «Спасибо! Голос учтён» (или `thanks_text` опроса) и справа число голосов `results.total`. */
-function ResultsFooter({ thanks, votes, results, fonts }) {
-  return (
-    <View style={styles.footer}>
-      {thanks ? (
-        <Text style={[styles.footerThanks, styles.footerStrong, { fontFamily: fonts.bold }]}>{thanks}</Text>
-      ) : (
-        <Text style={styles.footerThanks}>
-          <Text style={[styles.footerStrong, { fontFamily: fonts.bold }]}>{results.thanks}</Text>
-          <Text style={[styles.footerMuted, { fontFamily: fonts.regular }]}>{` ${results.counted}`}</Text>
-        </Text>
-      )}
-      {votes ? <Text style={[styles.footerMuted, styles.votes, { fontFamily: fonts.regular }]}>{votes}</Text> : null}
-    </View>
-  )
-}
-
-/** Форма текста: поле, счётчик `n/limit` (если есть лимит) и кнопка. */
-function textForm(poll, view, controller, { fonts, input, onFocus, onBlur }) {
+/**
+ * Поле с кнопкой — форма текста и комментарий к вопросу полосы шкалы (`renderTextField` JS SDK):
+ * многострочное поле, счётчик `n/limit` (если есть лимит) и кнопка, включённая при непустом тексте.
+ */
+function textField(field, view, { fonts, input, onFocus, onBlur }) {
   const nodes = [
     <TextInput
       key="input"
       ref={input}
       style={[styles.input, { fontFamily: fonts.regular }]}
       multiline
-      value={view.text}
-      onChangeText={(value) => controller.setText(value)}
-      placeholder={poll.placeholder || undefined}
+      value={field.value}
+      onChangeText={field.onChange}
+      placeholder={field.placeholder || undefined}
       placeholderTextColor={STORY_POLL_STYLE.hint}
-      maxLength={view.limit || undefined}
+      maxLength={field.limit || undefined}
       editable={!view.sending}
-      autoFocus={view.reanswered}
+      autoFocus={!!field.autoFocus}
       onFocus={onFocus}
       onBlur={onBlur}
       textAlignVertical="top"
-      accessibilityLabel={poll.question || poll.placeholder || undefined}
+      accessibilityLabel={field.label || undefined}
     />,
   ]
-  if (view.counter) {
+  if (field.counter) {
     nodes.push(
       <Text key="counter" style={[styles.counter, { fontFamily: fonts.regular }]}>
-        {view.counter}
+        {field.counter}
       </Text>,
     )
   }
   nodes.push(
     <SubmitButton
       key="submit"
-      label={view.submitLabel}
-      enabled={view.canSubmit}
-      onPress={() => controller.submit()}
+      label={field.submitLabel}
+      enabled={field.canSubmit}
+      onPress={field.onSubmit}
       fonts={fonts}
       style={styles.textSubmit}
     />,
@@ -571,11 +606,13 @@ function AnsweredOption({ index, label, selected, percent, fonts }) {
 }
 
 /**
- * Шкала: дорожка-капсула, значения поровну. Выбранное — капсула на всю высоту дорожки цветом своей
- * полосы (нет полосы — цвет выбора), цифра белая или тёмная по контрасту. Форма — нажатие отправляет;
- * ответ — без нажатий, прочие значения приглушены.
+ * Шкала: дорожка-капсула, значения поровну, у каждого — свой цвет от красного к зелёному, как у JS
+ * (`storyPollScaleTone`): семантические Danger и Warning кита и цвет успеха карточки; цифра белая или
+ * тёмная по контрасту. Форма — нажатие отправляет, выбранное обведено сразу; ответ — без нажатий,
+ * выбранное обведено, прочие приглушены.
  */
 function ScaleTrack({ poll, view, controller, fonts }) {
+  const theme = usePersonalizationTheme()
   const values = storyPollScaleRange(poll.type, poll)
   const min = values[0]
   const max = values[values.length - 1]
@@ -585,21 +622,18 @@ function ScaleTrack({ poll, view, controller, fonts }) {
       {values.map((value) => {
         const on = view.rate === value
         const disabled = answered || view.sending
-        const fill = on ? storyPollScaleFill(poll, value, min, max) || STORY_POLL_STYLE.accent : null
+        const fill = scaleFill(theme, storyPollScaleTone(poll.type, value, min, max))
         return (
           <Pressable
             key={value}
             disabled={disabled}
             onPress={() => controller.rate(value)}
-            style={[styles.step, fill && { backgroundColor: fill }, answered && !on && styles.stepMuted]}
+            style={[styles.step, { backgroundColor: fill }, on && styles.stepSelected, answered && !on && styles.stepMuted]}
             accessibilityRole="button"
             accessibilityLabel={String(value)}
             accessibilityState={{ selected: on, disabled }}
           >
-            <Text
-              style={[styles.stepLabel, fill && { color: textOn(fill) }, { fontFamily: fonts.bold }]}
-              numberOfLines={1}
-            >
+            <Text style={[styles.stepLabel, { color: textOn(fill), fontFamily: fonts.bold }]} numberOfLines={1}>
               {String(value)}
             </Text>
           </Pressable>
@@ -608,6 +642,10 @@ function ScaleTrack({ poll, view, controller, fonts }) {
     </View>
   )
 }
+
+/** Цвет ячейки шкалы по тону: Danger и Warning кита, успех — цвет выбора карточки. */
+const scaleFill = (theme, tone) =>
+  tone === 'danger' ? theme.colors.semanticDanger : tone === 'warning' ? theme.colors.semanticWarning : STORY_POLL_STYLE.accent
 
 /**
  * Кнопка отправки во всю ширину; выключенная — серая.
@@ -666,7 +704,7 @@ const SPACE = PERSONALIZATION_SPACING
 const RADIUS = PERSONALIZATION_RADIUS
 
 const styles = StyleSheet.create({
-  slot: { position: 'absolute', left: SPACE.lg, right: SPACE.lg, alignItems: 'center' },
+  slot: { position: 'absolute', left: S.sideMargin, right: S.sideMargin, alignItems: 'center' },
   card: {
     width: '100%',
     maxWidth: S.maxWidth,
@@ -678,16 +716,6 @@ const styles = StyleSheet.create({
   },
   scroll: { flexGrow: 0 },
   content: { padding: SPACE.xl2 },
-  overline: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md, marginBottom: SPACE.lg },
-  dot: { width: S.dotSize, height: S.dotSize, borderRadius: S.dotSize / 2, backgroundColor: S.accent },
-  overlineText: {
-    fontSize: T.xsEmphasized.fontSize,
-    lineHeight: T.xsEmphasized.lineHeight,
-    fontWeight: '600',
-    letterSpacing: T.xsEmphasized.fontSize * S.overlineTracking,
-    textTransform: 'uppercase',
-    color: S.textSecondary,
-  },
   question: {
     fontSize: T.lgEmphasized.fontSize,
     lineHeight: S.questionLineHeight,
@@ -749,11 +777,6 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   optionsSubmit: { marginTop: SPACE.xl },
-  footer: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.lg, marginTop: SPACE.xl },
-  footerThanks: { flex: 1, fontSize: T.smDefault.fontSize, lineHeight: T.smDefault.lineHeight, textAlign: 'left' },
-  footerStrong: { fontSize: T.smEmphasized.fontSize, lineHeight: T.smEmphasized.lineHeight, fontWeight: '600', color: S.text },
-  footerMuted: { fontSize: T.smDefault.fontSize, lineHeight: T.smDefault.lineHeight, color: S.textSecondary },
-  votes: { textAlign: 'right', fontVariant: ['tabular-nums'] },
   submit: {
     alignSelf: 'stretch',
     height: S.controlHeight,
@@ -790,9 +813,19 @@ const styles = StyleSheet.create({
     height: S.trackHeight,
     borderRadius: RADIUS.rounded,
     backgroundColor: S.surface,
-    paddingHorizontal: SPACE.sm,
+    padding: SPACE.sm,
+    gap: S.scaleGap,
   },
-  step: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.rounded },
+  step: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADIUS.rounded,
+    borderWidth: S.selectedBorderWidth,
+    borderColor: 'transparent',
+  },
+  stepSelected: { borderColor: S.text },
   stepMuted: { opacity: S.answeredOpacity },
   stepLabel: {
     fontSize: T.baseEmphasized.fontSize,
@@ -802,6 +835,16 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   band: { marginTop: SPACE.xl, fontSize: T.smDefault.fontSize, lineHeight: T.smDefault.lineHeight, color: S.text, textAlign: 'left' },
+  thanks: { fontSize: T.smEmphasized.fontSize, lineHeight: T.smEmphasized.lineHeight, fontWeight: '600' },
+  followUp: {
+    marginTop: SPACE.xl,
+    marginBottom: SPACE.lg,
+    fontSize: T.baseEmphasized.fontSize,
+    lineHeight: T.baseEmphasized.lineHeight,
+    fontWeight: '600',
+    color: S.text,
+    textAlign: 'left',
+  },
   done: { flexDirection: 'row', alignItems: 'center', gap: SPACE.lg },
   doneIcon: {
     width: S.letterSize,

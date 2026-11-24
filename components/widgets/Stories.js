@@ -3,6 +3,7 @@ import { Linking, Platform } from 'react-native'
 import { awaitInstance, isAmbiguousDefault } from '../../lib/facade/facade'
 import { getViewedSlides, markSlideAsViewed } from '../../lib/stories/storage'
 import { registerOverlayLayer } from '../Popup/overlayLayers'
+import { loadStorySoundMuted } from '../design-system/storyNative'
 import StoriesBar from '../design-system/StoriesBar'
 import StoryViewer from '../design-system/StoryViewer'
 import {
@@ -18,11 +19,14 @@ import {
   withoutProps,
 } from '../design-system/storySupport'
 import { attachStoriesShowHost, registerOpenStoriesViewer, requestStoriesShow } from './storiesShow'
+import { loadStoryPollAnswers, storyPollStorageKeys } from '../design-system/storyPollSupport'
 import {
   fetchStoriesFeedV3,
   resolveStoriesApiV3Domain,
   setStoriesApiV3Domain,
   storiesApiV3Domain,
+  storiesDeviceId,
+  storiesV3ResponseDeviceId,
   trackStoriesV3,
 } from './storiesApiV3'
 import { handleStoriesLink } from './storiesLink'
@@ -58,6 +62,13 @@ import { createStoriesPollsApi } from './storiesPollsApi'
  * `shareUrlTransform` — ссылка для окна «Поделиться» из ссылки слайда (событие `share` то же).
  * Опросы на слайдах (элемент `poll`) — тоже только в v3: просмотру уходит транспорт опросов на тот
  * же хост (`storiesPollsApi`) или `pollTransport` хоста; без v3 опросы не рисуются.
+ *
+ * Сторис из ленты v3 ведут себя как в JS SDK: сторис открывается на `start_position` ленты, а после
+ * показа в этом сеансе — на слайде, где из неё ушли (досмотренная — с начала); кольцо — по `viewed`
+ * ленты, а в этом сеансе ещё и после ухода из сторис вперёд (R8); виденные слайды на устройство не
+ * пишутся. `view` — и на перезапуске слайда (F4); `click` — только кнопка, шапка и товар, копирование
+ * промокода — без события (E1); кнопка без ссылки — только `click` (R5); нажатие на шапку `header` —
+ * `click` и её ссылка (R1).
  *
  * Нажатия (D): просмотр закрывается, потом `onElementPress(element)` (уведомление, как у прежних
  * сторис) и переход: кнопка → `onLinkClick(url)`, если задан, иначе системный обработчик; товар →
@@ -168,8 +179,13 @@ function Stories(
   }, [code, generation, report, showViewer])
 
   // Инстанс и код есть — грузим блок (v3 или старое API), затем виденные слайды по магазину (A2).
-  // Ответ на прежний код отбрасывается. Хост v3, откуда пришёл блок, — для событий.
+  // Ответ на прежний код отбрасывается. Хост v3, откуда пришёл блок, — для событий. У ленты v3 —
+  // ещё did устройства и сохранённые ответы опросов (P1): карточки рисуются сразу отвеченными.
   const v3Host = useRef(null)
+  const [pollDeviceId, setPollDeviceId] = useState('')
+  // Сторис v3 (R8): слайд, на котором из сторис ушли в этом сеансе, и сторис, из которых ушли вперёд.
+  const positions = useRef({})
+  const [leftForward, setLeftForward] = useState(EMPTY_IDS)
   const ownHost = resolveStoriesApiV3Domain(apiV3Domain)
   useEffect(() => {
     if (!sdk || !code) return undefined
@@ -182,11 +198,26 @@ function Stories(
       })
       .then(async (response) => {
         const list = playableStories(response?.stories)
-        const entries = await Promise.all(
-          list.map(async (story) => [String(story.id), await getViewedSlides(String(story.id), shop)]),
-        )
+        // Виденные слайды с устройства — только у старой ленты: у v3 продолжение считает сервер (R8).
+        const entries = host
+          ? []
+          : await Promise.all(list.map(async (story) => [String(story.id), await getViewedSlides(String(story.id), shop)]))
+        let did = ''
+        if (host) {
+          // `did`, с которым лента загружена, — второй раз в очередь SDK за ним не ходим; сохранённые
+          // ответы опросов и выбор звука читаются вместе.
+          const loaded = storiesV3ResponseDeviceId(response)
+          did = loaded !== null ? loaded : await storiesDeviceId(sdk).catch(() => '')
+          await Promise.all([
+            did && shop ? loadStoryPollAnswers(storyPollStorageKeys({ shopId: String(shop), did }, list)) : null,
+            shop ? loadStorySoundMuted(shop) : null,
+          ]).catch(() => {})
+        }
         if (!alive) return
         v3Host.current = host || null
+        positions.current = {}
+        setLeftForward(EMPTY_IDS)
+        setPollDeviceId(did || '')
         setSeen(Object.fromEntries(entries.filter(([, ids]) => ids.length > 0)))
         setStories(list)
       })
@@ -272,6 +303,8 @@ function Stories(
   )
 
   const visible = useMemo(() => (failed || ambiguous ? [] : stories || []), [failed, ambiguous, stories])
+  // Лента пришла из v3 — поведение JS SDK (R1, R2, R4–R9, E1, F4).
+  const v3 = stories !== null && !!v3Host.current
 
   // Транспорт опросов — только у ленты из v3: свой хоста или клиент опросов на хост ленты.
   const pollHost = stories === null ? null : v3Host.current
@@ -352,9 +385,12 @@ function Stories(
         id: story.id,
         title: story.name || '',
         source: story.avatar ? { uri: story.avatar } : undefined,
-        ...storyCoverRing(story, seen[String(story.id)]),
+        // v3 (R8): просмотрена — по `viewed` ленты или после ухода из неё вперёд в этом сеансе.
+        ...(v3
+          ? storyCoverRing({ ...story, viewed: story.viewed === true || leftForward.has(String(story.id)) }, EMPTY_SEEN_IDS)
+          : storyCoverRing(story, seen[String(story.id)])),
       })),
-    [visible, seen],
+    [visible, seen, v3, leftForward],
   )
 
   const closeViewer = useCallback(() => {
@@ -386,19 +422,50 @@ function Stories(
       <StoryViewer
         visible={opened !== null}
         stories={visible}
-        seen={seen}
+        seen={v3 ? EMPTY_SEEN_MAP : seen}
         initialStoryIndex={opened ? opened.index : 0}
         initialSlideIndex={opened ? opened.slide : undefined}
         openRequest={opened ? opened.request : 0}
         paused={hostPaused}
         onClose={closeViewer}
         onSlideView={(story, slide) => {
-          markSeen(story, slide)
+          if (v3) {
+            const index = (story.slides || []).indexOf(slide)
+            if (index >= 0) positions.current[String(story.id)] = index
+          } else {
+            markSeen(story, slide)
+          }
           track('view', story, slide)
         }}
+        onSlideRestart={v3 ? (story, slide) => track('view', story, slide) : undefined}
+        onStoryLeave={
+          v3
+            ? (story, completed) => {
+                const id = String(story.id)
+                if (completed) positions.current[id] = 0
+                setLeftForward((current) => (current.has(id) ? current : new Set([...current, id])))
+              }
+            : undefined
+        }
+        onHeaderPress={
+          v3
+            ? (story, slide, header) => {
+                track('click', story, slide)
+                const target = storyButtonTarget(header, null, Platform.OS)
+                if (!target) {
+                  callbacks.current.onElementPress && callbacks.current.onElementPress(header)
+                  return
+                }
+                navigate(header, target)
+              }
+            : undefined
+        }
+        v3={v3}
+        positions={positions.current}
         onButtonPress={(story, slide, button) => {
           track('click', story, slide)
-          const target = storyButtonTarget(button, slideProduct(slide), Platform.OS)
+          // Кнопка без ссылки у сторис v3 никуда не ведёт, как в JS SDK (R5): товар слайда не открывает.
+          const target = storyButtonTarget(button, v3 ? null : slideProduct(slide), Platform.OS)
           // Кнопке некуда вести — просмотр остаётся открытым, хосту только уведомление.
           if (!target) {
             callbacks.current.onElementPress && callbacks.current.onElementPress(button)
@@ -411,13 +478,15 @@ function Stories(
           navigate(element || { type: 'product', item: product }, { kind: 'product', product })
         }}
         onPromoCopied={(story, slide, promo, element) => {
-          track('click', story, slide)
+          // Копирование промокода у сторис v3 событий не шлёт, как в JS SDK (E1).
+          if (!v3) track('click', story, slide)
           callbacks.current.onElementPress && callbacks.current.onElementPress(element)
         }}
         onShare={(story, slide) => track('share', story, slide)}
         shareUrlTransform={shareUrlTransform}
         pollTransport={polls}
         pollShopId={shop || ''}
+        pollDeviceId={pollDeviceId}
         pollReanswerText={pollReanswerText}
         pollSubmitText={pollSubmitText}
         pollErrorText={pollErrorText}
@@ -440,6 +509,10 @@ function Stories(
 
 /** Блок грузится не дольше, мс (D). */
 const LOAD_TIMEOUT = 15000
+
+const EMPTY_IDS = new Set()
+const EMPTY_SEEN_IDS = []
+const EMPTY_SEEN_MAP = Object.freeze({})
 
 /**
  * Пропсы v3 виджета и параметры v3 show(): хост API v3, «Поделиться» (подпись, ссылка для окна),

@@ -151,7 +151,8 @@ describe('Popups v3 API — requests.json', () => {
     const sdk = { shop_id: SHOP, stream: 'android', userSeance: context.sid, getDeviceId: async () => context.did }
     const actions = createPopupActions(sdk, () => context.app_host)
     await expect(actions.submitSurvey({ type: 'nps', campaignCode: '' }, 9, '')).rejects.toMatchObject({ message: 'Channel not found', code: 404 })
-    expect(axios.mock.calls[0][0].data).toEqual({ shop_id: SHOP, did: context.did, sid: context.sid, channel: 'popup', rate: 9 })
+    // Поток магазина уходит с отзывом, как у JS SDK (его `ajax.sendPost` добавляет `stream` в каждый POST).
+    expect(axios.mock.calls[0][0].data).toEqual({ shop_id: SHOP, did: context.did, sid: context.sid, stream: 'android', channel: 'popup', rate: 9 })
   })
 
   test('subscription: subscriptions/manage with the flags, then segments/add by did', async () => {
