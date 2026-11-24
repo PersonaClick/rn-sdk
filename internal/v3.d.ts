@@ -2,6 +2,7 @@
 import type { ComponentType, ForwardRefExoticComponent, RefAttributes } from 'react'
 import type {
   PersonalizationProduct,
+  PersonalizationStoryElement,
   PersonalizationStoriesHandle,
   PersonalizationStoriesOptions,
   PersonalizationStoriesProps,
@@ -85,6 +86,18 @@ export interface PersonalizationStoryPollAnswer {
   option_ids?: number[] | null
   text?: string | null
   rate?: number | null
+  /** Комментарий к вопросу полосы шкалы NPS / CSAT / CES. */
+  comment?: string | null
+}
+
+/**
+ * Источник ответа для отчётов опросов, как у JS SDK: `stories`, id сторис и id слайда строками
+ * (`source_item_id` — только с известным слайдом).
+ */
+export interface PersonalizationStoryPollSource {
+  source_type?: 'stories'
+  source_id?: string
+  source_item_id?: string
 }
 
 /** Результаты мини-опроса с `show_results`. */
@@ -95,29 +108,36 @@ export interface PersonalizationStoryPollResults {
 
 /**
  * Транспорт опросов на слайдах (элемент `poll`, API v3). По умолчанию виджет берёт клиент опросов
- * на хост ленты v3 (`POST /api/v3/polls/…` с `shop_id`, `did`, `sid`); подменить можно для тестов
- * и офлайн-демо. Ошибка (reject) — карточка показывает текст ошибки и даёт повторить.
+ * на хост ленты v3 (`POST /api/v3/polls/…` с `shop_id`, `did`, `sid`, `stream` и `testmode` в тестовом
+ * режиме попапов v3); подменить можно для тестов и офлайн-демо. Ошибка (reject) — карточка показывает
+ * текст ошибки и даёт повторить.
  */
 export interface PersonalizationStoryPollTransport {
-  /** Ответ на мини-опрос: `body` — `{ option_ids } | { text }`, `story_id` (число), `slide_id` (строка). */
+  /** Ответ на мини-опрос: `body` — `{ option_ids } | { text }` и источник ответа. */
   answerMiniPoll(
     code: string,
-    body: { option_ids?: number[]; text?: string; story_id: number | string; slide_id: string },
+    body: { option_ids?: number[]; text?: string } & PersonalizationStoryPollSource,
   ): Promise<{ answer?: PersonalizationStoryPollAnswer | null; results?: PersonalizationStoryPollResults | null }>
-  /** Оценка шкалы: `body` — `{ channel, category }` (NPS) или `{ channel, campaign }` (CSAT, CES) и `rate`. */
+  /**
+   * Оценка шкалы: `body` — `{ channel, category }` (NPS) или `{ channel, campaign }` (CSAT, CES), `rate`
+   * и источник. Комментарий к вопросу полосы — второй запрос с той же оценкой и `comment`.
+   */
   review(
     kind: 'nps' | 'csat' | 'ces',
-    body: { channel: string; category?: string; campaign?: string; rate: number },
+    body: { channel: string; category?: string; campaign?: string; rate: number; comment?: string } & PersonalizationStoryPollSource,
   ): Promise<unknown>
 }
 
-/** Тексты сторис v3 — одни имена на всех платформах (D). У опросов `labels` элемента важнее. */
+/**
+ * Тексты сторис v3 — одни имена на всех платформах (D). У опросов `labels` элемента важнее, без
+ * текстов хоста — встроенные английские, как в JS SDK, при любом языке устройства.
+ */
 export interface PersonalizationStoriesV3Texts {
   /** «Поделиться» для скринридера, по умолчанию «Share». */
   shareLabel?: string
   /** Ссылка «ответить заново» опроса, по умолчанию «Answer again». */
   pollReanswerText?: string
-  /** Кнопка отправки без `submit_label`, по умолчанию «Send». */
+  /** Кнопка отправки без `submit_label` и кнопка комментария шкалы, по умолчанию «Send». */
   pollSubmitText?: string
   /** Ошибка отправки, по умолчанию «Failed to send the answer. Please try again». */
   pollErrorText?: string
@@ -143,8 +163,52 @@ export interface PersonalizationStoryViewerV3Props extends PersonalizationStoryV
    * слайд, пока её трогают, в поле фокус или ответ уходит; поднимается над клавиатурой.
    */
   pollTransport?: PersonalizationStoryPollTransport | null
-  /** Магазин — ключ ответов опросов этой сессии (в памяти процесса). */
+  /**
+   * Магазин и устройство (`did`) — ключ ответов опросов, сохранённых на устройстве на 90 дней (лента не
+   * знает ответов анонимов). Без них ответы не сохраняются и не читаются. Ответ ленты важнее сохранённого.
+   */
   pollShopId?: string
+  pollDeviceId?: string
+  /**
+   * Сторис из ленты API v3 — поведение как у JS SDK: медиа по `type`, `background_color` красит и
+   * слайд без медиа (схема кита — по контрасту с ним), текст-блоки и шапка `header` по правилам v3,
+   * слайд без фото, видео и товара пропускается (вперёд проходится, назад через него переступают;
+   * сторис из одних таких проходится насквозь и считается досмотренной), назад на первом слайде
+   * первой сторис закрывает просмотр, выбор кнопки звука помнится по магазину (`pollShopId`), кнопки
+   * звука нет, только если звука у видео точно нет. По умолчанию `false` — правила кита.
+   */
+  v3?: boolean
+  /**
+   * Где из сторис ушли в этом сеансе: `{ [storyId]: индекс слайда }` (только с `v3`). Сторис
+   * открывается на этом слайде, без записи — на `start_position` ленты. Просмотр объект только читает;
+   * вести его — хосту (виджет пишет слайд из `onSlideView` и 0 после досмотренной).
+   */
+  positions?: Record<string, number> | null
+  /** Слайд начался заново (назад на первом слайде, только правила кита) — тот же слайд показан снова. */
+  onSlideRestart?: (story: PersonalizationStoryV3, slide: PersonalizationStorySlideV3) => void
+  /**
+   * Ушли из сторис вперёд (только с `v3`): `completed` — досмотрена (кончился её последний показанный
+   * слайд или в ней нечего показать), `false` — свайп к следующей. По нему кольцо сторис в ленте
+   * становится просмотренным до конца сеанса.
+   */
+  onStoryLeave?: (story: PersonalizationStoryV3, completed: boolean) => void
+  /**
+   * Нажата шапка слайда — элемент `header` (иконка, заголовок, подзаголовок; только с `v3`). Без
+   * обработчика шапка не нажимается. Виджет шлёт `click` и открывает её ссылку, без ссылки — только
+   * `click`.
+   */
+  onHeaderPress?: (story: PersonalizationStoryV3, slide: PersonalizationStorySlideV3, header: PersonalizationStoryHeaderElement) => void
+}
+
+/** Элемент `header` слайда ленты API v3: иконка, заголовок, подзаголовок и ссылка. */
+export type PersonalizationStoryHeaderElement = PersonalizationStoryElement & {
+  type: 'header'
+  icon?: string | null
+  title?: string | null
+  subtitle?: string | null
+  link?: string | null
+  link_android?: string | null
+  link_ios?: string | null
 }
 
 /** Просмотр сторис кита (`PersonalizationStoryViewer` из `ui`) с пропсами v3. */

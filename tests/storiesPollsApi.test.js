@@ -33,7 +33,7 @@ describe('Stories polls API — requests', () => {
       url: 'https://app.personaClick.ru/api/v3/polls/mini_polls/gift%20recipient/answers',
       headers: { 'Content-Type': 'application/json' },
       withCredentials: false,
-      data: { shop_id: 'shop', did: 'did-1', sid: 'sid-1', option_ids: [2], story_id: 5, slide_id: '101' },
+      data: { shop_id: 'shop', did: 'did-1', sid: 'sid-1', stream: 'react-native', option_ids: [2], story_id: 5, slide_id: '101' },
     })
     expect(config.validateStatus(500)).toBe(true)
   })
@@ -49,7 +49,15 @@ describe('Stories polls API — requests', () => {
       'https://app.personaClick.ru/api/v3/polls/csat/reviews',
       'https://app.personaClick.ru/api/v3/polls/ces/reviews',
     ])
-    expect(axios.mock.calls[0][0].data).toEqual({ shop_id: 'shop', did: 'did-1', sid: 'sid-1', channel: 'stories', category: 'delivery', rate: 9 })
+    expect(axios.mock.calls[0][0].data).toEqual({
+      shop_id: 'shop',
+      did: 'did-1',
+      sid: 'sid-1',
+      stream: 'react-native',
+      channel: 'stories',
+      category: 'delivery',
+      rate: 9,
+    })
     expect(axios.mock.calls[1][0].data).toMatchObject({ campaign: 'support', rate: 4 })
     await expect(api.review('smile', { rate: 1 })).rejects.toMatchObject({ code: -1 })
     expect(axios).toHaveBeenCalledTimes(3)
@@ -59,11 +67,29 @@ describe('Stories polls API — requests', () => {
     axios.mockResolvedValue(reply(200, { status: 'success' }))
     const api = createStoriesPollsApi(sdk({ userSeance: '' }), HOST)
     await expect(api.answerMiniPoll('c', { text: 'Книга', story_id: 5, slide_id: '39_0' })).resolves.toEqual({ answer: null, results: null })
-    expect(axios.mock.calls[0][0].data).toEqual({ shop_id: 'shop', did: 'did-1', sid: '', text: 'Книга', story_id: 5, slide_id: '39_0' })
+    expect(axios.mock.calls[0][0].data).toEqual({ shop_id: 'shop', did: 'did-1', sid: '', stream: 'react-native', text: 'Книга', story_id: 5, slide_id: '39_0' })
     await createStoriesPollsApi(sdk({ userSeance: undefined }), HOST).review('ces', { channel: 'stories', campaign: 'c', rate: 2 })
-    expect(axios.mock.calls[1][0].data).toEqual({ shop_id: 'shop', did: 'did-1', sid: '', channel: 'stories', campaign: 'c', rate: 2 })
-    expect(storiesPollBody({ shopId: 's', did: 'd', sid: '' }, { a: null, b: undefined, c: 0 })).toEqual({ shop_id: 's', did: 'd', sid: '', c: 0 })
-    expect(storiesPollBody({ shopId: 's', did: 'd' }, {})).toEqual({ shop_id: 's', did: 'd', sid: '' })
+    expect(axios.mock.calls[1][0].data).toEqual({ shop_id: 'shop', did: 'did-1', sid: '', stream: 'react-native', channel: 'stories', campaign: 'c', rate: 2 })
+    expect(storiesPollBody({ shop_id: 's', did: 'd', sid: '' }, { a: null, b: undefined, c: 0 })).toEqual({ shop_id: 's', did: 'd', sid: '', c: 0 })
+    expect(storiesPollBody({ shop_id: 's', did: 'd' }, {})).toEqual({ shop_id: 's', did: 'd', sid: '' })
+  })
+
+  test('identity as in the JS SDK: the stream, test mode of popups v3, no segment', async () => {
+    axios.mockResolvedValue(reply(200, { status: 'success', payload: {} }))
+    const instance = sdk({ stream: 'ios', segment: 'B', _popupsV3: { testMode: true } })
+    await createStoriesPollsApi(instance, HOST).review('nps', { channel: 'stories', category: 'x', rate: 1 })
+    await createStoriesPollsApi({ ...instance, _popupsV3: { testMode: false } }, HOST).answerMiniPoll('c', { text: 'a' })
+    expect(axios.mock.calls[0][0].data).toEqual({
+      shop_id: 'shop',
+      did: 'did-1',
+      sid: 'sid-1',
+      stream: 'ios',
+      testmode: true,
+      channel: 'stories',
+      category: 'x',
+      rate: 1,
+    })
+    expect(axios.mock.calls[1][0].data).toEqual({ shop_id: 'shop', did: 'did-1', sid: 'sid-1', stream: 'ios', text: 'a' })
   })
 
   test('waits for init like the v3 feed; no did — an error and nothing is sent', async () => {

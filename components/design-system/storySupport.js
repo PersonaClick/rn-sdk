@@ -9,6 +9,9 @@
  * Номера правил в комментариях (A1…E6) — общие правила сторис V2 для всех четырёх SDK.
  */
 
+import { PERSONALIZATION_COLORS } from '../../constants/colors.constants'
+import { popupColor, popupKitScheme } from '../../lib/popupsV3/values'
+
 /** Длительность слайда по умолчанию, с — если сервер её не прислал или прислал 0 (A7). */
 export const STORY_DEFAULT_DURATION = 10
 
@@ -242,6 +245,41 @@ export function parseOpacity(value) {
   return Math.max(0, Math.min(1, fraction))
 }
 
+/**
+ * Прозрачность фона текст-блока сторис v3 — как `calculateOpacity` JS SDK (R4): число — проценты,
+ * строкой или числом, с `%` и без (`"50"`, `"50%"`, `50` → 0.5, `"0.5"` → 0.005); ложное значение (нет
+ * значения, `""`, число `0`, `false` — у JS `!opacity`), не число или вне 0…100 — цвет как есть, без
+ * прозрачности (1). Прозрачный фон — только строкой: `"0"` или `"0%"`.
+ * @returns {number} 0…1
+ */
+export function storyV3Opacity(value) {
+  const opacity = storyV3OpacityValue(value)
+  return opacity === null ? 1 : opacity
+}
+
+/** Прозрачность сторис v3, если она задана верно (`storyV3Opacity`), иначе `null`. */
+function storyV3OpacityValue(value) {
+  if (!value) return null
+  const n = parseFloat(String(value).trim())
+  if (!Number.isFinite(n) || n < 0 || n > 100) return null
+  return n / 100
+}
+
+/**
+ * Фон текст-блока сторис v3 и его прозрачность. Верная прозрачность (`storyV3Opacity`) заменяет альфу
+ * самого цвета (`#RRGGBBAA`, `rgba()`): цвет берётся непрозрачным, прозрачность — заданная. Без неё у
+ * цвета остаётся своя альфа. Цвет, который не разобрал `storyColor` (имя, `hsl()`), — как есть.
+ *
+ * @returns {{ color: string|undefined, opacity: number }}
+ */
+export function storyV3TextBackground(color, opacityValue) {
+  const text = hasText(color) ? color.trim() : undefined
+  const opacity = storyV3OpacityValue(opacityValue)
+  if (opacity === null) return { color: text, opacity: 1 }
+  const parsed = storyColor(text)
+  return { color: parsed ? `${parsed.slice(0, 7)}ff` : text, opacity }
+}
+
 /** Пресеты кегля текст-блока для хоста: large 48/48, medium 30/36, small 20/24, все Regular. */
 export const STORY_TEXT_PRESETS = {
   large: { fontSize: 48, lineHeight: 48 },
@@ -309,24 +347,45 @@ export function isVisibleColor(color) {
 
 const pick = (element, snake, camel) => (element[snake] !== undefined ? element[snake] : element[camel])
 
+/** Кегль текст-блока сторис v3 без своего — основной текст кита (Base, 16; у JS — кегль страницы). */
+export const STORY_TEXT_V3_FONT_SIZE = 16
+
+/** Признак жирности или курсива: `true`, `1` или `"true"`. */
+const isOn = (value) => value === true || value === 1 || value === 'true'
+
+/** Первое заданное значение из ключей элемента. */
+const firstOf = (element, keys) => {
+  for (const key of keys) if (element[key] !== undefined && element[key] !== null) return element[key]
+  return undefined
+}
+
 /**
  * Элемент `text_block` → пропсы StoryTextBlock плюс положение на слайде (`yOffset`, % высоты) и
  * промокод (C12). Фон — `text_background_color` как есть и его прозрачность отдельно
- * (`backgroundOpacity` из `text_background_color_opacity`): блок кладёт её на подложку, так что
- * годится любой цвет, который понимает React Native, — hex, rgb(), именованный. Кегля нет — 20
- * (small); интерлиньяж — storyTextLineHeight (C15). Пустой текст — `null` (C15: такие блоки
- * пропускаются).
+ * (`backgroundOpacity` из `text_background_color_opacity`: `"NN%"`, число 0–100 или доля 0–1; у сторис
+ * v3 — проценты всегда, как JS, `storyV3Opacity`): блок
+ * кладёт её на подложку, так что годится любой цвет, который понимает React Native, — hex, rgb(),
+ * именованный. Кегля нет — 20 (small), у сторис v3 — основной текст кита (R4); интерлиньяж —
+ * storyTextLineHeight (C15). Жирность — `bold`, курсив — `italic`; у сторис v3 ещё и старые
+ * `text_bold` / `text_italic` (R4). Пустой текст — `null` (C15: такие блоки пропускаются).
+ *
+ * @param {object} element
+ * @param {boolean} [v3] сторис из ленты API v3
  */
-export function storyTextBlockProps(element) {
+export function storyTextBlockProps(element, v3 = false) {
   const el = element || {}
   const text = pick(el, 'text_input', 'textInput')
   if (!hasText(text)) return null
-  const fontSize = toNumber(pick(el, 'font_size', 'fontSize')) || STORY_TEXT_PRESETS.small.fontSize
-  const opacity = parseOpacity(pick(el, 'text_background_color_opacity', 'textBackgroundColorOpacity'))
-  const background = pick(el, 'text_background_color', 'textBackgroundColor')
+  const fontSize = toNumber(pick(el, 'font_size', 'fontSize')) || (v3 ? STORY_TEXT_V3_FONT_SIZE : STORY_TEXT_PRESETS.small.fontSize)
+  const rawOpacity = pick(el, 'text_background_color_opacity', 'textBackgroundColorOpacity')
+  const rawBackground = pick(el, 'text_background_color', 'textBackgroundColor')
+  // У сторис v3 верная прозрачность заменяет альфу цвета (`storyV3TextBackground`).
+  const v3Background = v3 ? storyV3TextBackground(rawBackground, rawOpacity) : null
+  const opacity = v3Background ? v3Background.opacity : parseOpacity(rawOpacity)
+  const background = v3Background ? v3Background.color : rawBackground
   const visible = isVisibleColor(background) && opacity > 0
-  const bold = pick(el, 'bold', 'textBold')
-  const italic = pick(el, 'italic', 'textItalic')
+  const bold = v3 ? firstOf(el, ['bold', 'text_bold', 'textBold']) : pick(el, 'bold', 'textBold')
+  const italic = v3 ? firstOf(el, ['italic', 'text_italic', 'textItalic']) : pick(el, 'italic', 'textItalic')
   const y = pick(el, 'y_offset', 'yOffset')
   const color = pick(el, 'text_color', 'textColor')
   const fontType = pick(el, 'font_type', 'fontType')
@@ -339,8 +398,8 @@ export function storyTextBlockProps(element) {
     backgroundColor: visible ? background.trim() : undefined,
     backgroundOpacity: visible ? opacity : undefined,
     align: storyTextAlign(pick(el, 'text_align', 'textAlignment')),
-    bold: bold === true || bold === 'true',
-    italic: italic === true || italic === 'true',
+    bold: v3 ? isOn(bold) : bold === true || bold === 'true',
+    italic: v3 ? isOn(italic) : italic === true || italic === 'true',
     fontType: hasText(fontType) ? fontType : undefined,
     yOffset: y === undefined || y === null || y === '' ? undefined : Math.max(0, Math.min(100, toNumber(y))),
     promocode: hasText(promocode) ? promocode.trim() : undefined,
@@ -350,16 +409,31 @@ export function storyTextBlockProps(element) {
 const elementsOf = (slide) => (Array.isArray(slide?.elements) ? slide.elements.filter(Boolean) : [])
 
 /**
- * Слайд с фото или видео — тот, у которого непустой `background` (F9; один `type` ничего не
- * решает): медиа вписывается целиком, слайд рисуется тёмными токенами (C1).
+ * Слайд с фото или видео: медиа вписывается целиком, слайд рисуется тёмными токенами (C1). У старой
+ * ленты — тот, у которого непустой `background` (F9; один `type` ничего не решает); у сторис v3 — по
+ * `type` `image` или `video`, как в JS SDK (R6).
+ *
+ * @param {object} slide
+ * @param {boolean} [v3] сторис из ленты API v3
  */
-export function isMediaSlide(slide) {
-  return !!slide && hasText(slide.background)
+export function isMediaSlide(slide, v3 = false) {
+  if (!slide) return false
+  if (v3) return slide.type === 'image' || slide.type === 'video'
+  return hasText(slide.background)
 }
 
-/** Видео-слайд: медиа-слайд (F9) с `type` `video`; иначе медиа — картинка. */
-export function isVideoSlide(slide) {
-  return isMediaSlide(slide) && slide.type === 'video'
+/**
+ * Слайд сторис v3, который пропускается, как в JS SDK (`stories.js`, ветка `default` показа): ни фото,
+ * ни видео по `type` и нет элемента `product` — просмотр сразу идёт дальше, `view` не уходит. У старой
+ * ленты пропусков нет.
+ */
+export function isSkippedSlide(slide, v3 = false) {
+  return !!v3 && !!slide && !isMediaSlide(slide, true) && !slideProductElement(slide)
+}
+
+/** Видео-слайд: медиа-слайд с `type` `video`; иначе медиа — картинка. */
+export function isVideoSlide(slide, v3 = false) {
+  return isMediaSlide(slide, v3) && slide.type === 'video'
 }
 
 /** Элемент `product` слайда (с товаром в `item`), если он есть. */
@@ -371,6 +445,18 @@ export function slideProductElement(slide) {
 export function slideProduct(slide) {
   const element = slideProductElement(slide)
   return element ? element.item || element.product : null
+}
+
+/**
+ * Элемент `header` слайда (иконка, заголовок, подзаголовок, ссылка) — его рисуют сторис v3, как JS SDK
+ * (R1); без заголовка, подзаголовка и иконки — `null`.
+ */
+export function slideHeaderElement(slide) {
+  return (
+    elementsOf(slide).find(
+      (el) => el.type === 'header' && (hasText(el.title) || hasText(el.subtitle) || hasText(el.icon)),
+    ) || null
+  )
 }
 
 /** Кнопки слайда с непустой подписью, по порядку (C8: на товарном слайде — все, стопкой). */
@@ -405,48 +491,153 @@ export function slidePromocode(slide) {
   return undefined
 }
 
-export function slideTextBlocks(slide) {
+export function slideTextBlocks(slide, v3 = false) {
   if (slideProductElement(slide)) return []
   return elementsOf(slide)
     .filter((el) => el.type === 'text_block')
     .map((el) => {
-      const props = storyTextBlockProps(el)
+      const props = storyTextBlockProps(el, v3)
       return props ? { ...props, element: el } : null
     })
     .filter(Boolean)
 }
 
 /**
+ * Область текст-блоков слайда от его верха: верх содержимого (`contentTop`, под безопасной зоной), в
+ * нём верх тела слайда (`bodyTop` — под шапкой и строкой элемента `header`, по замеру) и в теле
+ * свободное место над кнопками (`free`: `{ y, height }` от верха тела). Чего-то ещё не измерили —
+ * `null`, блоки ждут.
+ *
+ * @returns {{ top: number, bottom: number } | null}
+ */
+export function storyTextRegion(contentTop, bodyTop, free) {
+  if (typeof contentTop !== 'number' || typeof bodyTop !== 'number' || !free) return null
+  const top = contentTop + bodyTop + free.y
+  return { top, bottom: top + Math.max(0, free.height) }
+}
+
+/**
  * Скрим сверху и снизу — на каждом слайде (C3): 50 % только у медиа-слайда без товара и без
  * непустых текст-блоков, иначе 30 %.
  */
-export function storySlideScrim(slide) {
-  if (!isMediaSlide(slide) || slideProductElement(slide)) return 0.3
-  return slideTextBlocks(slide).length > 0 ? 0.3 : 0.5
+export function storySlideScrim(slide, v3 = false) {
+  if (!isMediaSlide(slide, v3) || slideProductElement(slide)) return 0.3
+  return slideTextBlocks(slide, v3).length > 0 ? 0.3 : 0.5
 }
 
 /**
  * Фон слайда (C1, C2): у медиа-слайда — поля вокруг вписанного медиа, `background_color` или
  * чёрный; у слайда без фото и видео — `null`, то есть Background/Card темы приложения
- * (`background_color` там не берётся).
+ * (`background_color` там не берётся). У сторис v3 `background_color` красит любой слайд, как в JS
+ * SDK (R2): без медиа — вместо цвета карточки кита, пустой — карточка кита.
  */
-export function storySlideLetterbox(slide) {
-  if (!isMediaSlide(slide)) return null
-  const color = slide.background_color ?? slide.backgroundColor
+export function storySlideLetterbox(slide, v3 = false) {
+  const color = slide ? slide.background_color ?? slide.backgroundColor : null
+  if (v3 && !isMediaSlide(slide, v3)) return hasText(color) ? color.trim() : null
+  if (!isMediaSlide(slide, v3)) return null
   return hasText(color) ? color.trim() : '#000000'
 }
 
 /**
- * Что слайду нужно загрузить, прежде чем пойдут часы (C5): у медиа-слайда (F9) — картинку
- * `background`, у видео — сам ролик (или превью, когда плеера нет). Нечего грузить — `false`.
+ * Цвет из данных сторис — один разбор на весь SDK сторис (фон слайда, заливки карточки опроса):
+ * `#RGB`, `#RRGGBB`, `#RRGGBBAA` (альфа последней) и `rgb()` / `rgba()` (через запятые или пробелы, с
+ * альфой после `/`) → `#rrggbbaa` в нижнем регистре; остальное (имена, `#RGBA`, пусто) — `null`. Сам
+ * разбор — `popupColor` попапов v3.
+ *
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export function storyColor(value) {
+  const text = typeof value === 'string' ? value.trim() : ''
+  if (!/^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(text) && !/^rgba?\(/i.test(text)) return null
+  return popupColor(text)
+}
+
+/** Непрозрачный цвет `#rrggbbff`: `color` (`#rrggbbaa`) со своей альфой поверх непрозрачного `under`. */
+function storyColorOver(color, under) {
+  const channels = (value) => [1, 3, 5].map((index) => parseInt(value.slice(index, index + 2), 16))
+  const alpha = parseInt(color.slice(7, 9), 16) / 255
+  const base = channels(under)
+  const mixed = channels(color).map((channel, index) => Math.round(channel * alpha + base[index] * (1 - alpha)))
+  return `#${mixed.map((channel) => channel.toString(16).padStart(2, '0')).join('')}ff`
+}
+
+/** Основной текст светлой и тёмной схем кита — по нему выбирается схема на цвете (R2). */
+const KIT_TEXT_PRIMARY = Object.freeze({
+  light: PERSONALIZATION_COLORS.light.textPrimary,
+  dark: PERSONALIZATION_COLORS.dark.textPrimary,
+})
+
+/**
+ * Схема кита на цвете (`storyColor`): из светлой и тёмной та, чей основной текст контрастнее с ним по
+ * WCAG (равно — светлая). Полупрозрачный цвет ложится на чёрный — фон просмотра под слайдом. Не цвет —
+ * `null`.
+ *
+ * @param {unknown} color
+ * @param {{ light: string, dark: string }} [textPrimary] основной текст светлой и тёмной схем
+ * @returns {'dark'|'light'|null}
+ */
+export function storyColorScheme(color, textPrimary = KIT_TEXT_PRIMARY) {
+  const parsed = storyColor(color)
+  if (!parsed) return null
+  return popupKitScheme(storyColorOver(parsed, '#000000ff'), textPrimary)
+}
+
+/**
+ * Схема токенов слайда: медиа — тёмная (C1); слайд сторис v3 без медиа со своим `background_color` —
+ * та схема кита, чей текст контрастнее с этим цветом по WCAG (R2, `storyColorScheme`); иначе `null` —
+ * схема приложения.
+ *
+ * @returns {'dark'|'light'|null}
+ */
+export function storySlideScheme(slide, v3 = false) {
+  if (isMediaSlide(slide, v3)) return 'dark'
+  if (!v3) return null
+  return storyColorScheme(storySlideLetterbox(slide, v3))
+}
+
+/**
+ * Есть ли у видео звук — по дорожкам, которые перечислил плеер (`audioTracks` из `onLoad`
+ * react-native-video), для кнопки звука сторис v3 (R9): дорожки есть — `true`; список пуст на Android —
+ * `false` (ExoPlayer перечисляет дорожки файла); пуст на iOS или списка нет — `null`, неизвестно: iOS
+ * строит список из группы выбора аудио (AVMediaSelectionGroup), а у обычного MP4 её нет и со звуком.
+ *
+ * @param {unknown} audioTracks
+ * @param {string} os `Platform.OS`
+ * @returns {boolean|null}
+ */
+export function storyVideoHasAudio(audioTracks, os) {
+  if (!Array.isArray(audioTracks)) return null
+  if (audioTracks.length > 0) return true
+  return os === 'android' ? false : null
+}
+
+/**
+ * Кнопка звука видео-слайда: у старой ленты — всегда; у сторис v3 — когда плеер сказал, что звук есть
+ * или что не знает (`storyVideoHasAudio` → `true` / `null`); пока видео не загрузилось (`undefined`) и
+ * когда звука точно нет (`false`) — нет (и места не занимает).
+ *
+ * @param {boolean|null|undefined} audio
+ * @param {boolean} v3
+ */
+export function storySoundButtonShown(audio, v3) {
+  if (!v3) return true
+  return audio === true || audio === null
+}
+
+/**
+ * Что слайду нужно загрузить, прежде чем пойдут часы (C5): у медиа-слайда — картинку `background`, у
+ * видео — сам ролик (или превью, когда плеера нет). Нечего грузить (в том числе у слайда v3 с `type`
+ * медиа без адреса) — `false`.
  *
  * @param {object} slide
  * @param {boolean} [canPlayVideo] установлен ли плеер
+ * @param {boolean} [v3] сторис из ленты API v3
  */
-export function slideNeedsMedia(slide, canPlayVideo = true) {
-  if (!isMediaSlide(slide)) return false
-  if (isVideoSlide(slide)) return canPlayVideo || hasText(slide.preview)
-  return true
+export function slideNeedsMedia(slide, canPlayVideo = true, v3 = false) {
+  if (!isMediaSlide(slide, v3)) return false
+  if (isVideoSlide(slide, v3)) return (canPlayVideo && hasText(slide.background)) || hasText(slide.preview)
+  return hasText(slide.background)
 }
 
 /** Длительность слайда, с: из админки, иначе (нет или 0) — 10 (A7). У видео — его длина (C4). */
@@ -550,7 +741,8 @@ export function storyLink(element, os) {
 
 /**
  * Куда ведёт кнопка слайда (C11): своя ссылка (сперва платформенная, потом `link`); кнопка без
- * ссылки на товарном слайде открывает товар. Вести некуда — `null`.
+ * ссылки на товарном слайде открывает товар (у сторис v3 — нет, как в JS SDK, R5: товар не передают).
+ * Вести некуда — `null`.
  *
  * @param {object} button элемент `button`
  * @param {object|null} product товар слайда, если слайд товарный
@@ -612,10 +804,9 @@ const SHARE_STORY_ID = /^\d{1,10}$/
 const SHARE_SLIDE_ID = /^\d{1,10}(_\d{1,4})?$/
 
 /**
- * Ссылка «Поделиться» показанного слайда (API v3): у кампании с `shareable: false` — нет; иначе
- * своя ссылка слайда, а без неё — ссылка кампании с id слайда в `r46_slide` (у слайдов товарных
- * кампаний, `39_2`, своих ссылок нет, и без id ссылка открыла бы кампанию с начала, а не с этого
- * слайда). Только http(s), регистр схемы не важен; иначе — `null`, и кнопки на слайде нет.
+ * Ссылка «Поделиться» показанного слайда (API v3), как `slideShareUrl` JS SDK (S3): у кампании с
+ * `shareable: false` — нет; иначе своя ссылка слайда, без неё — ссылка кампании как есть. Только
+ * http(s), регистр схемы не важен; иначе — `null`, и кнопки на слайде нет.
  *
  * @param {object} story
  * @param {object} slide
@@ -623,31 +814,8 @@ const SHARE_SLIDE_ID = /^\d{1,10}(_\d{1,4})?$/
  */
 export function storyShareUrl(story, slide) {
   if (!story || story.shareable === false) return null
-  const own = slide ? slide.share_url : null
-  const campaign = story.share_url
-  let url = null
-  if (typeof own === 'string' && own.length > 0) url = own
-  else if (typeof campaign === 'string' && campaign.length > 0) url = storyShareUrlWithSlide(campaign, slide ? slide.id : null)
+  const url = (slide && slide.share_url) || story.share_url
   return typeof url === 'string' && /^https?:\/\//i.test(url) ? url : null
-}
-
-/**
- * Ссылка кампании с `r46_slide=<id слайда>` в конце строки запроса (до `#`); остальной адрес не
- * перекодируется. Уже есть `r46_slide` или id не годится для ссылки (до 10 цифр, у товарного слайда
- * ещё `_` и до 4 цифр) — как есть.
- *
- * @param {string} url
- * @param {string|number|null|undefined} slideId
- * @returns {string}
- */
-export function storyShareUrlWithSlide(url, slideId) {
-  const id = slideId === null || slideId === undefined ? '' : String(slideId)
-  if (!SHARE_SLIDE_ID.test(id) || queryParams(url).has(STORY_SHARE_PARAMS.slide)) return url
-  const hash = url.indexOf('#')
-  const base = hash < 0 ? url : url.slice(0, hash)
-  const fragment = hash < 0 ? '' : url.slice(hash)
-  const separator = base.indexOf('?') < 0 ? '?' : /[?&]$/.test(base) ? '' : '&'
-  return `${base}${separator}${STORY_SHARE_PARAMS.slide}=${id}${fragment}`
 }
 
 /**

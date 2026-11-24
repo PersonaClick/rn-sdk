@@ -15,7 +15,9 @@
  * «Поделиться» — `Share` ядра React Native, без зависимостей.
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { AppState, Platform, Share } from 'react-native'
+import { getStorageKey } from '../../utils'
 
 // Модули берутся при первом обращении, а не при импорте: плашке цены нужен только буфер обмена,
 // и импорт кита не должен поднимать видеоплеер.
@@ -141,18 +143,64 @@ export function systemBottomInset() {
   return typeof bottom === 'number' && Number.isFinite(bottom) ? bottom : null
 }
 
-// Звук сторис помнится в пределах процесса (C7): первое открытие — без звука, дальше — как
-// оставил пользователь.
+// Звук сторис старой ленты помнится в пределах процесса (C7): первое открытие — без звука, дальше —
+// как оставил пользователь. У сторис v3 — своё состояние, отдельно от старых просмотров (R9), как в
+// JS SDK: выбор кнопки звука магазина помнится на устройстве (`@PersonaClick_<shop>_stories_mute`), без
+// выбора — без звука; у просмотра v3 без магазина — только в этом запуске.
 let soundMuted = true
+const soundByShop = new Map()
 
-/** Звук сторис выключен — выбор пользователя в этом запуске приложения (по умолчанию да). */
-export function storySoundMuted() {
+const soundKey = (shopId) => getStorageKey('stories_mute', shopId)
+
+/** Область звука v3: строка магазина (`''` — без магазина); `undefined` / `null` — старая лента. */
+const v3Scope = (shopId) => (shopId === undefined || shopId === null ? null : String(shopId))
+
+/**
+ * Звук сторис выключен — выбор пользователя (по умолчанию да): с `shopId` (сторис v3; `''` — без
+ * магазина) — выбор v3 этого магазина, без него — выбор старой ленты в этом запуске приложения.
+ */
+export function storySoundMuted(shopId) {
+  const shop = v3Scope(shopId)
+  if (shop !== null) return soundByShop.has(shop) ? soundByShop.get(shop) : true
   return soundMuted
 }
 
-/** Запоминает выбор звука до конца процесса. */
-export function rememberStorySoundMuted(muted) {
-  soundMuted = !!muted
+/**
+ * Запоминает выбор кнопки звука: у сторис v3 (`shopId`) — выбор магазина, на устройстве (без магазина
+ * — до конца процесса); у старой ленты — до конца процесса. Кнопки громкости сюда не ходят.
+ */
+export function rememberStorySoundMuted(muted, shopId) {
+  const shop = v3Scope(shopId)
+  if (shop === null) {
+    soundMuted = !!muted
+    return
+  }
+  soundByShop.set(shop, !!muted)
+  if (!shop) return
+  try {
+    Promise.resolve(AsyncStorage.setItem(soundKey(shop), String(!!muted))).catch(() => {})
+  } catch (error) {
+    // Нет хранилища — выбор живёт до конца процесса.
+  }
+}
+
+/** Читает сохранённый выбор звука магазина (один раз); выбор, сделанный за время чтения, важнее. */
+export async function loadStorySoundMuted(shopId) {
+  if (!shopId) return
+  const shop = String(shopId)
+  if (soundByShop.has(shop)) return
+  try {
+    const value = await AsyncStorage.getItem(soundKey(shop))
+    if (!soundByShop.has(shop) && (value === 'true' || value === 'false')) soundByShop.set(shop, value === 'true')
+  } catch (error) {
+    // Не прочиталось — без звука, как по умолчанию.
+  }
+}
+
+/** Для тестов: забыть выборы звука магазинов. */
+export function resetStorySoundMuted() {
+  soundByShop.clear()
+  soundMuted = true
 }
 
 /** Сколько на Android ждать, что окно выбора заберёт фокус, мс; не забрало — окна не было. */

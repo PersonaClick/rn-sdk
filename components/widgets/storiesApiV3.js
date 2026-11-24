@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { Platform } from 'react-native'
 import { version } from '../../package.json'
+import { DEFAULT_STREAM } from '../../lib/native/bridge'
 
 /**
  * Сторис V2 на API v3 (`/api/v3/storefront/stories`, хост панели, например `app.personaClick.ru`).
@@ -9,8 +10,9 @@ import { version } from '../../package.json'
  * старого API, как раньше. Только в v3 лента отдаёт ссылки «Поделиться»,
  * есть кампания по ссылке (`/story/{id}`) и события `share` / `shared_open`.
  *
- * Запросам нужны `shop_id` и `did` (без `sid`); без `did` сервер отвечает 400, поэтому запрос ждёт
- * init SDK — в той же очереди команд, что и остальные запросы SDK.
+ * Личность запросов — как у JS SDK (`storiesIdentity`): `shop_id`, `did`, `sid`, `segment`, `stream` и
+ * `testmode`. Без `did` сервер отвечает 400, поэтому запрос ждёт init SDK — в той же очереди команд,
+ * что и остальные запросы SDK.
  */
 
 let domain = null
@@ -88,12 +90,54 @@ const preview = (value) => {
 }
 
 /**
- * Тело события v3. `story_id` — как в ленте, числом; `slide_id` — всегда строкой (у товарных
- * кампаний слайды виртуальные, `39_0`).
+ * Личность запроса v3, как у JS SDK: `shop_id`, `did`, `sid` — сеанс SDK (с нативным модулем — сеанс
+ * нативного SDK; нет — `""`), `segment` — A/B-группа устройства (`A` / `B`, как у
+ * `segments.getAbGroup()`; неизвестна — `""`), `stream` — поток магазина (не задан — `react-native`) и
+ * `testmode: true` только в тестовом режиме — флаг попапов v3, тот же, что уходит с `/init`
+ * (`PersonalizationPopups.of(sdk).testMode`). Ответы опросов идут без `segment` (как в JS SDK):
+ * `{ segment: false }`.
+ *
+ * @param {object} sdk
+ * @param {string} did
+ * @param {{ segment?: boolean }} [options]
+ * @returns {{ shop_id: string, did: string, sid: string, segment?: string, stream: string, testmode?: true }}
  */
-export function storiesV3EventBody(shopId, did, event, storyId, slideId) {
+export function storiesIdentity(sdk, did, { segment = true } = {}) {
+  const text = (value) => (typeof value === 'string' ? value : '')
+  const identity = { shop_id: sdk.shop_id, did: text(did), sid: text(sdk.userSeance) }
+  if (segment) identity.segment = storiesAbGroup(sdk)
+  identity.stream = text(sdk.stream) || DEFAULT_STREAM
+  if (storiesTestMode(sdk)) identity.testmode = true
+  return identity
+}
+
+/** A/B-группа устройства: `A` / `B` (с нативным модулем — группа нативного SDK), иначе `""`. */
+export function storiesAbGroup(sdk) {
+  let group = ''
+  try {
+    group = sdk.segments && typeof sdk.segments.getAbGroup === 'function' ? sdk.segments.getAbGroup() : sdk.segment
+  } catch (error) {
+    group = sdk.segment
+  }
+  return group === 'A' || group === 'B' ? group : ''
+}
+
+/** Тестовый режим попапов v3 (`testmode=true` с `/init`) — он же у сторис v3. */
+export function storiesTestMode(sdk) {
+  try {
+    return !!(sdk._popupsV3 && sdk._popupsV3.testMode === true)
+  } catch (error) {
+    return false
+  }
+}
+
+/**
+ * Тело события v3: личность (`storiesIdentity`), `event`, `story_id` — числом, если он числовой (иначе
+ * как есть), `slide_id` — всегда строкой (у товарных кампаний слайды виртуальные, `39_0`).
+ */
+export function storiesV3EventBody(identity, event, storyId, slideId) {
   const story = typeof storyId === 'string' && /^\d+$/.test(storyId) ? Number(storyId) : storyId
-  return { shop_id: shopId, did, event, story_id: story, slide_id: String(slideId) }
+  return { ...identity, event, story_id: story, slide_id: String(slideId) }
 }
 
 /**
@@ -148,11 +192,26 @@ export function getApiV3(url, params) {
   }))
 }
 
-/** Лента блока из v3. */
+/**
+ * Ключ `did`, с которым ответ v3 загружен: ленте после загрузки он нужен ещё раз (сохранённые ответы
+ * опросов), и второй раз в очередь SDK за ним не ходят. Символ — копируется вместе с ответом
+ * (`{ ...response }`), но не мешает его полям.
+ */
+export const STORIES_V3_DEVICE_ID = Symbol('storiesV3DeviceId')
+
+/** `did` ответа v3 (`STORIES_V3_DEVICE_ID`) или `null`, если ответ пришёл не из fetch-функций v3. */
+export function storiesV3ResponseDeviceId(response) {
+  const did = response ? response[STORIES_V3_DEVICE_ID] : undefined
+  return typeof did === 'string' ? did : null
+}
+
+const withDeviceId = (response, did) => ({ ...response, [STORIES_V3_DEVICE_ID]: typeof did === 'string' ? did : '' })
+
+/** Лента блока из v3; в ответе — `did`, с которым её загрузили (`storiesV3ResponseDeviceId`). */
 export async function fetchStoriesFeedV3(sdk, code, host = domain) {
   const did = await storiesDeviceId(sdk)
-  const data = await send({ method: 'GET', url: storiesV3FeedUrl(host, code), params: { shop_id: sdk.shop_id, did } })
-  return unwrapStoriesV3(data)
+  const data = await send({ method: 'GET', url: storiesV3FeedUrl(host, code), params: storiesIdentity(sdk, did) })
+  return withDeviceId(unwrapStoriesV3(data), did)
 }
 
 /**
@@ -161,14 +220,14 @@ export async function fetchStoriesFeedV3(sdk, code, host = domain) {
  */
 export async function fetchSharedStoryV3(sdk, link, host = domain) {
   const did = await storiesDeviceId(sdk)
-  const params = { shop_id: sdk.shop_id, did }
+  const params = storiesIdentity(sdk, did)
   if (link.slideId) params.slide_id = link.slideId
   const data = await send({ method: 'GET', url: storiesV3StoryUrl(host, link.code, link.storyId), params })
-  return unwrapStoriesV3(data)
+  return withDeviceId(unwrapStoriesV3(data), did)
 }
 
 /** Событие сторис в v3: `view`, `click`, `share` или `shared_open`. */
 export async function trackStoriesV3(sdk, code, event, storyId, slideId, host = domain) {
   const did = await storiesDeviceId(sdk)
-  await postStoriesV3(storiesV3EventsUrl(host, code), storiesV3EventBody(sdk.shop_id, did, event, storyId, slideId))
+  await postStoriesV3(storiesV3EventsUrl(host, code), storiesV3EventBody(storiesIdentity(sdk, did), event, storyId, slideId))
 }

@@ -1,32 +1,48 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
+  STORY_POLL_ANSWER_TTL_MS,
+  STORY_POLL_COMMENT_LIMIT,
   STORY_POLL_DEFAULT_TEXTS,
-  STORY_POLL_RESULT_TEXTS,
   createStoryPollController,
   hasStoryPollAnswer,
+  loadStoryPollAnswers,
   parseStoryPoll,
+  parseStoryPollAnswer,
   resetStoryPollAnswers,
-  saveStoryPollAnswer,
   slidePolls,
   storyPollAnswerBody,
+  storyPollBandQuestion,
   storyPollBandText,
   storyPollCutText,
-  storyPollLanguage,
+  storyPollFittedTop,
+  storyPollLowerEdge,
   storyPollOptionLetter,
-  storyPollResultTexts,
   storyPollReviewBody,
   storyPollSavedAnswer,
-  storyPollScaleColor,
-  storyPollScaleFill,
   storyPollScaleRange,
+  storyPollScaleTone,
+  storyPollSource,
+  storyPollStorageKey,
+  storyPollStorageKeys,
   storyPollTextOn,
   storyPollTexts,
   storyPollTop,
-  storyPollVotes,
+  writeStoryPollAnswer,
 } from '../components/design-system/storyPollSupport'
 import { STORY_PAUSE, STORY_VIEWER_CLOSED, isStoryClockRunning, storyViewerReducer } from '../components/design-system/storyViewerState'
+import { STORY_POLL_STYLE } from '../components/design-system/StoryPoll'
+
 
 // Опросы на слайдах сторис V2 (API v3): кейсы `create-poll.test.ts` JS SDK на контроллере карточки,
-// разбор общей фикстуры, шкала, тексты, ответы сессии и пауза POLL просмотра.
+// разбор общей фикстуры, шкала и вопрос полосы, тексты, сохранённые ответы и пауза POLL просмотра.
+
+/** Источник ответа слайда 101 сторис 5 (P3). */
+const SOURCE = { source_type: 'stories', source_id: '5', source_item_id: '101' }
+/** Английские тексты по умолчанию — язык карточек в тестах. */
+const EN = STORY_POLL_DEFAULT_TEXTS
+/** Магазин и устройство сохранённых ответов. */
+const STORAGE = { shopId: 'shop', did: 'device-1' }
+const KEY = '@PersonaClick_shop_stories_poll_device-1_mini_poll_gift_recipient_5_101'
 
 const feed = require('./fixtures/stories-polls-feed.json')
 
@@ -82,6 +98,9 @@ const scalePoll = (type, overrides = {}, poll = {}) =>
     ...overrides,
   })
 
+/** Элемент ленты мини-опроса как есть (карточка пишет в него ответ). */
+const feedElement = (kind, overrides = {}) => ({ ...miniPoll(kind, overrides).element })
+
 /** Транспорт, каждым запросом которого тест управляет сам. */
 const transport = () => {
   const calls = []
@@ -109,7 +128,7 @@ const mount = (poll, extra = {}) => {
     storyId: 5,
     slideId: 101,
     transport: t.api,
-    shopId: 'shop',
+    storage: STORAGE,
     onHold: (on) => events.push(on ? 'pause' : 'resume'),
     ...extra,
   })
@@ -118,8 +137,9 @@ const mount = (poll, extra = {}) => {
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-beforeEach(() => {
+beforeEach(async () => {
   resetStoryPollAnswers()
+  await AsyncStorage.clearAll()
   jest.spyOn(console, 'log').mockImplementation(() => {})
 })
 afterEach(() => jest.restoreAllMocks())
@@ -156,18 +176,20 @@ describe('Stories polls — parsing', () => {
     expect(ces).toMatchObject({ type: 'ces', rateMin: 1, rateMax: 7, bands: null, yOffset: 5 })
     expect(storyPollScaleRange('ces', ces)).toEqual([1, 2, 3, 4, 5, 6, 7])
     expect(storyPollScaleRange('csat', csat)).toEqual([1, 2, 3, 4, 5])
-    expect(answered.answer).toEqual({ id: 77, option_ids: [2], text: null, rate: null })
+    expect(answered.answer).toEqual({ id: 77, option_ids: [2], text: null, rate: null, comment: null })
     expect(answered.results).toEqual({ total: 120, options: [{ id: 1, percent: 40 }, { id: 2, percent: 60 }] })
     expect(hasStoryPollAnswer(answered.answer)).toBe(true)
     expect(hasStoryPollAnswer(single.answer)).toBe(false)
   })
 
-  test('answered: non-empty option_ids, non-empty text or a numeric rate', () => {
+  test('answered as hasAnswer of JS: non-empty option_ids, non-empty text or a rate that is a number', () => {
     const answered = (answer) => hasStoryPollAnswer(parseStoryPoll({ type: 'poll', poll_type: 'nps', poll: {}, answer }).answer)
-    expect([{ option_ids: [1] }, { text: ' ' }, { rate: 0 }, { rate: '9' }, { rate: 7.5 }].map(answered)).toEqual([true, true, true, true, true])
-    expect([null, {}, { option_ids: [] }, { option_ids: ['x'] }, { text: '' }, { rate: null }, { rate: 'abc' }].map(answered)).toEqual(
-      Array(7).fill(false),
-    )
+    expect([{ option_ids: [1] }, { option_ids: ['x'] }, { text: ' ' }, { rate: 0 }, { rate: 7.5 }].map(answered)).toEqual(Array(5).fill(true))
+    expect(
+      [null, {}, { option_ids: [] }, { text: '' }, { text: 5 }, { rate: null }, { rate: '9' }, { rate: 'abc' }].map(answered),
+    ).toEqual(Array(8).fill(false))
+    // Целые строкой — числа: выделяется свой вариант.
+    expect(parseStoryPollAnswer({ option_ids: ['2', 'x'] }).option_ids).toEqual([2, 'x'])
   })
 
   test('numbers as strings and nulls everywhere optional; product slides keep their poll', () => {
@@ -221,7 +243,7 @@ describe('Stories polls — parsing', () => {
         results: null,
         labels: {},
       })
-      expect(mount(poll).state()).toMatchObject({ mode: 'form', counter: null, thanks: null, submitLabel: 'Send', texts: STORY_POLL_DEFAULT_TEXTS })
+      expect(mount(poll).state()).toMatchObject({ mode: 'form', counter: null, thanks: null, submitLabel: 'Send', texts: EN })
     })
     const ranges = { nps: [0, 10], csat: [1, 5], ces: [1, 7] }
     Object.keys(ranges).forEach((type) => {
@@ -248,7 +270,7 @@ describe('Stories polls — parsing', () => {
     c.choose(1)
     pending[1].resolve({})
     await tick()
-    expect(storyPollSavedAnswer('shop', poll)).toMatchObject({ answer: { option_ids: [1] } })
+    expect(storyPollSavedAnswer(c.storageKey)).toMatchObject({ answer: { option_ids: [1] } })
   })
 
   test('flags: only true, 1 or "true" are true', () => {
@@ -308,7 +330,7 @@ describe('Stories polls — single choice', () => {
     expect(state()).toMatchObject({ mode: 'form', selected: [], sending: false })
     c.choose(2)
     expect(calls).toEqual([
-      { method: 'answerMiniPoll', args: ['gift_recipient', { option_ids: [2], story_id: 5, slide_id: '101' }] },
+      { method: 'answerMiniPoll', args: ['gift_recipient', { option_ids: [2], ...SOURCE }] },
     ])
     expect(state()).toMatchObject({ sending: true, selected: [2] })
 
@@ -319,7 +341,6 @@ describe('Stories polls — single choice', () => {
     await tick()
     expect(state()).toMatchObject({ mode: 'answered', sending: false, selected: [2], thanks: 'Спасибо!', canReanswer: false })
     expect(state().percents).toEqual({ 1: 40, 2: 60, 3: 0 })
-    expect(state().total).toBe(121)
   })
 
   test('does not send twice while the request is pending', () => {
@@ -354,8 +375,8 @@ describe('Stories polls — single choice', () => {
     await tick()
     expect(state()).toMatchObject({ mode: 'answered', selected: [3] })
 
-    // Другой магазин: ответ первого уже в ответах сессии.
-    const nullAnswer = mount(miniPoll('single_choice'), { shopId: 'other' })
+    // Другой магазин: ответ первого уже сохранён.
+    const nullAnswer = mount(miniPoll('single_choice'), { storage: { shopId: 'other', did: 'device-1' } })
     nullAnswer.c.choose(1)
     nullAnswer.pending[0].resolve({ answer: null, results: null })
     await tick()
@@ -368,7 +389,7 @@ describe('Stories polls — single choice', () => {
     pending[0].resolve({ answer: { id: 77, option_ids: [2], text: null }, results: null })
     await tick()
     expect(state()).toMatchObject({ mode: 'answered', selected: [2] })
-    expect(storyPollSavedAnswer('shop', miniPoll('single_choice')).answer).toMatchObject({ id: 77, option_ids: [2] })
+    expect(storyPollSavedAnswer(KEY).answer).toEqual({ id: 77, option_ids: [2], text: null })
   })
 
   test('percents are rounded and clamped to 0..100; an option without a result has 0%', async () => {
@@ -399,7 +420,7 @@ describe('Stories polls — multiple choice', () => {
     c.toggle(3)
     c.toggle(3)
     c.submit()
-    expect(calls[0].args).toEqual(['gift_recipient', { option_ids: [1, 3], story_id: 5, slide_id: '101' }])
+    expect(calls[0].args).toEqual(['gift_recipient', { option_ids: [1, 3], ...SOURCE }])
     pending[0].resolve({ answer: { option_ids: [1, 3] }, results: { total: 2, options: [{ id: 1, percent: 50 }, { id: 3, percent: 50 }] } })
     await tick()
     expect(state()).toMatchObject({ mode: 'answered', selected: [1, 3] })
@@ -421,7 +442,7 @@ describe('Stories polls — multiple choice', () => {
   test('the submit button: submit_label, else the submit text (defaults < host < labels)', () => {
     expect(mount(miniPoll('multiple_choice')).state().submitLabel).toBe('Отправить')
     expect(miniPoll('multiple_choice', {}, { submit_label: null }).submitLabel).toBeNull()
-    expect(mount(miniPoll('multiple_choice', {}, { submit_label: null })).state().submitLabel).toBe(STORY_POLL_DEFAULT_TEXTS.submit)
+    expect(mount(miniPoll('multiple_choice', {}, { submit_label: null })).state().submitLabel).toBe(EN.submit)
     expect(mount(miniPoll('text', {}, { submit_label: '' }), { texts: { submit: 'Готово' } }).state().submitLabel).toBe('Готово')
     const labelled = miniPoll('multiple_choice', { labels: { submit: 'Ответить' } }, { submit_label: null })
     expect(mount(labelled, { texts: { submit: 'Готово' } }).state().submitLabel).toBe('Ответить')
@@ -429,20 +450,20 @@ describe('Stories polls — multiple choice', () => {
   })
 
   test('the default submit label and texts: defaults < host < labels', () => {
-    expect(mount(miniPoll('multiple_choice', {}, { submit_label: null })).state().texts.submit).toBe(STORY_POLL_DEFAULT_TEXTS.submit)
+    expect(mount(miniPoll('multiple_choice', {}, { submit_label: null })).state().texts.submit).toBe(EN.submit)
     expect(storyPollTexts(null, null)).toEqual({ reanswer: 'Answer again', error: 'Failed to send the answer. Please try again', submit: 'Send' })
     expect(storyPollTexts({ reanswer: 'Ещё раз', error: '' }, { reanswer: 'Снова' })).toEqual({
       reanswer: 'Снова',
-      error: STORY_POLL_DEFAULT_TEXTS.error,
+      error: EN.error,
       submit: 'Send',
     })
     expect(storyPollTexts({ submit: 'Отправить' }, { submit: '' }).submit).toBe('Отправить')
     expect(storyPollTexts({ submit: 'Отправить' }, 'labels').submit).toBe('Отправить')
     // Пустой текст хоста умолчание не перекрывает, строка из пробелов — перекрывает.
     expect(storyPollTexts({ reanswer: '', error: ' ', submit: null }, null)).toEqual({
-      reanswer: STORY_POLL_DEFAULT_TEXTS.reanswer,
+      reanswer: EN.reanswer,
       error: ' ',
-      submit: STORY_POLL_DEFAULT_TEXTS.submit,
+      submit: EN.submit,
     })
     expect(mount(miniPoll('text', {}, { submit_label: null }), { texts: { submit: '' } }).state().submitLabel).toBe('Send')
     expect(miniPoll('single_choice', { labels: 'labels' }).labels).toEqual({})
@@ -458,7 +479,7 @@ describe('Stories polls — text', () => {
     c.setText(' Мастер и Маргарита ')
     expect(state()).toMatchObject({ text: ' Мастер и ', counter: '10/10', canSubmit: true })
     c.submit()
-    expect(calls[0].args).toEqual(['gift_recipient', { text: 'Мастер и', story_id: 5, slide_id: '101' }])
+    expect(calls[0].args).toEqual(['gift_recipient', { text: 'Мастер и', ...SOURCE }])
     c.setText('другое')
     expect(state().text).toBe(' Мастер и ')
     pending[0].resolve({ answer: { id: 1, option_ids: null, text: 'Мастер и' }, results: null })
@@ -489,7 +510,7 @@ describe('Stories polls — scales', () => {
     expect(storyPollScaleRange('nps', poll)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     const { c, state, calls, pending } = mount(poll)
     c.rate(9)
-    expect(calls[0]).toEqual({ method: 'review', args: ['nps', { channel: 'stories', category: 'delivery', rate: 9 }] })
+    expect(calls[0]).toEqual({ method: 'review', args: ['nps', { channel: 'stories', category: 'delivery', rate: 9, ...SOURCE }] })
     expect(state()).toMatchObject({ rate: 9, sending: true })
     pending[0].resolve({ answer: null, results: null })
     await tick()
@@ -499,14 +520,14 @@ describe('Stories polls — scales', () => {
   test('CSAT 1..5 and CES 1..7 go with campaign; no channel — "stories"', async () => {
     const csat = mount(scalePoll('csat', {}, { bands: [{ from: 1, to: 3, success: 'Жаль' }, { from: 4, to: 5, success: 'Ура' }] }))
     csat.c.rate(1)
-    expect(csat.calls[0].args).toEqual(['csat', { channel: 'stories', campaign: 'delivery', rate: 1 }])
+    expect(csat.calls[0].args).toEqual(['csat', { channel: 'stories', campaign: 'delivery', rate: 1, ...SOURCE }])
     csat.pending[0].resolve({})
     await tick()
     expect(csat.state().thanks).toBe('Жаль')
 
     const ces = mount(scalePoll('ces', {}, { channel: null }))
     ces.c.rate(7)
-    expect(ces.calls[0].args).toEqual(['ces', { channel: 'stories', campaign: 'delivery', rate: 7 }])
+    expect(ces.calls[0].args).toEqual(['ces', { channel: 'stories', campaign: 'delivery', rate: 7, ...SOURCE }])
     expect(storyPollReviewBody({ type: 'nps', code: 'test', channel: 'test' }, 0)).toEqual({ channel: 'test', category: 'test', rate: 0 })
   })
 
@@ -531,18 +552,21 @@ describe('Stories polls — scales', () => {
     expect(storyPollBandText(bands, null)).toBeNull()
   })
 
-  test('colors: NPS detractors, passives and promoters; other scales by thirds', () => {
-    const nps = [0, 3, 6, 7, 8, 9, 10].map((value) => storyPollScaleColor('nps', value, 0, 10))
-    expect(nps).toEqual(['#FCA5A5', '#FDBA74', '#FCD34D', '#FDE68A', '#FDE68A', '#86EFAC', '#86EFAC'])
-    expect([1, 2, 3, 4, 5].map((value) => storyPollScaleColor('csat', value, 1, 5))).toEqual([
-      '#FCA5A5',
-      '#FCA5A5',
-      '#FDE68A',
-      '#86EFAC',
-      '#86EFAC',
+  test('tones: NPS detractors, passives and promoters; other scales by thirds (the colours of the JS SDK as kit semantics)', () => {
+    const nps = [0, 3, 6, 7, 8, 9, 10].map((value) => storyPollScaleTone('nps', value, 0, 10))
+    expect(nps).toEqual(['danger', 'danger', 'danger', 'warning', 'warning', 'success', 'success'])
+    expect([1, 2, 3, 4, 5].map((value) => storyPollScaleTone('csat', value, 1, 5))).toEqual(['danger', 'danger', 'warning', 'success', 'success'])
+    expect([1, 2, 3, 4, 5, 6, 7].map((value) => storyPollScaleTone('ces', value, 1, 7))).toEqual([
+      'danger',
+      'danger',
+      'danger',
+      'warning',
+      'warning',
+      'success',
+      'success',
     ])
-    expect(storyPollScaleColor('nps', 3, 1, 5)).toBe('#FDE68A')
-    expect(storyPollScaleColor('ces', 4, 4, 4)).toBe('#86EFAC')
+    expect(storyPollScaleTone('nps', 3, 1, 5)).toBe('warning')
+    expect(storyPollScaleTone('ces', 4, 4, 4)).toBe('success')
   })
 
   test('the answered state of a scale from the feed takes no taps', async () => {
@@ -596,7 +620,7 @@ describe('Stories polls — answer from the feed and re-answer', () => {
     expect(state()).toMatchObject({ selected: [1, 3], canSubmit: true })
     c.toggle(1)
     c.submit()
-    expect(calls[0].args).toEqual(['gift_recipient', { option_ids: [3], story_id: 5, slide_id: '101' }])
+    expect(calls[0].args).toEqual(['gift_recipient', { option_ids: [3], ...SOURCE }])
   })
 
   test('a scale highlights the previous rate on re-answer and restores it after an error', async () => {
@@ -620,7 +644,7 @@ describe('Stories polls — answer from the feed and re-answer', () => {
   test('labels of the element win over the host texts', () => {
     const poll = miniPoll('single_choice', { ...answered, allow_reanswer: true, labels: { reanswer: 'Ещё раз' } })
     expect(mount(poll, { texts: { reanswer: 'Answer again!' } }).state().texts.reanswer).toBe('Ещё раз')
-    expect(mount(miniPoll('single_choice', answered)).state().texts.reanswer).toBe(STORY_POLL_DEFAULT_TEXTS.reanswer)
+    expect(mount(miniPoll('single_choice', answered)).state().texts.reanswer).toBe(EN.reanswer)
   })
 })
 
@@ -674,7 +698,7 @@ describe('Stories polls — slide timer', () => {
     expect(events).toEqual(['pause', 'resume'])
   })
 
-  test('an answer after the card is gone only goes to the session answers', async () => {
+  test('an answer after the card is gone is still saved and written to the feed element', async () => {
     const changes = []
     const first = mount(miniPoll('single_choice'), { onChange: (state) => changes.push(state.mode) })
     first.c.choose(2)
@@ -684,8 +708,8 @@ describe('Stories polls — slide timer', () => {
     await tick()
     expect(changes).toHaveLength(count)
     expect(first.events).toEqual(['pause'])
-    expect(storyPollSavedAnswer('shop', miniPoll('single_choice'))).toEqual({
-      answer: { option_ids: [2], text: null, rate: null },
+    expect(storyPollSavedAnswer(KEY)).toEqual({
+      answer: { option_ids: [2] },
       results: { total: 1, options: [{ id: 2, percent: 100 }] },
     })
     // Вернулись на слайд: карточка уже отвеченная.
@@ -716,121 +740,378 @@ describe('Stories polls — slide timer', () => {
     pending[0].reject(new Error('fail'))
     await tick()
     expect(events).toEqual(['pause'])
-    expect(storyPollSavedAnswer('shop', miniPoll('single_choice'))).toBeNull()
+    expect(storyPollSavedAnswer(KEY)).toBeNull()
   })
 })
 
-describe('Stories polls — session answers', () => {
-  test('the session answer wins over the feed; shops and kinds do not mix', async () => {
-    const feedAnswer = { answer: { option_ids: [2] }, results: null }
-    saveStoryPollAnswer('shop', miniPoll('single_choice'), { answer: { option_ids: [1] }, results: null })
-    expect(mount(miniPoll('single_choice', feedAnswer)).state().selected).toEqual([1])
-    expect(mount(miniPoll('single_choice', feedAnswer), { shopId: 'other' }).state().selected).toEqual([2])
-    expect(storyPollSavedAnswer('shop', scalePoll('nps', {}, { code: 'gift_recipient' }))).toBeNull()
+describe('Stories polls — saved answers (P1)', () => {
+  const answeredRecord = (extra = {}) =>
+    JSON.stringify({ answer: { option_ids: [3] }, results: { total: 1, options: [{ id: 3, percent: 100 }] }, saved_at: Date.now(), ...extra })
 
+  test('the key: the shop as the other stores of the SDK, the device, the poll type and code, the story and the slide', () => {
+    const poll = miniPoll('single_choice')
+    expect(storyPollStorageKey(STORAGE, poll, 5, 101)).toBe(KEY)
+    expect(storyPollStorageKey(STORAGE, scalePoll('csat'), '39', '39_0')).toBe('@PersonaClick_shop_stories_poll_device-1_csat_delivery_39_39_0')
+    // Без устройства или магазина — ничего не читается и не пишется.
+    expect(storyPollStorageKey({ shopId: 'shop', did: '' }, poll, 5, 101)).toBeNull()
+    expect(storyPollStorageKey({ shopId: '', did: 'device-1' }, poll, 5, 101)).toBeNull()
+    expect(storyPollStorageKey(null, poll, 5, 101)).toBeNull()
+  })
+
+  test('writes the answer back to the feed element and to the device', async () => {
+    const element = feedElement('single_choice')
+    const first = mount(parseStoryPoll(element))
+    first.c.choose(2)
+    const results = { total: 3, options: [{ id: 2, percent: 100 }] }
+    first.pending[0].resolve({ answer: { id: 7, option_ids: [2] }, results })
+    await tick()
+    expect(element.answer).toEqual({ id: 7, option_ids: [2] })
+    expect(element.results).toEqual(results)
+    const saved = JSON.parse(await AsyncStorage.getItem(KEY))
+    expect({ answer: saved.answer, results: saved.results }).toEqual({ answer: { id: 7, option_ids: [2] }, results })
+    expect(typeof saved.saved_at).toBe('number')
+    // Слайд показан снова: тот же элемент ленты — карточка отвеченная, с процентами.
+    resetStoryPollAnswers()
+    const again = mount(parseStoryPoll(element))
+    expect(again.state()).toMatchObject({ mode: 'answered', selected: [2], percents: { 1: 0, 2: 100, 3: 0 } })
+  })
+
+  test('the saved answer is read with the feed and wins over nothing; another slide, device or no did — not restored', async () => {
+    await AsyncStorage.setItem(KEY, answeredRecord())
+    await loadStoryPollAnswers([KEY])
+    expect(mount(miniPoll('single_choice')).state()).toMatchObject({ mode: 'answered', selected: [3], percents: { 1: 0, 2: 0, 3: 100 } })
+    expect(mount(miniPoll('single_choice'), { slideId: 102 }).state().mode).toBe('form')
+    expect(mount(miniPoll('single_choice'), { storage: { shopId: 'shop', did: 'device-2' } }).state().mode).toBe('form')
+    expect(mount(miniPoll('single_choice'), { storage: { shopId: 'shop', did: null } }).state().mode).toBe('form')
+    expect(mount(miniPoll('single_choice'), { storage: null }).state().mode).toBe('form')
+  })
+
+  test('the answer of the feed wins over the saved one', async () => {
+    await AsyncStorage.setItem(KEY, answeredRecord())
+    await loadStoryPollAnswers([KEY])
+    const fed = mount(miniPoll('single_choice', { answer: { option_ids: [1] }, results: null }))
+    expect(fed.state()).toMatchObject({ mode: 'answered', selected: [1], percents: null })
+  })
+
+  test('precedence: a fresh feed answer > an answer sent earlier in this process > the saved record', async () => {
+    await AsyncStorage.setItem(KEY, answeredRecord())
+    await loadStoryPollAnswers([KEY])
+    // Отправили ответ в этом процессе — он важнее записи, прочитанной с устройства.
+    const sent = mount(miniPoll('single_choice', { allow_reanswer: true }))
+    expect(sent.state()).toMatchObject({ mode: 'answered', selected: [3] })
+    sent.c.reanswer()
+    sent.c.choose(1)
+    sent.pending[0].resolve({ answer: { option_ids: [1] }, results: null })
+    await tick()
+    // Лента загружена заново (новые элементы), ответа в ней нет — отправленный, а не запись.
+    expect(mount(miniPoll('single_choice')).state()).toMatchObject({ mode: 'answered', selected: [1] })
+    // Отправленный раньше уже на устройстве и в кэше: следующее чтение с диска его не перетирает.
+    await loadStoryPollAnswers([KEY])
+    expect(mount(miniPoll('single_choice')).state().selected).toEqual([1])
+    // Свежая лента с ответом важнее отправленного.
+    expect(mount(miniPoll('single_choice', { answer: { option_ids: [2] } })).state()).toMatchObject({ mode: 'answered', selected: [2] })
+  })
+
+  test('a card shown before the read shows the saved answer once it is read, unless it was touched', async () => {
+    await AsyncStorage.setItem(KEY, answeredRecord())
+    const late = mount(miniPoll('single_choice'))
+    expect(late.state().mode).toBe('form')
+    await tick()
+    expect(late.state()).toMatchObject({ mode: 'answered', selected: [3] })
+
+    resetStoryPollAnswers()
+    const touched = mount(miniPoll('multiple_choice', {}, { code: 'gift_recipient' }))
+    touched.c.toggle(1)
+    await tick()
+    expect(touched.state()).toMatchObject({ mode: 'form', selected: [1] })
+  })
+
+  test('broken, expired and undated records are not shown and are removed', async () => {
+    await AsyncStorage.setItem(KEY, '{broken')
+    await loadStoryPollAnswers([KEY])
+    expect(mount(miniPoll('single_choice')).state().mode).toBe('form')
+    await tick()
+    expect(await AsyncStorage.getItem(KEY)).toBeNull()
+
+    resetStoryPollAnswers()
+    await AsyncStorage.setItem(KEY, JSON.stringify({ answer: null, saved_at: Date.now() }))
+    await loadStoryPollAnswers([KEY])
+    expect(mount(miniPoll('single_choice')).state().mode).toBe('form')
+    await tick()
+    expect(await AsyncStorage.getItem(KEY)).toBeNull()
+
+    resetStoryPollAnswers()
+    await AsyncStorage.setItem(KEY, answeredRecord({ saved_at: Date.now() - STORY_POLL_ANSWER_TTL_MS - 1000 }))
+    await loadStoryPollAnswers([KEY])
+    expect(mount(miniPoll('single_choice')).state().mode).toBe('form')
+    await tick()
+    expect(await AsyncStorage.getItem(KEY)).toBeNull()
+
+    resetStoryPollAnswers()
+    await AsyncStorage.setItem(KEY, JSON.stringify({ answer: { option_ids: [3] }, results: null }))
+    await loadStoryPollAnswers([KEY])
+    expect(storyPollSavedAnswer(KEY)).toBeNull()
+    await tick()
+    expect(await AsyncStorage.getItem(KEY)).toBeNull()
+  })
+
+  test('a record that expires while the app runs is dropped on the next read', () => {
+    const now = jest.spyOn(Date, 'now')
+    now.mockReturnValue(1000)
+    writeStoryPollAnswer(KEY, { answer: { option_ids: [2] }, results: null })
+    expect(storyPollSavedAnswer(KEY)).toEqual({ answer: { option_ids: [2] }, results: null })
+    now.mockReturnValue(1000 + STORY_POLL_ANSWER_TTL_MS + 1)
+    expect(storyPollSavedAnswer(KEY)).toBeNull()
+  })
+
+  test('scales are keyed by the poll type; the saved rate is { rate }', async () => {
     const { c, pending } = mount(scalePoll('csat'))
-    c.rate(4)
+    c.rate(5)
     pending[0].resolve({})
     await tick()
-    expect(storyPollSavedAnswer('shop', scalePoll('csat'))).toEqual({ answer: { option_ids: null, text: null, rate: 4 }, results: null })
-    resetStoryPollAnswers()
-    expect(storyPollSavedAnswer('shop', scalePoll('csat'))).toBeNull()
+    const saved = JSON.parse(await AsyncStorage.getItem('@PersonaClick_shop_stories_poll_device-1_csat_delivery_5_101'))
+    expect(saved.answer).toEqual({ rate: 5 })
   })
 
-  test('a card from a session record is always answered, even if the answer selects nothing', () => {
-    saveStoryPollAnswer('shop', miniPoll('single_choice'), { answer: { id: 77, option_ids: null, text: null, rate: null }, results: null })
-    expect(mount(miniPoll('single_choice')).state()).toMatchObject({ mode: 'answered', selected: [], thanks: 'Спасибо!' })
-    saveStoryPollAnswer('shop', miniPoll('text'), { answer: null, results: null })
-    expect(mount(miniPoll('text')).state()).toMatchObject({ mode: 'answered', answerText: null })
-    // Без записи — по ответу ленты.
-    expect(mount(miniPoll('multiple_choice', { answer: { id: 1 } }, { code: 'other' })).state().mode).toBe('form')
+  test('without a did nothing is written', async () => {
+    const { c, pending } = mount(miniPoll('single_choice'), { storage: { shopId: 'shop', did: '' } })
+    c.choose(1)
+    pending[0].resolve({ answer: { option_ids: [1] } })
+    await tick()
+    expect(c.storageKey).toBeNull()
+    expect(await AsyncStorage.getAllKeys()).toEqual([])
   })
 
-  test('a send answered with an empty answer stays answered when the card comes back', async () => {
-    const first = mount(miniPoll('single_choice', { allow_reanswer: true }))
+  test('an empty answer of the server: answered now, the form when the slide comes back (as JS)', async () => {
+    const element = feedElement('single_choice', { allow_reanswer: true })
+    const first = mount(parseStoryPoll(element))
     first.c.choose(2)
     first.pending[0].resolve({ answer: { id: 77 }, results: null })
     await tick()
     expect(first.state()).toMatchObject({ mode: 'answered', selected: [], canReanswer: true })
-    expect(mount(miniPoll('single_choice', { allow_reanswer: true })).state()).toMatchObject({ mode: 'answered', canReanswer: true })
+    expect(element.answer).toEqual({ id: 77 })
+    expect(mount(parseStoryPoll(element)).state().mode).toBe('form')
   })
 
-  test('request bodies: story id a number, slide id always a string', () => {
-    expect(storyPollAnswerBody({ option_ids: [1] }, '39', '39_0')).toEqual({ option_ids: [1], story_id: 39, slide_id: '39_0' })
-    expect(storyPollAnswerBody({ text: 'a' }, 40, 76)).toEqual({ text: 'a', story_id: 40, slide_id: '76' })
+  test('the keys a feed needs: polls without an answer of the feed', () => {
+    const stories = [
+      {
+        id: 5,
+        slides: [
+          { id: 101, elements: [feedElement('single_choice'), feedElement('text', { answer: { text: 'a' } })] },
+          { id: '5_1', elements: [{ type: 'poll', poll_type: 'nps', poll: { code: 'q' } }] },
+        ],
+      },
+      { id: 6, slides: null },
+    ]
+    expect(storyPollStorageKeys(STORAGE, stories)).toEqual([KEY, '@PersonaClick_shop_stories_poll_device-1_nps_q_5_5_1'])
+    expect(storyPollStorageKeys({ shopId: 'shop', did: '' }, stories)).toEqual([])
+  })
+})
+
+describe('Stories polls — source of the answer (P3)', () => {
+  test('the story and the slide as the stories source, ids as strings', () => {
+    expect(storyPollSource(5, 101)).toEqual(SOURCE)
+    expect(storyPollSource('39', '39_0')).toEqual({ source_type: 'stories', source_id: '39', source_item_id: '39_0' })
+    expect(storyPollSource(5, null)).toEqual({ source_type: 'stories', source_id: '5' })
+    expect(storyPollSource(5, '')).toEqual({ source_type: 'stories', source_id: '5' })
+    expect(storyPollSource(null, 7)).toEqual({})
+    expect(storyPollSource('', 7)).toEqual({})
+  })
+
+  test('mini polls and scales send the same source and no story_id / slide_id', () => {
+    expect(storyPollAnswerBody({ option_ids: [1] }, 3, '3_0')).toEqual({ option_ids: [1], source_type: 'stories', source_id: '3', source_item_id: '3_0' })
+    expect(storyPollAnswerBody({ text: 'a' }, undefined, 76)).toEqual({ text: 'a' })
+    expect(storyPollReviewBody(scalePoll('nps'), 9, null, 3, '3_0')).toEqual({
+      channel: 'stories',
+      category: 'delivery',
+      rate: 9,
+      source_type: 'stories',
+      source_id: '3',
+      source_item_id: '3_0',
+    })
+    expect(storyPollReviewBody(scalePoll('ces'), 2, 'Долго', 3)).toEqual({
+      channel: 'stories',
+      campaign: 'delivery',
+      rate: 2,
+      comment: 'Долго',
+      source_type: 'stories',
+      source_id: '3',
+    })
+    const mini = mount(miniPoll('single_choice'), { storyId: 3, slideId: '3_0' })
+    const scale = mount(scalePoll('nps'), { storyId: 3, slideId: '3_0' })
+    mini.c.choose(1)
+    scale.c.rate(9)
+    const source = { source_type: 'stories', source_id: '3', source_item_id: '3_0' }
+    expect(mini.calls[0].args).toEqual(['gift_recipient', { option_ids: [1], ...source }])
+    expect(scale.calls[0].args).toEqual(['nps', { channel: 'stories', category: 'delivery', rate: 9, ...source }])
+  })
+})
+
+describe('Stories polls — follow-up question of the band (P2)', () => {
+  const bands = [
+    { from: 0, to: 6, question: 'Что нам улучшить?', success: 'Спасибо, мы станем лучше' },
+    { from: 7, to: 8, question: '  ', success: 'Спасибо!' },
+    { from: 9, to: 10, question: null, success: 'Спасибо, рады стараться!' },
+  ]
+  const withQuestion = (overrides = {}) => scalePoll('nps', overrides, { bands })
+
+  test('asks the question after the rate and sends the comment with the same rate', async () => {
+    const element = { ...withQuestion().element }
+    const { c, state, calls, pending, events } = mount(parseStoryPoll(element))
+    c.rate(3)
+    expect(calls[0].args).toEqual(['nps', { channel: 'stories', category: 'delivery', rate: 3, ...SOURCE }])
+    pending[0].resolve({ answer: null, results: null })
+    await tick()
+    expect(state()).toMatchObject({
+      mode: 'answered',
+      rate: 3,
+      followUp: 'Что нам улучшить?',
+      thanks: null,
+      field: 'comment',
+      comment: '',
+      commentCounter: `0/${STORY_POLL_COMMENT_LIMIT}`,
+      canSubmitComment: false,
+      commentSubmitLabel: 'Send',
+    })
+    expect(element.answer).toEqual({ rate: 3 })
+
+    c.focus(true)
+    c.setComment('  Курьер опоздал  ')
+    expect(state()).toMatchObject({ commentCounter: '18/5000', canSubmitComment: true })
+    c.submitComment()
+    expect(calls[1]).toEqual({
+      method: 'review',
+      args: ['nps', { channel: 'stories', category: 'delivery', rate: 3, comment: 'Курьер опоздал', ...SOURCE }],
+    })
+    expect(state()).toMatchObject({ sending: true, canSubmitComment: false })
+    pending[1].resolve({ answer: null, results: null })
+    await tick()
+    expect(state()).toMatchObject({ followUp: null, field: null, thanks: 'Спасибо, мы станем лучше' })
+    expect(element.answer).toEqual({ rate: 3, comment: 'Курьер опоздал' })
+    expect(JSON.parse(await AsyncStorage.getItem('@PersonaClick_shop_stories_poll_device-1_nps_delivery_5_101')).answer).toEqual({
+      rate: 3,
+      comment: 'Курьер опоздал',
+    })
+    expect(events[events.length - 1]).toBe('resume')
+  })
+
+  test('shows success right away without a question (blank or none)', async () => {
+    const passive = mount(withQuestion())
+    passive.c.rate(7)
+    passive.pending[0].resolve({})
+    await tick()
+    expect(passive.state()).toMatchObject({ followUp: null, field: null, thanks: 'Спасибо!' })
+
+    resetStoryPollAnswers()
+    const promoter = mount(withQuestion())
+    promoter.c.rate(10)
+    promoter.pending[0].resolve({})
+    await tick()
+    expect(promoter.state()).toMatchObject({ followUp: null, thanks: 'Спасибо, рады стараться!' })
+    expect(passive.calls.length + promoter.calls.length).toBe(2)
+  })
+
+  test('keeps the comment after a failed send; an empty comment is not sent', async () => {
+    const { c, state, calls, pending } = mount(withQuestion({ answer: { rate: 2, comment: null } }))
+    expect(await c.submitComment()).toBe(false)
+    c.setComment('   ')
+    expect(await c.submitComment()).toBe(false)
+    expect(calls).toHaveLength(0)
+    c.setComment('Долго')
+    c.submitComment()
+    pending[0].reject(new Error('fail'))
+    await tick()
+    expect(state()).toMatchObject({ error: true, comment: 'Долго', followUp: 'Что нам улучшить?', thanks: null, canSubmitComment: true })
+  })
+
+  test('a rate from the feed without a comment asks again (the scale takes no taps); with a comment — success', async () => {
+    const asked = mount(withQuestion({ answer: { rate: 5, comment: null } }))
+    expect(asked.state()).toMatchObject({ mode: 'answered', followUp: 'Что нам улучшить?', field: 'comment' })
+    expect(await asked.c.rate(1)).toBe(false)
+    expect(asked.calls).toHaveLength(0)
+    expect(mount(withQuestion({ answer: { rate: 5, comment: 'Долго' } })).state()).toMatchObject({
+      followUp: null,
+      field: null,
+      thanks: 'Спасибо, мы станем лучше',
+    })
+  })
+
+  test('the comment is cut at 5000 UTF-16 units', () => {
+    const { c, state } = mount(withQuestion({ answer: { rate: 1 } }))
+    c.setComment('я'.repeat(STORY_POLL_COMMENT_LIMIT + 10))
+    expect(state().comment).toHaveLength(STORY_POLL_COMMENT_LIMIT)
+    expect(state().commentCounter).toBe('5000/5000')
+  })
+
+  test('re-answering sends the new rate without a comment, so the question comes back', async () => {
+    const { c, state, calls, pending } = mount(withQuestion({ answer: { rate: 2, comment: 'Долго' }, allow_reanswer: true }))
+    expect(state()).toMatchObject({ followUp: null, canReanswer: true })
+    c.reanswer()
+    c.rate(4)
+    expect(calls[0].args[1]).not.toHaveProperty('comment')
+    pending[0].resolve({})
+    await tick()
+    expect(state()).toMatchObject({ rate: 4, followUp: 'Что нам улучшить?', canReanswer: true })
+  })
+
+  test('the follow-up button: labels > host > the built-in English "Send" of JS', () => {
+    expect(mount(withQuestion({ answer: { rate: 1 } })).state().commentSubmitLabel).toBe('Send')
+    expect(mount(withQuestion({ answer: { rate: 1 } }), { texts: { submit: 'Готово' } }).state().commentSubmitLabel).toBe('Готово')
+    const labelled = withQuestion({ answer: { rate: 1 }, labels: { submit: 'Ответить' } })
+    expect(mount(labelled, { texts: { submit: 'Готово' } }).state().commentSubmitLabel).toBe('Ответить')
+  })
+
+  test('the question of the band: trimmed, blank or none — null', () => {
+    expect(storyPollBandQuestion({ bands: [{ from: 0, to: 6, question: ' Что улучшить? ' }] }, 6)).toBe('Что улучшить?')
+    expect(storyPollBandQuestion(withQuestion(), 8)).toBeNull()
+    expect(storyPollBandQuestion(withQuestion(), 10)).toBeNull()
+    expect(storyPollBandQuestion({ bands: null }, 1)).toBeNull()
+    expect(storyPollBandQuestion(withQuestion(), null)).toBeNull()
+  })
+
+  test('the timer stays paused while the comment field is focused or the comment is sent', async () => {
+    const { c, events, pending } = mount(withQuestion({ answer: { rate: 1 } }))
+    c.focus(true)
+    c.setComment('a')
+    expect(events).toEqual(['pause'])
+    c.submitComment()
+    c.focus(false)
+    expect(events).toEqual(['pause'])
+    pending[0].resolve({})
+    await tick()
+    expect(events).toEqual(['pause', 'resume'])
+  })
+})
+
+describe('Stories polls — texts (P6, as JS DEFAULT_POLL_TEXTS)', () => {
+  test('the built-in texts are the three English constants of JS, whatever the device language', () => {
+    expect(STORY_POLL_DEFAULT_TEXTS).toEqual({ reanswer: 'Answer again', error: 'Failed to send the answer. Please try again', submit: 'Send' })
+    expect(storyPollTexts(null, null)).toEqual(STORY_POLL_DEFAULT_TEXTS)
+    expect(storyPollTexts({ submit: 'Go' }, { reanswer: 'Снова' })).toEqual({ reanswer: 'Снова', error: STORY_POLL_DEFAULT_TEXTS.error, submit: 'Go' })
+    // Язык устройства не читается: и в русской локали — английские.
+    jest.spyOn(Intl, 'DateTimeFormat').mockImplementation(() => ({ resolvedOptions: () => ({ locale: 'ru-RU' }) }))
+    expect(storyPollTexts(null, null)).toEqual(STORY_POLL_DEFAULT_TEXTS)
+  })
+
+  test('the card without host texts or labels: English texts, submit_label first for the button', () => {
+    const state = mount(miniPoll('multiple_choice', {}, { submit_label: null })).state()
+    expect(state.texts).toEqual(STORY_POLL_DEFAULT_TEXTS)
+    expect(state.submitLabel).toBe('Send')
+    expect(mount(miniPoll('multiple_choice', {}, { submit_label: 'Выбрать' })).state().submitLabel).toBe('Выбрать')
   })
 })
 
 describe('Stories polls — card view', () => {
-  test('votes: Russian forms голос / голоса / голосов, English vote / votes, grouped digits', () => {
-    const ru = (n) => storyPollVotes(n, 'ru')
-    expect([1, 2, 4, 5, 11, 12, 14, 21, 22, 25, 101, 111, 112, 1001].map(ru)).toEqual([
-      '1\u00a0голос',
-      '2\u00a0голоса',
-      '4\u00a0голоса',
-      '5\u00a0голосов',
-      '11\u00a0голосов',
-      '12\u00a0голосов',
-      '14\u00a0голосов',
-      '21\u00a0голос',
-      '22\u00a0голоса',
-      '25\u00a0голосов',
-      '101\u00a0голос',
-      '111\u00a0голосов',
-      '112\u00a0голосов',
-      '1\u00a0001\u00a0голос',
-    ])
-    expect(ru(1248)).toBe('1\u00a0248\u00a0голосов')
-    expect(ru(1234567)).toBe('1\u00a0234\u00a0567\u00a0голосов')
-    expect(storyPollVotes(1, 'en')).toBe('1\u00a0vote')
-    expect(storyPollVotes(2, 'en')).toBe('2\u00a0votes')
-    expect(storyPollVotes(1248, 'en')).toBe('1,248\u00a0votes')
-    expect(storyPollVotes(21, 'de')).toBe('21\u00a0votes')
-    expect(storyPollVotes(121.4, 'ru')).toBe('121\u00a0голос')
-  })
-
-  test('no votes, zero or not a number — no vote count', () => {
-    ;[0, -3, null, undefined, NaN, 'abc'].forEach((total) => {
-      expect(storyPollVotes(total, 'ru')).toBeNull()
-      expect(storyPollVotes(total, 'en')).toBeNull()
-    })
-  })
-
-  test('result texts in Russian and English by the device language; another language — English', () => {
-    expect(storyPollResultTexts('ru')).toMatchObject({ results: 'Результаты', thanks: 'Спасибо!', counted: 'Голос учтён' })
-    expect(storyPollResultTexts('en')).toMatchObject({ results: 'Results', thanks: 'Thanks!', counted: 'Vote counted' })
-    expect(storyPollResultTexts('de')).toBe(STORY_POLL_RESULT_TEXTS.en)
-    const spy = (locale) => jest.spyOn(Intl, 'DateTimeFormat').mockImplementation(() => ({ resolvedOptions: () => ({ locale }) }))
-    spy('ru-RU')
-    expect(storyPollLanguage()).toBe('ru')
-    jest.restoreAllMocks()
-    spy('en-US')
-    expect(storyPollLanguage()).toBe('en')
-  })
-
-  test('the total of results comes with the answered choice only', async () => {
-    expect(mount(miniPoll('single_choice')).state().total).toBeNull()
-    const fed = mount(miniPoll('multiple_choice', { answer: { option_ids: [1] }, results: { total: '7', options: [{ id: 1, percent: 100 }] } }))
-    expect(fed.state()).toMatchObject({ mode: 'answered', total: 7 })
-    expect(mount(miniPoll('single_choice', { answer: { option_ids: [1] } })).state().total).toBeNull()
-  })
-
   test('option letters A, B, C…; after Z — the number', () => {
     expect([0, 1, 2, 25, 26].map(storyPollOptionLetter)).toEqual(['A', 'B', 'C', 'Z', '27'])
   })
 
-  test('the selected scale value: the color of its band; outside the bands or no bands — none (the accent)', () => {
-    const poll = scalePoll('csat', {}, { rate_min: 1, rate_max: 5, bands: [{ from: 1, to: 2, success: 'a' }, { from: 4, to: 5, success: 'b' }] })
-    expect(storyPollScaleFill(poll, 1, 1, 5)).toBe(storyPollScaleColor('csat', 1, 1, 5))
-    expect(storyPollScaleFill(poll, 5, 1, 5)).toBe('#86EFAC')
-    expect(storyPollScaleFill(poll, 3, 1, 5)).toBeNull()
-    expect(storyPollScaleFill(scalePoll('nps', {}, { bands: null }), 9, 0, 10)).toBeNull()
-  })
-
   test('text and icons on a fill — one rule for the button, the check and the scale value: white or dark, whichever contrasts more', () => {
-    // Цвет выбора #22C55E: тёмный ≈ 9:1 против 2,3:1 у белого; пастель шкалы — тёмный; тёмные заливки — белый.
+    // Цвет выбора #22C55E: тёмный ≈ 9:1 против 2,3:1 у белого; Danger кита — белый, Warning — тёмный.
     expect(storyPollTextOn('#22C55E')).toBe('dark')
-    expect(['#FCA5A5', '#FDBA74', '#FCD34D', '#FDE68A', '#86EFAC'].map(storyPollTextOn)).toEqual(['dark', 'dark', 'dark', 'dark', 'dark'])
+    expect(storyPollTextOn('#E51919')).toBe('light')
+    expect(storyPollTextOn('#F37A17')).toBe('dark')
     expect(['#000000', '#0F3D2A', '#DC2626'].map(storyPollTextOn)).toEqual(['light', 'light', 'light'])
     // Синий кита #007DF2 (≈ 0,21) — уже тёмный: 5,2:1 против 4,0:1.
     expect(storyPollTextOn('#007DF2')).toBe('dark')
@@ -839,6 +1120,32 @@ describe('Stories polls — card view', () => {
     expect(storyPollTextOn('#767676')).toBe('dark')
     expect(storyPollTextOn('#757575')).toBe('light')
     expect(storyPollTextOn('red')).toBe('dark')
+  })
+
+  test('the top of the card as JS #277: y_offset % of the slide, lifted 16 above its bottom, never above its top', () => {
+    expect(storyPollFittedTop(50, 800, 300)).toBe(400)
+    expect(storyPollFittedTop(50, 800, 0)).toBe(400)
+    expect(storyPollFittedTop(80, 800, 400)).toBe(800 - 400 - 16)
+    expect(storyPollFittedTop(60, 300, 400)).toBe(0)
+    expect(storyPollFittedTop(140, 800, 0)).toBe(800)
+    expect(storyPollFittedTop(-10, 800, 100)).toBe(0)
+    // Безопасная зона: не под вырезом и не под полоской «домой».
+    const insets = { top: 50, bottom: 34 }
+    expect(storyPollFittedTop(0, 800, 100, insets)).toBe(50)
+    expect(storyPollFittedTop(90, 800, 100, insets)).toBe(800 - 34 - 100 - 16)
+    expect(storyPollFittedTop(50, 800, 900, insets)).toBe(50)
+    // Нижний ряд (звук, «товары») виден — низ карточки на 16 над ним, а не над низом зоны.
+    expect(storyPollFittedTop(90, 800, 100, insets, 16, 700)).toBe(700 - 100 - 16)
+    expect(storyPollFittedTop(10, 800, 100, insets, 16, 700)).toBe(80)
+    expect(storyPollFittedTop(50, 800, 900, insets, 16, 700)).toBe(50)
+    expect(storyPollLowerEdge(800, insets, null)).toBe(800 - 34)
+    expect(storyPollLowerEdge(800, insets, 700)).toBe(700)
+    expect(storyPollLowerEdge(800, insets, 10)).toBe(50)
+  })
+
+  test('the card keeps 16 from the sides and is at most 420 wide', () => {
+    expect(STORY_POLL_STYLE.sideMargin).toBe(16)
+    expect(STORY_POLL_STYLE.maxWidth).toBe(420)
   })
 })
 

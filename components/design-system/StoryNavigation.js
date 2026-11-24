@@ -16,6 +16,9 @@ import { storyIconRenderer } from './storyIcons'
  * Над фотографией шапка светлая сама: просмотрщик рисует такие слайды тёмной схемой.
  * Крестик рисует `renderIcon` хоста, а без него — встроенная иконка (storyIcons).
  *
+ * Касания берут только кнопки: пустые места колонки и строки и сами полоски пропускают касание
+ * к тому, что под шапкой (слайду, карточке опроса, которую шапка накрывает).
+ *
  * С `onShare` слева от крестика (зазор 8) — кнопка «Поделиться» того же вида: коробка 32 без
  * фона, иконка share, Text/Secondary 65 %. `onShare(anchor)` получает тег кнопки — к ней
  * привязывается поповер системного окна на iPad. Касание кнопок забирают они сами, слайд его
@@ -41,9 +44,11 @@ export default function StoryNavigation({
   const icon = storyIconRenderer(renderIcon)
   const shareButton = useRef(null)
   return (
-    <View style={[styles.column, style]}>
-      <StoryProgress count={count} current={current} progress={progress} />
-      <View style={styles.row}>
+    <View style={[styles.column, style]} pointerEvents="box-none">
+      <View pointerEvents="none">
+        <StoryProgress count={count} current={current} progress={progress} />
+      </View>
+      <View style={styles.row} pointerEvents="box-none">
         {onShare ? (
           <Pressable
             ref={shareButton}

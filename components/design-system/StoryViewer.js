@@ -22,11 +22,12 @@ import ToastPresenter from './ToastPresenter'
 import StorySlide from './StorySlide'
 import {
   isMediaSlide,
+  isSkippedSlide,
   isVideoSlide,
   slideProduct,
   storyShareTarget,
   storyShareUrl,
-  storyStartSlide,
+  storySlideScheme,
   withoutProps,
 } from './storySupport'
 import {
@@ -50,7 +51,9 @@ import {
   storyDragKind,
   storyGestureOutcome,
   storyPlayerPosition,
+  storyEntrySlide,
   storyPlayerShouldPlay,
+  storyShownSlide,
   storyViewerReducer,
 } from './storyViewerState'
 
@@ -71,7 +74,8 @@ import {
  * - Касание (B1): левая треть — назад, правая — вперёд, середина — ничего; в RTL края
  *   зеркальны. Удержание от 200 мс (B2) и перетаскивание (B4) ставят паузу, отпускание её снимает
  *   и никогда не листает. Вниз дальше 120 или быстрее 800 в секунду — закрыть; вбок — соседняя
- *   сторис. Назад на первом слайде первой сторис — слайд с нуля, вперёд на последнем — закрыть (B3).
+ *   сторис. Назад на первом слайде первой сторис — слайд с нуля (у сторис v3 — закрыть, как в JS SDK),
+ *   вперёд на последнем — закрыть (B3).
  *   Перезапуск не трекает показ и не грузит медиа заново: прогресс с нуля, видео — к нулю (F3).
  * - Шторка товаров (B5): тап вне её (и по кнопкам слайда) только закрывает её, слайды при ней не
  *   листаются, «назад» Android сперва закрывает её; смена слайда её сбрасывает. Крестик закрывает
@@ -83,7 +87,9 @@ import {
  *   10 с или ошибка — «Повторить», видео повторяет само через 15 с. В фоне оба срока стоят и потом
  *   идут с остатка (F5).
  * - Звук (C7): без звука при первом открытии в процессе, выбор помнится до конца процесса;
- *   громкость «вверх» включает звук (react-native-volume-manager, если есть).
+ *   громкость «вверх» включает звук (react-native-volume-manager, если есть). У сторис v3 — своё
+ *   состояние (R9): выбор кнопки звука помнится на устройстве по магазину, громкость «вверх» включает
+ *   звук только в этом просмотре.
  * - «Поделиться»: кнопка в шапке, если у слайда есть ссылка (`storyShareUrl`, API v3). Нажатие —
  *   своя причина паузы, `onShare` сразу (до результата), системное окно с одной ссылкой (через
  *   `shareUrlTransform` хоста, если он есть; `onShare` получает исходную); окно закрыто — пауза
@@ -92,6 +98,15 @@ import {
  * - Опросы (элемент `poll`, API v3): только с `pollTransport` — его даёт виджет, сам просмотр в
  *   сеть не ходит. Карточка держит слайд своей причиной паузы (палец, фокус в поле, отправка), её
  *   касания слайду не достаются; пока в её поле фокус, тап мимо карточки только прячет клавиатуру.
+ * - `v3` — сторис из ленты API v3, поведение как у JS SDK: медиа по `type` (R6), `background_color`
+ *   красит любой слайд (R2), текст-блоки по R4, шапка `header` (R1), старт сторис — `start_position`
+ *   или слайд, где из неё ушли в этом сеансе (`positions`, R8), выбор кнопки звука помнится на
+ *   устройстве по магазину (`pollShopId`), кнопки звука нет, только когда звука у видео точно нет (R9);
+ *   слайд без медиа и без товара пропускается (`isSkippedSlide`): вперёд его проходят, назад через него
+ *   переступают, сторис из одних таких проходится насквозь и считается досмотренной; пустой просмотр не
+ *   показывается. Назад на первом слайде первой сторис — закрыть, как в JS SDK. Перезапуск слайда
+ *   (только у старой ленты) — `onSlideRestart`, уход из сторис вперёд — `onStoryLeave(story, completed)`
+ *   (R8).
  *
  * Пропсы v3 (`STORY_VIEWER_V3_PROPS`: «Поделиться» и опросы) принимает только этот компонент — его
  * экспортирует шлюз internal/v3. Кит экспортирует KitStoryViewer: он их отбрасывает и выключает
@@ -135,6 +150,12 @@ export default function StoryViewer({
   pollErrorText,
   pollTransport,
   pollShopId = '',
+  pollDeviceId = '',
+  v3 = false,
+  positions,
+  onSlideRestart,
+  onStoryLeave,
+  onHeaderPress,
   insets,
   renderIcon,
   // Внутреннее: `false` — без «Поделиться», даже у слайдов со ссылкой (просмотр кита).
@@ -148,9 +169,10 @@ export default function StoryViewer({
 
   // Данные для действий берутся из ref: колбэки жестов и таймеров создаются один раз.
   const data = useRef({ stories, seen })
-  data.current = { stories, seen: seen || EMPTY_SEEN }
+  data.current = { stories, seen: seen || EMPTY_SEEN, v3: !!v3, positions: positions || null }
   const dispatch = useCallback((action) => {
-    rawDispatch({ ...action, stories: data.current.stories, seen: data.current.seen, canPlayVideo: !!storyVideoComponent() })
+    const { stories: list, seen: viewed, v3: fromV3, positions: places } = data.current
+    rawDispatch({ ...action, stories: list, seen: viewed, v3: fromV3, positions: places, canPlayVideo: !!storyVideoComponent() })
   }, [])
 
   // Открытие — по фронту `visible`; закрытие хостом — сброс. Новая сторис или новый запрос
@@ -173,16 +195,22 @@ export default function StoryViewer({
   const story = state.open ? stories[state.story] : null
   const slide = story?.slides?.[state.slide] || null
 
-  const [muted, setMuted] = useState(storySoundMuted)
-  const setSound = useCallback((value) => {
-    rememberStorySoundMuted(value)
-    setMuted(value)
-  }, [])
+  // Звук: у сторис v3 — своё состояние, выбор кнопки магазина на устройстве (R9); у старой ленты — в
+  // этом запуске (C7).
+  const soundShop = v3 ? String(pollShopId || '') : undefined
+  const [muted, setMuted] = useState(() => storySoundMuted(soundShop))
+  const setSound = useCallback(
+    (value) => {
+      rememberStorySoundMuted(value, soundShop)
+      setMuted(value)
+    },
+    [soundShop],
+  )
 
-  // Каждое открытие — со звуком, который пользователь оставил в этом запуске (C7).
+  // Каждое открытие — со звуком, который пользователь оставил (C7, R9).
   useEffect(() => {
-    if (visible) setMuted(storySoundMuted())
-  }, [visible])
+    if (visible) setMuted(storySoundMuted(soundShop))
+  }, [visible, soundShop])
 
   // Просмотр решил закрыться сам — хост убирает его.
   useEffect(() => {
@@ -190,11 +218,38 @@ export default function StoryViewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, state.closing])
 
+  // Слайд сторис v3 без медиа и без товара пропускается, как в JS SDK, без `view`: просмотр на него не
+  // встаёт (storyViewerState); оказался на нём (ленту подменили) — сразу дальше.
+  const skipped = isSkippedSlide(slide, v3)
+  useEffect(() => {
+    if (visible && state.open && skipped) dispatch({ type: 'ended' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, state.open, state.entry, skipped])
+
   // Слайд стал текущим (A1): трекинг `view` и отметка «видел» у хоста.
   useEffect(() => {
-    if (visible && state.open && story && slide && onSlideView) onSlideView(story, slide)
+    if (visible && state.open && story && slide && !skipped && onSlideView) onSlideView(story, slide)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, state.open, state.entry])
+
+  // Перезапуск слайда (B3): у сторис v3 — тоже показ, `view` уходит снова (F4).
+  useEffect(() => {
+    if (state.restart && visible && state.open && story && slide && onSlideRestart) onSlideRestart(story, slide)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.restart])
+
+  // Ушли из сторис вперёд (R8): хост отмечает её просмотренной в этом сеансе — каждую, и пройденные
+  // насквозь (в них показать нечего), по порядку.
+  const leftSeen = useRef(0)
+  useEffect(() => {
+    const entries = (state.left || []).filter((entry) => entry.seq > leftSeen.current)
+    leftSeen.current = Math.max(leftSeen.current, state.leave)
+    entries.forEach((entry) => {
+      const left = stories[entry.story]
+      if (left && onStoryLeave) onStoryLeave(left, entry.completed)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.leave])
 
   // Пауза хоста (`pause()` / `resume()` виджета, B8).
   useEffect(() => {
@@ -230,6 +285,12 @@ export default function StoryViewer({
   }
   const shareUrl = withShare ? storyShareUrl(story, slide) : null
 
+  // Сохранённые ответы опросов: по магазину и устройству; без `did` не читаются и не пишутся.
+  const pollStorage = useMemo(
+    () => (pollShopId && pollDeviceId ? { shopId: String(pollShopId), did: String(pollDeviceId) } : null),
+    [pollShopId, pollDeviceId],
+  )
+
   // Опросы: пауза `POLL` — пока карточку держат; фокус в её поле — тап мимо только прячет
   // клавиатуру. Новый слайд (или его новая загрузка) — карточки новые, фокуса нет.
   const pollFocus = useRef(false)
@@ -255,16 +316,17 @@ export default function StoryViewer({
     dispatch({ type: 'back' })
   }
 
-  // Громкость «вверх» включает звук (C7).
+  // Громкость «вверх» включает звук (C7). У сторис v3 — только в этом просмотре: сохраняется лишь
+  // выбор кнопки звука (R9), следующее открытие — с ним.
   useEffect(() => {
     if (!visible) return undefined
-    return listenVolumeUp(() => setSound(false))
-  }, [visible, setSound])
+    return listenVolumeUp(() => (v3 ? setMuted(false) : setSound(false)))
+  }, [visible, setSound, v3])
 
   // Медиа не готово за 10 с — ошибка и «Повторить» (C5). Видео, которое не загрузилось, повторяет
   // само через 15 с; уход со слайда это отменяет. В фоне оба срока стоят и потом идут с остатка (F5).
   const background = state.pauses.includes(STORY_PAUSE.BACKGROUND)
-  const videoSlide = isVideoSlide(slide)
+  const videoSlide = isVideoSlide(slide, v3)
   useFreezableTimeout(
     visible && state.open && state.media === 'loading',
     state.load,
@@ -283,8 +345,8 @@ export default function StoryViewer({
   // Следующий слайд — заранее в кэш картинок (C6): фон, превью видео или фото товара.
   useEffect(() => {
     if (!visible || !state.open) return
-    const upcoming = upcomingSlide(stories, data.current.seen, state.story, state.slide)
-    prefetchUris(upcoming).forEach((uri) => {
+    const upcoming = upcomingSlide(stories, data.current, state.story, state.slide)
+    prefetchUris(upcoming, data.current.v3).forEach((uri) => {
       try {
         Promise.resolve(Image.prefetch(uri)).catch(() => {})
       } catch (error) {
@@ -363,7 +425,9 @@ export default function StoryViewer({
       g.dragging = false
       g.keyboard = false
       if (outcome && outcome.type === 'close') {
-        Animated.timing(translateY, { toValue: size.current.height, duration: 200, useNativeDriver: true }).start(() =>
+        // Закрытие свайпом: слайд уезжает в сторону свайпа (вверх — у сторис v3, как JS SDK).
+        const toValue = outcome.up ? -size.current.height : size.current.height
+        Animated.timing(translateY, { toValue, duration: 200, useNativeDriver: true }).start(() =>
           dispatch({ type: 'close' }),
         )
         return
@@ -422,6 +486,7 @@ export default function StoryViewer({
               held: gesture.current.held,
               rtl: I18nManager.isRTL,
               sheetOpen: stateRef.current.sheetOpen,
+              v3: data.current.v3,
             }),
           )
         },
@@ -454,7 +519,8 @@ export default function StoryViewer({
   const bottom = insets ? insets.bottom || 0 : Platform.OS === 'android' ? androidBottomInset(rootHeight) : measured.bottom
   const slideInsets = useMemo(() => ({ top, bottom }), [top, bottom])
   const scheme = useColorScheme()
-  const lightChrome = isMediaSlide(slide) || scheme === 'dark'
+  const slideScheme = storySlideScheme(slide, v3)
+  const lightChrome = slideScheme ? slideScheme === 'dark' : scheme === 'dark'
 
   const texts = useMemo(
     () => ({
@@ -490,7 +556,7 @@ export default function StoryViewer({
   )
 
   const frame =
-    story && slide ? (
+    story && slide && !skipped ? (
       <StorySlide
         key={`${story.id}:${slide.id}:${state.slide}:${state.load}`}
         slide={slide}
@@ -521,8 +587,10 @@ export default function StoryViewer({
         texts={texts}
         renderIcon={renderIcon}
         storyId={story.id}
+        v3={!!v3}
+        onHeaderPress={onHeaderPress ? (element) => onHeaderPress(story, slide, element) : undefined}
         pollTransport={pollTransport}
-        pollShopId={pollShopId}
+        pollStorage={pollStorage}
         onPollHold={onPollHold}
         onPollFocus={onPollFocus}
       />
@@ -549,8 +617,10 @@ export default function StoryViewer({
     ) : null
 
   return (
+    // Модалка — только с открытым слайдом: просмотр, которому показать нечего (сторис из одних
+    // пропущенных слайдов), закрывается, так и не показав пустой чёрный экран.
     <Modal
-      visible={visible}
+      visible={visible && state.open}
       transparent
       animationType="fade"
       statusBarTranslucent
@@ -581,6 +651,12 @@ export const STORY_VIEWER_V3_PROPS = [
   'shareUrlTransform',
   'pollTransport',
   'pollShopId',
+  'pollDeviceId',
+  'v3',
+  'positions',
+  'onSlideRestart',
+  'onStoryLeave',
+  'onHeaderPress',
   'pollReanswerText',
   'pollSubmitText',
   'pollErrorText',
@@ -640,22 +716,28 @@ function androidBottomInset(rootHeight) {
   return Math.max(0, Math.round(screen.height - window.height - (StatusBar.currentHeight || 0)))
 }
 
-/** Слайд, который покажется следующим: следующий в сторис или стартовый в следующей (A4). */
-function upcomingSlide(stories, seen, storyIndex, slideIndex) {
+/**
+ * Слайд, который покажется следующим: следующий показанный в сторис или стартовый (показанный) в
+ * следующей (A4, R8); пропущенные слайды сторис v3 не в счёт.
+ */
+function upcomingSlide(stories, context, storyIndex, slideIndex) {
   const story = stories[storyIndex]
-  const nextInStory = story?.slides?.[slideIndex + 1]
-  if (nextInStory) return nextInStory
-  const nextStory = stories.slice(storyIndex + 1).find((item) => item?.slides?.length)
-  if (!nextStory) return null
-  return nextStory.slides[storyStartSlide(nextStory, seen[String(nextStory.id)])] || null
+  const nextInStory = storyShownSlide(story, slideIndex + 1, 1, context.v3)
+  if (nextInStory >= 0) return story.slides[nextInStory]
+  for (const item of stories.slice(storyIndex + 1)) {
+    if (!item?.slides?.length) continue
+    const index = storyShownSlide(item, storyEntrySlide(item, context), 1, context.v3)
+    if (index >= 0) return item.slides[index]
+  }
+  return null
 }
 
 /** Картинки слайда для кэша: фон (у видео — превью, F9) и фото товара. */
-function prefetchUris(slide) {
+function prefetchUris(slide, v3) {
   if (!slide) return []
   const product = slideProduct(slide)
   const uris = [
-    isVideoSlide(slide) ? slide.preview : isMediaSlide(slide) ? slide.background : null,
+    isVideoSlide(slide, v3) ? slide.preview : isMediaSlide(slide, v3) ? slide.background : null,
     product ? product.image_url_resized?.['520'] || product.image_url || product.picture : null,
   ]
   return uris.filter((uri) => typeof uri === 'string' && uri.trim().length > 0)
